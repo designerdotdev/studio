@@ -1,0 +1,13 @@
+{
+    "name": "designer/studio",
+    "description": "Designer Dev Studio",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Tony Lea",
+            "email": "tony@devdojo.com"
+        }
+    ],
+    "require": {}
+}
