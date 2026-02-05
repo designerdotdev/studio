@@ -87,7 +87,7 @@
 
             <div
                 data-component="{{ $component['id'] }}"
-                x-on:click="selectComponent({{ $component['id'] }}, $event)"
+                x-on:click="selectComponent('{{ $component['id'] }}', $event)"
             >{!! $renderedHtml !!}</div>
         @endforeach
     </div>
