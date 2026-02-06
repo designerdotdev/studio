@@ -1,5 +1,6 @@
 <?php
 
+use Designer\Studio\Http\Controllers\AssetController;
 use Designer\Studio\Http\Controllers\StudioController;
 use Illuminate\Support\Facades\Route;
 
@@ -8,6 +9,9 @@ Route::group([
     'middleware' => config('studio.middleware', ['web']),
     'as' => 'studio.',
 ], function () {
+    // Package assets
+    Route::get('/assets/{file}', AssetController::class)->name('assets');
+
     // Dashboard - list all pages
     Route::get('/', [StudioController::class, 'index'])->name('index');
 
