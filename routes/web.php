@@ -4,7 +4,7 @@ use Designer\Studio\Http\Controllers\StudioController;
 use Illuminate\Support\Facades\Route;
 
 Route::group([
-    'prefix' => config('studio.path', 'designer/studio'),
+    'prefix' => config('studio.path', 'studio'),
     'middleware' => config('studio.middleware', ['web']),
     'as' => 'studio.',
 ], function () {

@@ -11,7 +11,7 @@ return [
     | 'admin/studio', Studio will be available at /admin/studio.
     |
     */
-    'path' => 'designer/studio',
+    'path' => 'studio',
 
     /*
     |--------------------------------------------------------------------------
@@ -34,7 +34,7 @@ return [
     | in the storage directory to keep it separate from your application code.
     |
     */
-    'storage_path' => storage_path('designer-studio'),
+    'storage_path' => storage_path('studio'),
 
     /*
     |--------------------------------------------------------------------------

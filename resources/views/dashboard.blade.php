@@ -43,7 +43,7 @@
             if (!confirm('Are you sure you want to delete this page?')) return;
 
             try {
-                const response = await fetch('{{ url(config('studio.path', 'designer/studio')) }}/api/pages/' + slug, {
+                const response = await fetch('{{ url(config('studio.path', 'studio')) }}/api/pages/' + slug, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,

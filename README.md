@@ -40,7 +40,7 @@ composer require designer/studio
 
 2. **Visit the studio**:
    ```
-   http://your-app.test/designer/studio
+   http://your-app.test/studio
    ```
 
 3. **Edit a page** by clicking on it in the dashboard
@@ -60,13 +60,13 @@ php artisan vendor:publish --tag=studio-config
 ```php
 return [
     // Route prefix (e.g., 'admin/studio' → /admin/studio)
-    'path' => 'designer/studio',
+    'path' => 'studio',
 
     // Middleware for studio routes
     'middleware' => ['web'],
 
     // Where JSON data is stored
-    'storage_path' => storage_path('designer-studio'),
+    'storage_path' => storage_path('studio'),
 
     // Where generated Blade files go
     'output_path' => resource_path('views/designer'),
@@ -80,10 +80,10 @@ return [
 
 ### Storage
 
-All data is stored as JSON files in `storage/designer-studio/`:
+All data is stored as JSON files in `storage/studio/`:
 
 ```
-storage/designer-studio/
+storage/studio/
 ├── pages/
 │   ├── home.json
 │   └── about.json
