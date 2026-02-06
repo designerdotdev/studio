@@ -11,7 +11,7 @@ class StudioStorage
 
     public function __construct()
     {
-        $this->basePath = config('studio.storage_path', storage_path('designer-studio'));
+        $this->basePath = config('studio.storage_path', storage_path('studio'));
     }
 
     public function ensureDirectoryExists(string $subPath = ''): string

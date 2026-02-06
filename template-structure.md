@@ -92,7 +92,7 @@ s3://designer-templates/
 ### Local Cache (Runtime)
 
 ```
-storage/designer-studio/
+storage/studio/
 ├── components/
 │   ├── library/                   # User-created components
 │   └── remote-cache/              # Downloaded from S3
@@ -138,7 +138,7 @@ Responsibilities:
 
     // Caching
     'cache' => [
-        'path' => storage_path('designer-studio/components/remote-cache'),
+        'path' => storage_path('studio/components/remote-cache'),
         'manifest_ttl' => 3600,      // Re-fetch manifest hourly
         'template_ttl' => 86400,     // Cache templates for 24h
     ],

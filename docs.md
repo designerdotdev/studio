@@ -24,7 +24,7 @@ A JSON-based visual page builder for Laravel applications that generates static 
 
 Designer Studio uses a **stateless, JSON-based architecture** with no database storage. Key architectural principles:
 
-- **JSON File Storage**: Pages and components stored as JSON in `storage/designer-studio/`
+- **JSON File Storage**: Pages and components stored as JSON in `storage/studio/`
 - **Immutable DTOs**: Data Transfer Objects with readonly properties for type safety
 - **Singleton Services**: Core services registered as singletons via the service provider
 - **postMessage API**: Secure iframe-parent communication
@@ -88,7 +88,7 @@ routes/web.php                         # Route definitions
 ### Storage Structure
 
 ```
-storage/designer-studio/
+storage/studio/
 ├── pages/
 │   ├── home.json
 │   └── about.json
@@ -476,7 +476,7 @@ Low-level file system abstraction for JSON storage.
 
 ```php
 // Configuration
-$basePath = config('studio.storage_path'); // storage/designer-studio/
+$basePath = config('studio.storage_path'); // storage/studio/
 
 // Methods
 $storage->read('pages/home.json');           // Returns array or null
@@ -658,13 +658,13 @@ class ComponentData
 ```php
 return [
     // Route prefix for studio access
-    'path' => 'designer/studio',
+    'path' => 'studio',
 
     // Middleware applied to all routes
     'middleware' => ['web'],
 
     // JSON storage location
-    'storage_path' => storage_path('designer-studio'),
+    'storage_path' => storage_path('studio'),
 
     // Generated Blade output directory
     'output_path' => resource_path('views/designer'),
@@ -825,7 +825,7 @@ Here's the full event chain when a user edits a component variable:
 }
 ```
 
-Save to `storage/designer-studio/components/library/my-component.json`
+Save to `storage/studio/components/library/my-component.json`
 
 ### Adding a New postMessage Type
 
