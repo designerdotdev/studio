@@ -1,0 +1,13 @@
+{
+  "resources/css/studio.css": {
+    "file": "studio-css.css",
+    "src": "resources/css/studio.css",
+    "isEntry": true
+  },
+  "resources/js/studio.js": {
+    "file": "studio.js",
+    "name": "studio",
+    "src": "resources/js/studio.js",
+    "isEntry": true
+  }
+}
