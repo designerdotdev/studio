@@ -7,6 +7,7 @@ use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\BladeGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Artisan;
 
 class StudioController extends Controller
 {
@@ -20,13 +21,9 @@ class StudioController extends Controller
     {
         $pages = $this->pages->all();
 
-        // Create default page if none exist
+        // Seed sample data if no pages exist
         if ($pages->isEmpty()) {
-            $this->pages->create([
-                'slug' => 'home',
-                'title' => 'Home',
-                'description' => 'Your home page',
-            ]);
+            Artisan::call('studio:seed');
             $pages = $this->pages->all();
         }
 
