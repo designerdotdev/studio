@@ -2,19 +2,20 @@
 
 namespace Designer\Studio\Http\Controllers;
 
+use Designer\Studio\Services\SampleDataSeeder;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\BladeGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Artisan;
 
 class StudioController extends Controller
 {
     public function __construct(
         protected PageRepository $pages,
         protected ComponentRepository $components,
-        protected BladeGenerator $generator
+        protected BladeGenerator $generator,
+        protected SampleDataSeeder $seeder
     ) {}
 
     public function index()
@@ -23,7 +24,7 @@ class StudioController extends Controller
 
         // Seed sample data if no pages exist
         if ($pages->isEmpty()) {
-            Artisan::call('studio:seed');
+            $this->seeder->seed();
             $pages = $this->pages->all();
         }
 
