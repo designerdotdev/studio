@@ -77,7 +77,7 @@ class StudioController extends Controller
         }
 
         $components = [];
-        $variables = [];
+        $componentVariables = [];
 
         foreach ($page->components as $instance) {
             $component = $this->components->find($instance['component_ref']);
@@ -88,10 +88,12 @@ class StudioController extends Controller
                     'order' => $instance['order'],
                 ];
 
-                // Merge instance variables with field defaults
+                // Build per-component variables
+                $vars = [];
                 foreach ($component->fields as $key => $config) {
-                    $variables[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
+                    $vars[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
                 }
+                $componentVariables[$instance['id']] = $vars;
             }
         }
 
@@ -100,7 +102,7 @@ class StudioController extends Controller
 
         return view('studio::iframe', [
             'components' => $components,
-            'variables' => $variables,
+            'componentVariables' => $componentVariables,
         ]);
     }
 

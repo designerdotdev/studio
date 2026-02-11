@@ -6,7 +6,7 @@
 
     <div
         x-data="{
-            variables: {{ Js::from($variables) }},
+            componentVariables: {{ Js::from($componentVariables) }},
             selectedComponentId: null,
             templates: window.__componentTemplates,
 
@@ -44,9 +44,22 @@
                 }, '*');
             },
 
-            updateVariables(newVariables) {
-                this.variables = { ...this.variables, ...newVariables };
-                this.renderComponents();
+            updateVariables(componentId, newVariables) {
+                if (this.componentVariables[componentId]) {
+                    this.componentVariables[componentId] = { ...this.componentVariables[componentId], ...newVariables };
+                }
+                this.renderComponent(componentId);
+            },
+
+            renderComponent(componentId) {
+                const el = document.querySelector('[data-component=\'' + componentId + '\']');
+                if (!el) return;
+
+                const template = this.templates[componentId];
+                const vars = this.componentVariables[componentId] || {};
+                if (template && typeof blade !== 'undefined') {
+                    el.innerHTML = blade.renderBladeTemplate(template, vars);
+                }
             },
 
             renderComponents() {
@@ -55,8 +68,9 @@
                 document.querySelectorAll('[data-component]').forEach(el => {
                     const componentId = el.dataset.component;
                     const template = this.templates[componentId];
+                    const vars = this.componentVariables[componentId] || {};
                     if (template && typeof blade !== 'undefined') {
-                        el.innerHTML = blade.renderBladeTemplate(template, this.variables);
+                        el.innerHTML = blade.renderBladeTemplate(template, vars);
                     }
                 });
 
@@ -73,7 +87,7 @@
                 // Listen for messages from parent
                 window.addEventListener('message', (event) => {
                     if (event.data.type === 'update-variables') {
-                        this.updateVariables(event.data.variables);
+                        this.updateVariables(event.data.componentId, event.data.variables);
                     }
                 });
             }
@@ -82,7 +96,7 @@
     >
         @foreach($components as $component)
             @php
-                $renderedHtml = \Illuminate\Support\Facades\Blade::render($component['html'], $variables);
+                $renderedHtml = \Illuminate\Support\Facades\Blade::render($component['html'], $componentVariables[$component['id']] ?? []);
             @endphp
 
             <div
