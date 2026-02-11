@@ -22,7 +22,7 @@
                 }
             }
         }"
-        x-on:variable-updated.window="sendToIframe('update-variables', { variables: $event.detail.variables })"
+        x-on:variable-updated.window="sendToIframe('update-variables', { componentId: $event.detail.componentId, variables: $event.detail.variables })"
         class="w-full h-screen"
     >
         <iframe
