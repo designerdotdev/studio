@@ -12,11 +12,10 @@ Route::group([
     // Package assets
     Route::get('/assets/{file}', AssetController::class)->name('assets');
 
-    // Dashboard - list all pages
+    // Studio editor (single route)
     Route::get('/', [StudioController::class, 'index'])->name('index');
 
-    // Page editor
-    Route::get('/page/{slug}', [StudioController::class, 'edit'])->name('page.edit');
+    // Iframe preview for pages
     Route::get('/page/{slug}/iframe', [StudioController::class, 'iframe'])->name('page.iframe');
 
     // API endpoints

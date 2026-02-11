@@ -18,7 +18,7 @@ class StudioController extends Controller
         protected SampleDataSeeder $seeder
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $pages = $this->pages->all();
 
@@ -28,15 +28,14 @@ class StudioController extends Controller
             $pages = $this->pages->all();
         }
 
-        return view('studio::dashboard', [
-            'pages' => $pages,
-            'componentLibrary' => $this->components->all(),
-        ]);
-    }
+        // Load the requested page or fall back to the first page
+        $slug = $request->query('page', $pages->first()?->slug);
+        $page = $slug ? $this->pages->find($slug) : null;
 
-    public function edit(string $slug)
-    {
-        $page = $this->pages->find($slug);
+        // If page not found, fall back to first page
+        if (!$page && $pages->isNotEmpty()) {
+            $page = $pages->first();
+        }
 
         if (!$page) {
             abort(404);
@@ -63,6 +62,7 @@ class StudioController extends Controller
 
         return view('studio::home', [
             'page' => $page,
+            'pages' => $pages,
             'components' => $componentsData,
             'componentLibrary' => $this->components->all(),
         ]);
