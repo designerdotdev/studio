@@ -1,0 +1,30 @@
+name: hero-basic
+title: Basic Hero Section
+description: A simple hero with title, subtitle, and optional CTA
+category: heroes
+tags:
+    - hero
+    - landing
+    - header
+
+fields:
+    title:
+        type: text
+        label: Title
+        default: Welcome
+        required: true
+
+    subtitle:
+        type: textarea
+        label: Subtitle
+        default: Your subtitle here
+
+    cta_text:
+        type: text
+        label: Button Text
+        default: ""
+
+    cta_link:
+        type: text
+        label: Button Link
+        default: "#"
