@@ -2,6 +2,7 @@
 
 namespace Designer\Studio\Http\Controllers;
 
+use Designer\Studio\Services\SampleDataSeeder;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\BladeGenerator;
@@ -13,32 +14,28 @@ class StudioController extends Controller
     public function __construct(
         protected PageRepository $pages,
         protected ComponentRepository $components,
-        protected BladeGenerator $generator
+        protected BladeGenerator $generator,
+        protected SampleDataSeeder $seeder
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $pages = $this->pages->all();
 
-        // Create default page if none exist
+        // Seed sample data if no pages exist
         if ($pages->isEmpty()) {
-            $this->pages->create([
-                'slug' => 'home',
-                'title' => 'Home',
-                'description' => 'Your home page',
-            ]);
+            $this->seeder->seed();
             $pages = $this->pages->all();
         }
 
-        return view('studio::dashboard', [
-            'pages' => $pages,
-            'componentLibrary' => $this->components->all(),
-        ]);
-    }
+        // Load the requested page or fall back to the first page
+        $slug = $request->query('page', $pages->first()?->slug);
+        $page = $slug ? $this->pages->find($slug) : null;
 
-    public function edit(string $slug)
-    {
-        $page = $this->pages->find($slug);
+        // If page not found, fall back to first page
+        if (!$page && $pages->isNotEmpty()) {
+            $page = $pages->first();
+        }
 
         if (!$page) {
             abort(404);
@@ -65,6 +62,7 @@ class StudioController extends Controller
 
         return view('studio::home', [
             'page' => $page,
+            'pages' => $pages,
             'components' => $componentsData,
             'componentLibrary' => $this->components->all(),
         ]);
@@ -79,7 +77,7 @@ class StudioController extends Controller
         }
 
         $components = [];
-        $variables = [];
+        $componentVariables = [];
 
         foreach ($page->components as $instance) {
             $component = $this->components->find($instance['component_ref']);
@@ -90,10 +88,12 @@ class StudioController extends Controller
                     'order' => $instance['order'],
                 ];
 
-                // Merge instance variables with field defaults
+                // Build per-component variables
+                $vars = [];
                 foreach ($component->fields as $key => $config) {
-                    $variables[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
+                    $vars[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
                 }
+                $componentVariables[$instance['id']] = $vars;
             }
         }
 
@@ -102,7 +102,7 @@ class StudioController extends Controller
 
         return view('studio::iframe', [
             'components' => $components,
-            'variables' => $variables,
+            'componentVariables' => $componentVariables,
         ]);
     }
 

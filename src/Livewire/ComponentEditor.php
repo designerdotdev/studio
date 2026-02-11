@@ -23,21 +23,21 @@ class ComponentEditor extends Component
         $this->components = $components;
         $this->pageSlug = $pageSlug;
 
-        // Initialize variables with values from all components
-        foreach ($components as $component) {
-            // Use instance variables or fall back to field defaults
-            if (!empty($component['variables'])) {
-                foreach ($component['variables'] as $key => $value) {
-                    $this->variables[$key] = $value;
+        // Initialize variables per component instance
+        foreach ($components as $id => $component) {
+            $this->variables[$id] = [];
+
+            // Fill defaults first
+            if (!empty($component['fields'])) {
+                foreach ($component['fields'] as $key => $config) {
+                    $this->variables[$id][$key] = $config['default'] ?? '';
                 }
             }
 
-            // Fill in any missing fields with defaults
-            if (!empty($component['fields'])) {
-                foreach ($component['fields'] as $key => $config) {
-                    if (!isset($this->variables[$key])) {
-                        $this->variables[$key] = $config['default'] ?? '';
-                    }
+            // Override with instance variables
+            if (!empty($component['variables'])) {
+                foreach ($component['variables'] as $key => $value) {
+                    $this->variables[$id][$key] = $value;
                 }
             }
         }
@@ -60,22 +60,31 @@ class ComponentEditor extends Component
     public function updated(string $property): void
     {
         if (str_starts_with($property, 'variables.')) {
-            $this->dispatch('variable-updated', variables: $this->variables);
-            $this->saveVariables();
+            // Extract component ID from property path: variables.{componentId}.{key}
+            $parts = explode('.', $property);
+            $componentId = $parts[1] ?? null;
+
+            if ($componentId && isset($this->variables[$componentId])) {
+                $this->dispatch('variable-updated',
+                    componentId: $componentId,
+                    variables: $this->variables[$componentId]
+                );
+                $this->saveVariables($componentId);
+            }
         }
     }
 
-    protected function saveVariables(): void
+    protected function saveVariables(string $componentId): void
     {
-        if (!$this->pageSlug || !$this->selectedComponentId) {
+        if (!$this->pageSlug) {
             return;
         }
 
         $pageRepository = app(PageRepository::class);
         $pageRepository->updateComponentVariables(
             $this->pageSlug,
-            $this->selectedComponentId,
-            $this->variables
+            $componentId,
+            $this->variables[$componentId]
         );
     }
 

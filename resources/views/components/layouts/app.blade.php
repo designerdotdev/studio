@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>Designer Studio</title>
 
@@ -13,10 +14,8 @@
         <!-- Filament Styles -->
         @filamentStyles
 
-        <!-- Styles / Scripts -->
-        @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-            @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @endif
+        <!-- Studio Styles -->
+        @studioStyles
 
         @livewireStyles
     </head>
@@ -32,5 +31,6 @@
 
     @livewireScripts
     @filamentScripts
+    @studioScripts
 </body>
 </html>

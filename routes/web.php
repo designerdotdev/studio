@@ -1,5 +1,6 @@
 <?php
 
+use Designer\Studio\Http\Controllers\AssetController;
 use Designer\Studio\Http\Controllers\StudioController;
 use Illuminate\Support\Facades\Route;
 
@@ -8,11 +9,13 @@ Route::group([
     'middleware' => config('studio.middleware', ['web']),
     'as' => 'studio.',
 ], function () {
-    // Dashboard - list all pages
+    // Package assets
+    Route::get('/assets/{file}', AssetController::class)->name('assets');
+
+    // Studio editor (single route)
     Route::get('/', [StudioController::class, 'index'])->name('index');
 
-    // Page editor
-    Route::get('/page/{slug}', [StudioController::class, 'edit'])->name('page.edit');
+    // Iframe preview for pages
     Route::get('/page/{slug}/iframe', [StudioController::class, 'iframe'])->name('page.iframe');
 
     // API endpoints
