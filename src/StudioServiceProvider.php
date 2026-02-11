@@ -3,6 +3,7 @@
 namespace Designer\Studio;
 
 use Designer\Studio\Console\Commands\SeedSampleData;
+use Designer\Studio\Console\Commands\SyncDesigns;
 use Designer\Studio\Console\Commands\Uninstall;
 use Designer\Studio\Livewire\ComponentEditor;
 use Designer\Studio\Livewire\TemplateEditor;
@@ -59,6 +60,7 @@ class StudioServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SeedSampleData::class,
+                SyncDesigns::class,
                 Uninstall::class,
             ]);
 
@@ -69,6 +71,10 @@ class StudioServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../resources/views' => resource_path('views/vendor/studio'),
             ], 'studio-views');
+
+            $this->publishes([
+                __DIR__ . '/../resources/views/designer' => resource_path('views/designer'),
+            ], 'studio-designs');
         }
 
         // Initialize storage directories on first request
