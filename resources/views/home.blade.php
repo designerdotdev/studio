@@ -16,13 +16,21 @@
                 });
             },
 
+            // Track current variables per component for sending full set to iframe
+            componentVariables: {{ Js::from(collect($components)->mapWithKeys(fn($comp) => [$comp['id'] => $comp['variables'] ?? []])->toArray()) }},
+
             sendToIframe(type, data) {
                 if (this.iframe && this.iframe.contentWindow) {
                     this.iframe.contentWindow.postMessage({ type, ...data }, '*');
                 }
             }
         }"
-        x-on:variable-updated.window="sendToIframe('update-variables', { componentId: $event.detail.componentId, variables: $event.detail.variables })"
+        x-on:preview-variable-changed.window="
+            const { componentId, key, value } = $event.detail;
+            if (!componentVariables[componentId]) componentVariables[componentId] = {};
+            componentVariables[componentId][key] = value;
+            sendToIframe('update-variables', { componentId, variables: JSON.parse(JSON.stringify(componentVariables[componentId])) });
+        "
         class="w-full h-screen"
     >
         <iframe

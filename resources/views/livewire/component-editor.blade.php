@@ -1,4 +1,13 @@
-<div class="h-full flex flex-col">
+<div
+    class="h-full flex flex-col"
+    x-data="{
+        notifyIframe(componentId, key, value) {
+            window.dispatchEvent(new CustomEvent('preview-variable-changed', {
+                detail: { componentId, key, value }
+            }));
+        }
+    }"
+>
     @if($selectedComponent)
         <div class="p-4 border-b border-gray-200 bg-white">
             <h2 class="text-lg font-semibold text-gray-900">{{ $selectedComponent['title'] ?? 'Edit Component' }}</h2>
@@ -24,13 +33,15 @@
                             id="field-{{ $key }}"
                             rows="4"
                             class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            wire:model.live.debounce.300ms="variables.{{ $selectedComponentId }}.{{ $key }}"
+                            wire:model.blur="variables.{{ $selectedComponentId }}.{{ $key }}"
+                            x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         ></textarea>
                     @elseif($fieldType === 'select')
                         <select
                             id="field-{{ $key }}"
                             class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             wire:model.live="variables.{{ $selectedComponentId }}.{{ $key }}"
+                            x-on:change="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         >
                             @foreach($field['options'] ?? [] as $optionValue => $optionLabel)
                                 <option value="{{ $optionValue }}">{{ $optionLabel }}</option>
@@ -41,6 +52,7 @@
                             type="button"
                             class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 {{ ($variables[$selectedComponentId][$key] ?? false) ? 'bg-indigo-600' : 'bg-gray-200' }}"
                             wire:click="$set('variables.{{ $selectedComponentId }}.{{ $key }}', {{ ($variables[$selectedComponentId][$key] ?? false) ? 'false' : 'true' }})"
+                            x-on:click="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', {{ ($variables[$selectedComponentId][$key] ?? false) ? 'false' : 'true' }})"
                         >
                             <span class="sr-only">Toggle {{ $field['label'] ?? $key }}</span>
                             <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{ ($variables[$selectedComponentId][$key] ?? false) ? 'translate-x-5' : 'translate-x-0' }}"></span>
@@ -51,13 +63,15 @@
                             id="field-{{ $key }}"
                             class="block h-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             wire:model.live="variables.{{ $selectedComponentId }}.{{ $key }}"
+                            x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         />
                     @else
                         <input
                             type="text"
                             id="field-{{ $key }}"
                             class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            wire:model.live.debounce.300ms="variables.{{ $selectedComponentId }}.{{ $key }}"
+                            wire:model.blur="variables.{{ $selectedComponentId }}.{{ $key }}"
+                            x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         />
                     @endif
 
