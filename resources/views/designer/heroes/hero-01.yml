@@ -8,23 +8,28 @@ tags:
     - header
 
 fields:
-    title:
+    heading_text_line_1:
         type: text
-        label: Title
-        default: Welcome
+        label: Heading Line 1
+        default: "Build faster."
         required: true
 
-    subtitle:
+    heading_text_line_2:
+        type: text
+        label: Heading Line 2
+        default: "Ship smarter."
+
+    text:
         type: textarea
-        label: Subtitle
-        default: Your subtitle here
+        label: Description
+        default: "Build pages, edit content, and control layouts. All inside of our visual editor built for developers."
 
-    cta_text:
+    button_text:
         type: text
-        label: Button Text
-        default: ""
+        label: Primary Button Text
+        default: "Start building for free"
 
-    cta_link:
+    button_text_2:
         type: text
-        label: Button Link
-        default: "#"
+        label: Secondary Button Text
+        default: "Watch demo"
