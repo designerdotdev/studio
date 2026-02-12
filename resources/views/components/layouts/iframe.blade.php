@@ -5,37 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Preview</title>
 
-    <!-- Tailwind CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    @if($tailwindCdn)
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    @endif
 
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    @if($alpineCdn)
+        @foreach($alpinePlugins as $plugin)
+            <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/{{ $plugin }}@3.x.x/dist/cdn.min.js"></script>
+        @endforeach
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    @endif
 
-    <!-- Blade.js for client-side rendering -->
-    @studioScripts
+    @foreach($extraStyles as $style)
+        <link rel="stylesheet" href="{{ $style }}">
+    @endforeach
 
-    <style>
-        [data-component] {
-            cursor: pointer;
-            position: relative;
-        }
-        [data-component]::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            z-index: 9999;
-            transition: box-shadow 0.15s ease;
-        }
-        [data-component]:hover::before {
-            box-shadow: inset 0 0 0 2px #3b82f6;
-        }
-        [data-component].selected::before {
-            box-shadow: inset 0 0 0 3px #3b82f6;
-        }
-    </style>
+    @foreach($extraScripts as $script)
+        @if(is_array($script))
+            <script src="{{ $script['src'] }}"@if(!empty($script['defer'])) defer @endif></script>
+        @else
+            <script src="{{ $script }}"></script>
+        @endif
+    @endforeach
+
+    @studioIframeCore
+
+    {!! $headHtml !!}
+
+    @stack('iframe-head')
 </head>
-<body class="min-h-screen w-full">
+<body class="{{ $bodyClass }}">
+    @stack('iframe-body-start')
+
     {{ $slot }}
+
+    @stack('iframe-body-end')
 </body>
 </html>
