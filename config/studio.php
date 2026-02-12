@@ -69,6 +69,39 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Iframe Preview Settings
+    |--------------------------------------------------------------------------
+    |
+    | Customize the iframe preview layout used in the page editor. You can
+    | toggle default CDN includes, add custom stylesheets/scripts, set
+    | body classes, or inject raw HTML into the <head>.
+    |
+    | For full control, publish the layout:
+    |   php artisan vendor:publish --tag=studio-iframe-layout
+    |
+    */
+    'iframe' => [
+        'tailwind_cdn' => true,
+        'alpine_cdn' => true,
+        'alpine_plugins' => [
+            'mask' => true,
+            'intersect' => true,
+            'resize' => true,
+            'persist' => true,
+            'focus' => true,
+            'collapse' => true,
+            'anchor' => true,
+            'morph' => true,
+            'sort' => true,
+        ],
+        'extra_styles' => [],
+        'extra_scripts' => [],
+        'body_class' => 'min-h-screen w-full',
+        'head_html' => '',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Designer.dev API (Pro Feature)
     |--------------------------------------------------------------------------
     */
