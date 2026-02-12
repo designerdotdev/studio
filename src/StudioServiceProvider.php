@@ -13,6 +13,7 @@ use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\StudioStorage;
 use Designer\Studio\View\Components\Layouts\App;
 use Designer\Studio\View\Components\Layouts\Iframe;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -77,6 +78,9 @@ class StudioServiceProvider extends ServiceProvider
             ], 'studio-designs');
         }
 
+        // Auto-publish design files on first boot if not already present
+        $this->publishDesignsOnInstall();
+
         // Initialize storage directories on first request
         $this->app->booted(function () {
             if (!$this->app->runningInConsole()) {
@@ -86,6 +90,21 @@ class StudioServiceProvider extends ServiceProvider
                 $storage->ensureDirectoryExists('components/library');
             }
         });
+    }
+
+    protected function publishDesignsOnInstall(): void
+    {
+        $destination = resource_path('views/designer');
+
+        if (is_dir($destination)) {
+            return;
+        }
+
+        $source = __DIR__ . '/../resources/views/designer';
+
+        $filesystem = new Filesystem;
+        $filesystem->ensureDirectoryExists($destination);
+        $filesystem->copyDirectory($source, $destination);
     }
 
     protected function registerAssetDirectives(): void
