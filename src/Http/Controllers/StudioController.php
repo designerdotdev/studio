@@ -2,6 +2,7 @@
 
 namespace Designer\Studio\Http\Controllers;
 
+use Designer\Studio\Services\DesignSyncService;
 use Designer\Studio\Services\SampleDataSeeder;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
@@ -15,14 +16,18 @@ class StudioController extends Controller
         protected PageRepository $pages,
         protected ComponentRepository $components,
         protected BladeGenerator $generator,
+        protected DesignSyncService $designSync,
         protected SampleDataSeeder $seeder
     ) {}
 
     public function index(Request $request)
     {
+        // Always sync designs from resource files so edits are reflected
+        $this->designSync->syncAll();
+
         $pages = $this->pages->all();
 
-        // Seed sample data if no pages exist
+        // Seed sample home page if no pages exist
         if ($pages->isEmpty()) {
             $this->seeder->seed();
             $pages = $this->pages->all();
