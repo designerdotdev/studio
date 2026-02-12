@@ -65,10 +65,6 @@ class ComponentEditor extends Component
             $componentId = $parts[1] ?? null;
 
             if ($componentId && isset($this->variables[$componentId])) {
-                $this->dispatch('variable-updated',
-                    componentId: $componentId,
-                    variables: $this->variables[$componentId]
-                );
                 $this->saveVariables($componentId);
             }
         }
