@@ -2,7 +2,9 @@
 
 namespace Designer\Studio\Http\Controllers;
 
+use Designer\Studio\Services\DesignSyncService;
 use Designer\Studio\Services\SampleDataSeeder;
+use Designer\Studio\Services\TemplateRegistry;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\BladeGenerator;
@@ -15,17 +17,23 @@ class StudioController extends Controller
         protected PageRepository $pages,
         protected ComponentRepository $components,
         protected BladeGenerator $generator,
-        protected SampleDataSeeder $seeder
+        protected DesignSyncService $designSync,
+        protected SampleDataSeeder $seeder,
+        protected TemplateRegistry $templates
     ) {}
 
     public function index(Request $request)
     {
+        // Always sync designs from resource files so edits are reflected
+        $this->designSync->syncAll();
+
         $pages = $this->pages->all();
 
-        // Seed sample data if no pages exist
+        // Show onboarding when no pages exist
         if ($pages->isEmpty()) {
-            $this->seeder->seed();
-            $pages = $this->pages->all();
+            return view('studio::onboarding', [
+                'templates' => $this->templates->all(),
+            ]);
         }
 
         // Load the requested page or fall back to the first page
@@ -65,6 +73,24 @@ class StudioController extends Controller
             'pages' => $pages,
             'components' => $componentsData,
             'componentLibrary' => $this->components->all(),
+        ]);
+    }
+
+    public function applyTemplate(Request $request)
+    {
+        $validated = $request->validate([
+            'template' => 'required|string',
+        ]);
+
+        $pages = $this->seeder->seedFromTemplate($validated['template']);
+
+        $firstPage = $pages[0] ?? null;
+
+        return response()->json([
+            'success' => true,
+            'redirect' => $firstPage
+                ? route('studio.index', ['page' => $firstPage->slug])
+                : route('studio.index'),
         ]);
     }
 
