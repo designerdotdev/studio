@@ -29,6 +29,7 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(PageRepository::class);
         $this->app->singleton(ComponentRepository::class);
         $this->app->singleton(BladeGenerator::class);
+        $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
 
         // Register asset version for cache busting
         $this->app->singleton('studio.asset.version', function () {
