@@ -15,6 +15,7 @@ use Designer\Studio\View\Components\Layouts\App;
 use Designer\Studio\View\Components\Layouts\Iframe;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -44,6 +45,7 @@ class StudioServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+        $this->registerPageRoutes();
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
 
         // NOTE: No migrations - we use JSON file storage!
@@ -143,6 +145,39 @@ class StudioServiceProvider extends ServiceProvider
                     [data-component].selected::before { box-shadow: inset 0 0 0 3px #3b82f6; }
                 </style>\';
             ?>';
+        });
+    }
+
+    protected function registerPageRoutes(): void
+    {
+        if (!config('studio.page_routing.enabled', true)) {
+            return;
+        }
+
+        $storagePath = config('studio.storage_path', storage_path('studio'));
+        $pagesPath = $storagePath . '/pages';
+
+        if (!is_dir($pagesPath)) {
+            return;
+        }
+
+        $files = glob($pagesPath . '/*.json');
+
+        if (empty($files)) {
+            return;
+        }
+
+        $middleware = config('studio.page_routing.middleware', ['web']);
+        $homeSlug = config('studio.page_routing.home_slug', 'home');
+
+        Route::middleware($middleware)->group(function () use ($files, $homeSlug) {
+            foreach ($files as $file) {
+                $slug = basename($file, '.json');
+                $uri = ($slug === $homeSlug) ? '/' : $slug;
+
+                Route::get($uri, [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
+                    ->defaults('slug', $slug);
+            }
         });
     }
 }
