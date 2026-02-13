@@ -21,11 +21,18 @@
     </head>
 <body class="h-full min-h-screen w-full antialiased">
     @php $sidebarPosition = config('studio.sidebar_position', 'left'); @endphp
-    <div class="w-full h-full min-h-screen flex items-stretch justify-stretch {{ $sidebarPosition === 'right' ? 'flex-row' : 'flex-row-reverse' }}">
-        <main class="flex-1 h-screen overflow-hidden">{{ $slot }}</main>
-        <aside class="w-80 bg-gray-50 h-screen flex flex-col {{ $sidebarPosition === 'right' ? 'border-l' : 'border-r' }} border-gray-200 overflow-hidden">
-            {{ $sidebar ?? '' }}
-        </aside>
+    <div class="w-full h-full min-h-screen flex items-stretch justify-stretch">
+        @if($sidebarPosition === 'left')
+            <aside class="w-80 bg-gray-50 h-screen flex flex-col border-r border-gray-200 overflow-hidden">
+                {{ $sidebar ?? '' }}
+            </aside>
+            <main class="flex-1 h-screen overflow-hidden">{{ $slot }}</main>
+        @else
+            <main class="flex-1 h-screen overflow-hidden">{{ $slot }}</main>
+            <aside class="w-80 bg-gray-50 h-screen flex flex-col border-l border-gray-200 overflow-hidden">
+                {{ $sidebar ?? '' }}
+            </aside>
+        @endif
     </div>
 
     @livewire('notifications')
