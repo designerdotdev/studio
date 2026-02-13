@@ -48,7 +48,7 @@
     >
         <div class="flex items-center justify-center min-h-screen px-4">
             {{-- Backdrop --}}
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+            <div class="fixed inset-0 bg-black/10"></div>
 
             {{-- Modal --}}
             <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full p-8">

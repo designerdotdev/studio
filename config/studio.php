@@ -69,6 +69,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Page Auto-Routing
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, every Studio page automatically becomes a live public
+    | route in your app — no generation step needed. When the package is
+    | removed, all routes disappear and your app is unaffected.
+    |
+    | - enabled: toggle auto-routing on/off
+    | - middleware: middleware for public page routes (separate from editor)
+    | - home_slug: which page slug maps to "/" (default: "home")
+    |
+    */
+    'page_routing' => [
+        'enabled' => true,
+        'middleware' => ['web'],
+        'home_slug' => 'home',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sidebar Position
     |--------------------------------------------------------------------------
     |
