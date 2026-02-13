@@ -2,6 +2,7 @@
 
 namespace Designer\Studio\Services;
 
+use Designer\Studio\DataTransferObjects\PageData;
 use Designer\Studio\Services\Storage\PageRepository;
 use Illuminate\Support\Str;
 
@@ -9,53 +10,57 @@ class SampleDataSeeder
 {
     public function __construct(
         protected DesignSyncService $designSync,
-        protected PageRepository $pages
+        protected PageRepository $pages,
+        protected TemplateRegistry $templates
     ) {}
 
+    /**
+     * Seed using the starter template (backward compatibility for studio:seed command).
+     */
     public function seed(): void
     {
-        $this->seedComponents();
-        $this->seedHomePage();
+        $this->seedFromTemplate('starter');
     }
 
-    protected function seedComponents(): void
+    /**
+     * Sync designs and create all pages defined by the given template.
+     *
+     * @return PageData[]
+     */
+    public function seedFromTemplate(string $templateName): array
     {
+        $template = $this->templates->find($templateName);
+
+        if (!$template) {
+            return [];
+        }
+
+        // Always sync designs so component refs resolve
         $this->designSync->syncAll();
-    }
 
-    protected function seedHomePage(): void
-    {
-        if (!$this->pages->find('home')) {
-            $this->pages->create([
-                'slug' => 'home',
-                'title' => 'Home Page',
-                'description' => 'Sample home page',
-                'components' => [
-                    [
-                        'id' => Str::uuid()->toString(),
-                        'component_ref' => 'hero-basic',
-                        'order' => 0,
-                        'variables' => [
-                            'title' => 'Welcome to Designer Studio',
-                            'subtitle' => 'Build beautiful pages visually',
-                            'cta_text' => 'Get Started',
-                            'cta_link' => '#features',
-                        ],
-                    ],
-                    [
-                        'id' => Str::uuid()->toString(),
-                        'component_ref' => 'features-grid',
-                        'order' => 1,
-                        'variables' => [],
-                    ],
-                    [
-                        'id' => Str::uuid()->toString(),
-                        'component_ref' => 'cta-section',
-                        'order' => 2,
-                        'variables' => [],
-                    ],
-                ],
+        $createdPages = [];
+
+        foreach ($template['pages'] as $pageDef) {
+            // Skip if page already exists
+            if ($this->pages->find($pageDef['slug'])) {
+                continue;
+            }
+
+            // Generate UUIDs for components that don't have one
+            $components = array_map(function ($comp) {
+                return array_merge($comp, [
+                    'id' => $comp['id'] ?? Str::uuid()->toString(),
+                ]);
+            }, $pageDef['components'] ?? []);
+
+            $createdPages[] = $this->pages->create([
+                'slug' => $pageDef['slug'],
+                'title' => $pageDef['title'],
+                'description' => $pageDef['description'] ?? '',
+                'components' => $components,
             ]);
         }
+
+        return $createdPages;
     }
 }
