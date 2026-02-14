@@ -45,8 +45,14 @@ class StudioServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
-        $this->registerPageRoutes();
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
+
+        // Register page routes in booted callback so they override app routes
+        // (package boot() runs before app routes are loaded, so registering
+        // here in boot() would be overwritten by the app's GET / route)
+        $this->app->booted(function () {
+            $this->registerPageRoutes();
+        });
 
         // NOTE: No migrations - we use JSON file storage!
 
