@@ -55,12 +55,9 @@ class PageController extends Controller
         // Extract just the rendered HTML strings
         $renderedSections = array_map(fn($s) => $s['html'], $renderedSections);
 
-        $layout = $page->layout ?? config('studio.default_layout', 'layouts.app');
-
         return view('studio::page', [
             'renderedSections' => $renderedSections,
             'page' => $page,
-            'layout' => $layout,
         ]);
     }
 

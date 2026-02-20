@@ -52,10 +52,13 @@ return [
     | Default Layout
     |--------------------------------------------------------------------------
     |
-    | The default Blade layout that generated pages will extend.
+    | The default Blade component that generated pages will be wrapped in.
+    | This maps to a component tag, e.g. 'layout' becomes <x-layout>.
+    | For nested components, use dot notation: 'layouts.app' becomes
+    | <x-layouts.app>.
     |
     */
-    'default_layout' => 'layouts.app',
+    'default_layout' => 'layout',
 
     /*
     |--------------------------------------------------------------------------
