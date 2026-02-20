@@ -175,6 +175,32 @@ class StudioController extends Controller
         ]);
     }
 
+    public function addComponentToPage(Request $request, string $slug)
+    {
+        $validated = $request->validate([
+            'component_ref' => 'required|string',
+        ]);
+
+        $component = $this->components->find($validated['component_ref']);
+
+        if (!$component) {
+            return response()->json(['success' => false, 'error' => 'Component not found'], 404);
+        }
+
+        // Use preview_variables as default variable values
+        $defaultVariables = [];
+        foreach ($component->fields as $key => $config) {
+            $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? '';
+        }
+
+        $page = $this->pages->addComponent($slug, $validated['component_ref'], $defaultVariables);
+
+        return response()->json([
+            'success' => true,
+            'page' => $page?->toArray(),
+        ]);
+    }
+
     public function deletePage(string $slug)
     {
         $this->pages->delete($slug);
