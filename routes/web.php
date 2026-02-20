@@ -24,6 +24,7 @@ Route::group([
         Route::post('/pages', [StudioController::class, 'createPage'])->name('api.pages.store');
         Route::delete('/pages/{slug}', [StudioController::class, 'deletePage'])->name('api.pages.destroy');
         Route::put('/pages/{slug}/components', [StudioController::class, 'updatePageComponents'])->name('api.pages.components.update');
+        Route::post('/pages/{slug}/components/add', [StudioController::class, 'addComponentToPage'])->name('api.pages.components.add');
 
         // Onboarding
         Route::post('/onboarding/apply-template', [StudioController::class, 'applyTemplate'])->name('api.onboarding.apply');
