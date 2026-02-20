@@ -12,8 +12,6 @@
                         Livewire.dispatch('component-selected', { componentId: event.data.componentId });
                     } else if (event.data.type === 'component-deselected') {
                         Livewire.dispatch('component-deselected');
-                    } else if (event.data.type === 'add-section') {
-                        window.dispatchEvent(new CustomEvent('open-add-section-modal'));
                     }
                 });
             },
@@ -51,9 +49,16 @@
                 newPageSlug: '',
                 slugManuallyEdited: false,
                 creating: false,
-                generating: false,
                 showAddSectionModal: false,
                 addingSectionRef: null,
+
+                init() {
+                    window.addEventListener('message', (event) => {
+                        if (event.data && event.data.type === 'add-section') {
+                            this.showAddSectionModal = true;
+                        }
+                    });
+                },
 
                 async createPage() {
                     if (!this.newPageTitle.trim()) return;
@@ -100,30 +105,10 @@
                     this.addingSectionRef = null;
                 },
 
-                async generate() {
-                    this.generating = true;
-                    try {
-                        const response = await fetch('{{ route('studio.api.generate') }}', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                            },
-                        });
-                        const data = await response.json();
-                        if (data.success) {
-                            alert('Generated ' + data.count + ' Blade file(s)!');
-                        }
-                    } catch (e) {
-                        console.error(e);
-                        alert('Failed to generate Blade files');
-                    }
-                    this.generating = false;
-                }
             }"
             class="flex flex-col h-full"
-            @open-add-section-modal.window="showAddSectionModal = true"
         >
-            {{-- Header with page switcher and generate button --}}
+            {{-- Header with page switcher --}}
             <div class="p-4 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
                 {{-- Page Switcher Dropdown --}}
                 <div class="relative" @click.outside="open = false">
@@ -182,16 +167,6 @@
                 </div>
 
                 <div class="flex items-center gap-1.5">
-                    {{-- Generate Button --}}
-                    <button
-                        @click="generate()"
-                        :disabled="generating"
-                        class="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
-                    >
-                        <span x-show="!generating">Generate</span>
-                        <span x-show="generating">Generating...</span>
-                    </button>
-
                     {{-- Preview Button --}}
                     <a
                         href="{{ $page->slug === config('studio.page_routing.home_slug', 'home') ? '/' : '/' . $page->slug }}"
