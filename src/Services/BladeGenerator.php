@@ -63,18 +63,18 @@ class BladeGenerator
      */
     protected function buildPageBlade(PageData $page): string
     {
-        $layout = $page->layout ?: config('studio.default_layout', 'layouts.app');
+        $layout = $page->layout ?: config('studio.default_layout', 'layout');
 
         $sections = [];
-        $sections[] = "@extends('{$layout}')";
-        $sections[] = "";
+        $sections[] = "<x-{$layout}>";
 
-        // Add SEO meta if available
+        // Add SEO title slot if available
         if (!empty($page->meta['seo_title'])) {
-            $sections[] = "@section('title', " . var_export($page->meta['seo_title'], true) . ")";
+            $seoTitle = e($page->meta['seo_title']);
+            $sections[] = "    <x-slot:title>";
+            $sections[] = "        {$seoTitle}";
+            $sections[] = "    </x-slot>";
         }
-
-        $sections[] = "@section('content')";
 
         // Sort components by order and render each
         $sortedComponents = collect($page->components)->sortBy('order');
@@ -105,7 +105,7 @@ class BladeGenerator
         }
 
         $sections[] = "";
-        $sections[] = "@endsection";
+        $sections[] = "</x-{$layout}>";
 
         // Add header comment
         $header = [
