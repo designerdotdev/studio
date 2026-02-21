@@ -66,39 +66,24 @@
         ></iframe>
 
         {{-- Add Section Modal --}}
-        <div
-            x-show="showAddSectionModal"
-            x-cloak
-            style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;"
-            aria-labelledby="add-section-title"
-            role="dialog"
-            aria-modal="true"
-        >
-            {{-- Backdrop --}}
+        <template x-if="showAddSectionModal">
             <div
-                x-show="showAddSectionModal"
-                x-transition:enter="ease-out duration-300"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="ease-in duration-200"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);"
-                @click="showAddSectionModal = false"
-            ></div>
-
-            {{-- Modal Panel --}}
-            <div
-                x-show="showAddSectionModal"
-                x-transition:enter="ease-out duration-300"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="ease-in duration-200"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                style="position:relative;z-index:10;width:100%;max-width:672px;"
-                class="bg-white rounded-lg text-left shadow-xl"
+                style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;"
+                aria-labelledby="add-section-title"
+                role="dialog"
+                aria-modal="true"
             >
+                {{-- Backdrop --}}
+                <div
+                    style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);"
+                    @click="showAddSectionModal = false"
+                ></div>
+
+                {{-- Modal Panel --}}
+                <div
+                    style="position:relative;z-index:10;width:100%;max-width:672px;"
+                    class="bg-white rounded-lg text-left shadow-xl"
+                >
                 <div class="px-6 pt-5 pb-4">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg leading-6 font-medium text-gray-900" id="add-section-title">
@@ -159,7 +144,7 @@
                     </button>
                 </div>
             </div>
-        </div>
+        </template>
     </div>
 
     <x-slot:sidebar>
