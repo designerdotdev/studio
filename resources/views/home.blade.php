@@ -81,69 +81,73 @@
 
                 {{-- Modal Panel --}}
                 <div
-                    style="position:relative;z-index:10;width:100%;max-width:672px;"
-                    class="bg-white rounded-lg text-left shadow-xl"
+                    style="position:relative;z-index:10;width:100%;max-width:560px;border-radius:16px;overflow:hidden;"
+                    class="bg-white text-left shadow-2xl"
                 >
-                <div class="px-6 pt-5 pb-4">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="add-section-title">
-                            Add Section
-                        </h3>
-                        <button
-                            @click="showAddSectionModal = false"
-                            class="text-gray-400 hover:text-gray-500 transition-colors"
-                        >
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
+                    <div style="padding:24px 24px 20px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+                            <h3 style="font-size:18px;font-weight:600;color:#111827;" id="add-section-title">
+                                Add Section
+                            </h3>
+                            <button
+                                @click="showAddSectionModal = false"
+                                style="color:#9ca3af;padding:4px;border-radius:6px;transition:color 0.15s;"
+                                onmouseover="this.style.color='#6b7280'"
+                                onmouseout="this.style.color='#9ca3af'"
+                            >
+                                <svg style="width:20px;height:20px;" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
 
-                    <div style="max-height:384px;overflow-y:auto;">
-                        @php
-                            $grouped = $componentLibrary->groupBy('category');
-                        @endphp
+                        <div style="max-height:400px;overflow-y:auto;">
+                            @php
+                                $grouped = $componentLibrary->groupBy('category');
+                            @endphp
 
-                        @foreach($grouped as $category => $categoryComponents)
-                            <div class="mb-4">
-                                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ $category }}</h4>
-                                <div class="grid grid-cols-2 gap-2">
-                                    @foreach($categoryComponents as $comp)
-                                        <button
-                                            @click="addSection('{{ $comp->name }}')"
-                                            :disabled="addingSectionRef === '{{ $comp->name }}'"
-                                            class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left disabled:opacity-50"
-                                        >
-                                            <div class="flex-shrink-0 mt-0.5">
-                                                <div class="w-8 h-8 rounded-md bg-blue-100 flex items-center justify-center">
-                                                    <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            @foreach($grouped as $category => $categoryComponents)
+                                <div style="margin-bottom:20px;">
+                                    <h4 style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">{{ $category }}</h4>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                                        @foreach($categoryComponents as $comp)
+                                            <button
+                                                @click="addSection('{{ $comp->name }}')"
+                                                :disabled="addingSectionRef === '{{ $comp->name }}'"
+                                                style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:12px;border:1px solid #e5e7eb;background:white;text-align:left;cursor:pointer;transition:all 0.15s;"
+                                                onmouseover="this.style.borderColor='#93c5fd';this.style.background='#eff6ff'"
+                                                onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'"
+                                            >
+                                                <div style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#dbeafe;display:flex;align-items:center;justify-content:center;">
+                                                    <svg style="width:18px;height:18px;color:#2563eb;" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 0 1-1.125-1.125v-3.75ZM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 0 1-1.125-1.125v-8.25ZM3.75 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 0 1-1.125-1.125v-2.25Z" />
                                                     </svg>
                                                 </div>
-                                            </div>
-                                            <div class="min-w-0">
-                                                <p class="text-sm font-medium text-gray-900" x-text="addingSectionRef === '{{ $comp->name }}' ? 'Adding...' : '{{ $comp->title }}'"></p>
-                                                @if($comp->description)
-                                                    <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ $comp->description }}</p>
-                                                @endif
-                                            </div>
-                                        </button>
-                                    @endforeach
+                                                <div style="min-width:0;">
+                                                    <p style="font-size:14px;font-weight:500;color:#111827;" x-text="addingSectionRef === '{{ $comp->name }}' ? 'Adding...' : '{{ $comp->title }}'"></p>
+                                                    @if($comp->description)
+                                                        <p style="font-size:12px;color:#6b7280;margin-top:2px;">{{ $comp->description }}</p>
+                                                    @endif
+                                                </div>
+                                            </button>
+                                        @endforeach
+                                    </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div style="padding:12px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;">
+                        <button
+                            @click="showAddSectionModal = false"
+                            style="padding:8px 16px;font-size:14px;font-weight:500;color:#374151;background:white;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;transition:background 0.15s;"
+                            onmouseover="this.style.background='#f9fafb'"
+                            onmouseout="this.style.background='white'"
+                        >
+                            Cancel
+                        </button>
                     </div>
                 </div>
-
-                <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end rounded-b-lg">
-                    <button
-                        @click="showAddSectionModal = false"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </div>
         </template>
     </div>
 
@@ -266,12 +270,12 @@
                 <div
                     x-show="showCreateModal"
                     x-cloak
-                    class="fixed inset-0 z-50 overflow-y-auto"
+                    style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;"
                     aria-labelledby="modal-title"
                     role="dialog"
                     aria-modal="true"
                 >
-                    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;">
                         <div
                             x-show="showCreateModal"
                             x-transition:enter="ease-out duration-300"
@@ -280,21 +284,20 @@
                             x-transition:leave="ease-in duration-200"
                             x-transition:leave-start="opacity-100"
                             x-transition:leave-end="opacity-0"
-                            class="fixed inset-0 bg-black/50 transition-opacity"
+                            style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"
                             @click="showCreateModal = false"
                         ></div>
-
-                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
                         <div
                             x-show="showCreateModal"
                             x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
                             x-transition:leave="ease-in duration-200"
-                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            class="relative z-10 inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            style="position:relative;z-index:10;width:100%;max-width:512px;"
+                            class="bg-white rounded-xl text-left shadow-xl p-6"
                         >
                             <div>
                                 <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">

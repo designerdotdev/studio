@@ -48,7 +48,7 @@
     >
         <div class="flex items-center justify-center min-h-screen px-4">
             {{-- Backdrop --}}
-            <div class="fixed inset-0 bg-black/40 backdrop-blur-sm"></div>
+            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
 
             {{-- Modal --}}
             <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full p-8">
