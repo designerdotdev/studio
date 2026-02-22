@@ -2,6 +2,7 @@
 
 namespace Designer\Studio;
 
+use Designer\Studio\Console\Commands\DevReset;
 use Designer\Studio\Console\Commands\SeedSampleData;
 use Designer\Studio\Console\Commands\SyncDesigns;
 use Designer\Studio\Console\Commands\Uninstall;
@@ -69,6 +70,7 @@ class StudioServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                DevReset::class,
                 SeedSampleData::class,
                 SyncDesigns::class,
                 Uninstall::class,

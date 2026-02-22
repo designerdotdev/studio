@@ -34,20 +34,26 @@ class TemplateRegistry
                         'components' => [
                             [
                                 'id' => null,
-                                'component_ref' => 'hero-basic',
+                                'component_ref' => 'header-nav',
                                 'order' => 0,
                                 'variables' => [],
                             ],
                             [
                                 'id' => null,
-                                'component_ref' => 'features-grid',
+                                'component_ref' => 'hero-basic',
                                 'order' => 1,
                                 'variables' => [],
                             ],
                             [
                                 'id' => null,
-                                'component_ref' => 'cta-section',
+                                'component_ref' => 'features-grid',
                                 'order' => 2,
+                                'variables' => [],
+                            ],
+                            [
+                                'id' => null,
+                                'component_ref' => 'cta-section',
+                                'order' => 3,
                                 'variables' => [],
                             ],
                         ],

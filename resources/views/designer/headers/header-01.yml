@@ -1,0 +1,40 @@
+name: header-nav
+title: Header Navigation
+description: A clean header with logo, navigation links, and two action buttons
+category: headers
+tags:
+    - header
+    - navigation
+    - navbar
+
+fields:
+    company_name:
+        type: text
+        label: Company Name
+        default: "Your Company"
+        required: true
+
+    logo_svg:
+        type: textarea
+        label: Logo SVG
+        default: '<svg class="h-8 w-auto" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="50" height="50" rx="10" fill="#111827"/><path d="M15 35V15h8c5 0 8 3 8 7s-3 7-8 7h-4v6h-4zm4-10h4c2.5 0 4-1.5 4-3.5S25.5 18 23 18h-4v7z" fill="white"/><text x="60" y="35" font-family="system-ui, sans-serif" font-size="24" font-weight="700" fill="#111827">Company</text></svg>'
+
+    button_1_text:
+        type: text
+        label: Button 1 Text
+        default: "Log in"
+
+    button_1_link:
+        type: text
+        label: Button 1 Link
+        default: "#"
+
+    button_2_text:
+        type: text
+        label: Button 2 Text
+        default: "Sign up"
+
+    button_2_link:
+        type: text
+        label: Button 2 Link
+        default: "#"
