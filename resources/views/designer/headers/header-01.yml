@@ -11,13 +11,13 @@ fields:
     company_name:
         type: text
         label: Company Name
-        default: "Your Company"
+        default: "Acme"
         required: true
 
     logo_svg:
         type: textarea
         label: Logo SVG
-        default: '<svg class="h-8 w-auto" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="50" height="50" rx="10" fill="#111827"/><path d="M15 35V15h8c5 0 8 3 8 7s-3 7-8 7h-4v6h-4zm4-10h4c2.5 0 4-1.5 4-3.5S25.5 18 23 18h-4v7z" fill="white"/><text x="60" y="35" font-family="system-ui, sans-serif" font-size="24" font-weight="700" fill="#111827">Company</text></svg>'
+        default: '<svg class="text-gray-900 -translate-y-px w-auto h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>'
 
     button_1_text:
         type: text

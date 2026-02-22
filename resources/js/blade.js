@@ -35,15 +35,29 @@ export default {
         });
 
         // Step 4: Handle {{ $var ?? 'default' }} - escaped output with default
-        const echoDefaultRegex = /{{\s*\$(\w+)\s*\?\?\s*['"]([^'"]*)['"]\s*}}/g;
-        result = result.replace(echoDefaultRegex, (match, varName, defaultValue) => {
+        // Single-quoted defaults (may contain double quotes inside)
+        const echoDefaultSingleRegex = /{{\s*\$(\w+)\s*\?\?\s*'([^']*)'\s*}}/g;
+        result = result.replace(echoDefaultSingleRegex, (match, varName, defaultValue) => {
+            const value = Object.hasOwnProperty.call(variables, varName) ? variables[varName] : defaultValue;
+            return this.escapeHtml(value);
+        });
+        // Double-quoted defaults (may contain single quotes inside)
+        const echoDefaultDoubleRegex = /{{\s*\$(\w+)\s*\?\?\s*"([^"]*)"\s*}}/g;
+        result = result.replace(echoDefaultDoubleRegex, (match, varName, defaultValue) => {
             const value = Object.hasOwnProperty.call(variables, varName) ? variables[varName] : defaultValue;
             return this.escapeHtml(value);
         });
 
         // Step 5: Handle {!! $var ?? 'default' !!} - unescaped output with default
-        const rawDefaultRegex = /{!!\s*\$(\w+)\s*\?\?\s*['"]([^'"]*)['"]\s*!!}/g;
-        result = result.replace(rawDefaultRegex, (match, varName, defaultValue) => {
+        // Single-quoted defaults (may contain double quotes inside)
+        const rawDefaultSingleRegex = /{!!\s*\$(\w+)\s*\?\?\s*'([^']*)'\s*!!}/g;
+        result = result.replace(rawDefaultSingleRegex, (match, varName, defaultValue) => {
+            const value = Object.hasOwnProperty.call(variables, varName) ? variables[varName] : defaultValue;
+            return value;
+        });
+        // Double-quoted defaults (may contain single quotes inside)
+        const rawDefaultDoubleRegex = /{!!\s*\$(\w+)\s*\?\?\s*"([^"]*)"\s*!!}/g;
+        result = result.replace(rawDefaultDoubleRegex, (match, varName, defaultValue) => {
             const value = Object.hasOwnProperty.call(variables, varName) ? variables[varName] : defaultValue;
             return value;
         });
