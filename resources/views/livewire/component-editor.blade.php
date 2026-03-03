@@ -5,7 +5,16 @@
             window.dispatchEvent(new CustomEvent('preview-variable-changed', {
                 detail: { componentId, key, value }
             }));
-        }
+        },
+        notifyIframeRepeater(componentId, key) {
+            // Gather current repeater values from Livewire state and send full array
+            const component = @this;
+            const items = component.variables[componentId]?.[key] ?? [];
+            window.dispatchEvent(new CustomEvent('preview-variable-changed', {
+                detail: { componentId, key, value: JSON.parse(JSON.stringify(items)) }
+            }));
+        },
+        collapsedItems: {}
     }"
 >
     @if($selectedComponent)
@@ -65,6 +74,118 @@
                             wire:model.live="variables.{{ $selectedComponentId }}.{{ $key }}"
                             x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         />
+                    @elseif($fieldType === 'repeater')
+                        @php
+                            $repeaterItems = $variables[$selectedComponentId][$key] ?? [];
+                            $subFields = $field['sub_fields'] ?? [];
+                            $nestable = !empty($field['nestable']);
+                            $addLabel = $field['add_button_label'] ?? 'Add Item';
+                        @endphp
+
+                        <div class="space-y-2">
+                            @foreach($repeaterItems as $itemIndex => $item)
+                                <div class="border border-gray-200 rounded-md bg-gray-50">
+                                    {{-- Item header --}}
+                                    <div class="flex items-center justify-between px-3 py-2 bg-gray-100 rounded-t-md">
+                                        <span class="text-xs font-medium text-gray-600">#{{ $itemIndex + 1 }}</span>
+                                        <div class="flex items-center space-x-1">
+                                            {{-- Move up --}}
+                                            @if($itemIndex > 0)
+                                                <button type="button" class="p-1 text-gray-400 hover:text-gray-600" wire:click="moveRepeaterItem('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, {{ $itemIndex - 1 }})" x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))" title="Move up">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                                </button>
+                                            @endif
+                                            {{-- Move down --}}
+                                            @if($itemIndex < count($repeaterItems) - 1)
+                                                <button type="button" class="p-1 text-gray-400 hover:text-gray-600" wire:click="moveRepeaterItem('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, {{ $itemIndex + 1 }})" x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))" title="Move down">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                                </button>
+                                            @endif
+                                            {{-- Indent (nestable only) --}}
+                                            @if($nestable && $itemIndex > 0)
+                                                <button type="button" class="p-1 text-gray-400 hover:text-indigo-600" wire:click="indentMenuItem('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }})" x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))" title="Make child of above">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                                                </button>
+                                            @endif
+                                            {{-- Remove --}}
+                                            <button type="button" class="p-1 text-gray-400 hover:text-red-500" wire:click="removeRepeaterItem('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }})" x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))" title="Remove">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {{-- Sub-fields --}}
+                                    <div class="p-3 space-y-2">
+                                        @foreach($subFields as $subKey => $subConfig)
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-500 mb-0.5">{{ $subConfig['label'] ?? ucfirst($subKey) }}</label>
+                                                <input
+                                                    type="text"
+                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                    value="{{ $item[$subKey] ?? $subConfig['default'] ?? '' }}"
+                                                    x-on:input.debounce.400ms="
+                                                        $wire.updateRepeaterSubField('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, '{{ $subKey }}', $event.target.value).then(() => {
+                                                            notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}');
+                                                        })
+                                                    "
+                                                />
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    {{-- Nested children (nestable only) --}}
+                                    @if($nestable && !empty($item['children']))
+                                        <div class="ml-4 border-l-2 border-indigo-200 pl-2 pb-2 space-y-2">
+                                            @foreach($item['children'] as $childIndex => $child)
+                                                <div class="border border-gray-200 rounded-md bg-white">
+                                                    <div class="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded-t-md">
+                                                        <span class="text-xs font-medium text-indigo-500">↳ #{{ $childIndex + 1 }}</span>
+                                                        <div class="flex items-center space-x-1">
+                                                            {{-- Outdent --}}
+                                                            <button type="button" class="p-1 text-gray-400 hover:text-indigo-600" wire:click="outdentMenuItem('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, {{ $childIndex }})" x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))" title="Move to top level">
+                                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                                                            </button>
+                                                            {{-- Remove child --}}
+                                                            <button type="button" class="p-1 text-gray-400 hover:text-red-500" wire:click="removeRepeaterChild('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, {{ $childIndex }})" x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))" title="Remove">
+                                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="p-2 space-y-2">
+                                                        @foreach($subFields as $subKey => $subConfig)
+                                                            <div>
+                                                                <label class="block text-xs font-medium text-gray-500 mb-0.5">{{ $subConfig['label'] ?? ucfirst($subKey) }}</label>
+                                                                <input
+                                                                    type="text"
+                                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                                    value="{{ $child[$subKey] ?? $subConfig['default'] ?? '' }}"
+                                                                    x-on:input.debounce.400ms="
+                                                                        $wire.updateRepeaterChildSubField('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, {{ $childIndex }}, '{{ $subKey }}', $event.target.value).then(() => {
+                                                                            notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}');
+                                                                        })
+                                                                    "
+                                                                />
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+
+                            {{-- Add button --}}
+                            <button
+                                type="button"
+                                class="flex items-center justify-center w-full px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-300 rounded-md hover:bg-indigo-100 transition-colors"
+                                wire:click="addRepeaterItem('{{ $selectedComponentId }}', '{{ $key }}')"
+                                x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))"
+                            >
+                                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                {{ $addLabel }}
+                            </button>
+                        </div>
                     @else
                         <input
                             type="text"

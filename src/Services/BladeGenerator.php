@@ -123,23 +123,71 @@ class BladeGenerator
     }
 
     /**
-     * Render component HTML, converting {{ $var ?? 'default' }} to static values
+     * Render component HTML, converting {{ $var ?? 'default' }} to static values.
+     * For array variables (repeaters), injects @php preamble and preserves @foreach directives.
      */
     protected function renderComponentWithVariables(string $html, array $variables): string
     {
-        // Replace Blade variable syntax with actual values
+        $preamble = '';
+        $arrayVars = [];
+
+        // Identify array variables and build @php preamble
+        foreach ($variables as $varName => $value) {
+            if (is_array($value)) {
+                $arrayVars[$varName] = true;
+                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $preamble .= "@php \${$varName} = json_decode('" . addcslashes($json, "'") . "', true); @endphp\n";
+            }
+        }
+
+        // Replace scalar Blade variable syntax with actual values
         // Pattern: {{ $varName ?? 'default' }} or {{ $varName ?? "default" }}
         $pattern = '/{{\s*\$(\w+)\s*\?\?\s*[\'"]([^\'"]*)[\'"]?\s*}}/';
 
-        return preg_replace_callback($pattern, function ($matches) use ($variables) {
+        $result = preg_replace_callback($pattern, function ($matches) use ($variables, $arrayVars) {
             $varName = $matches[1];
             $default = $matches[2];
+
+            // Skip array variables — they're handled by @foreach in the template
+            if (isset($arrayVars[$varName])) {
+                return $matches[0];
+            }
 
             $value = $variables[$varName] ?? $default;
 
             // Escape for HTML output
             return e($value);
         }, $html);
+
+        // Also handle {{ $varName }} without defaults for scalar vars
+        $result = preg_replace_callback('/{{\s*\$(\w+)\s*}}/', function ($matches) use ($variables, $arrayVars) {
+            $varName = $matches[1];
+
+            if (isset($arrayVars[$varName])) {
+                return $matches[0];
+            }
+
+            $value = $variables[$varName] ?? '';
+            return e($value);
+        }, $result);
+
+        // Handle {!! $varName !!} and {!! $varName ?? 'default' !!} for scalar vars
+        $result = preg_replace_callback('/{!!\s*\$(\w+)\s*(?:\?\?\s*[\'"]([^\'"]*)[\'"])?\s*!!}/', function ($matches) use ($variables, $arrayVars) {
+            $varName = $matches[1];
+
+            if (isset($arrayVars[$varName])) {
+                return $matches[0];
+            }
+
+            $default = $matches[2] ?? '';
+            return $variables[$varName] ?? $default;
+        }, $result);
+
+        if ($preamble) {
+            return $preamble . $result;
+        }
+
+        return $result;
     }
 
     /**
