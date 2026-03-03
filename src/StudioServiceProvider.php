@@ -149,7 +149,7 @@ class StudioServiceProvider extends ServiceProvider
                 echo \'<style>
                     [data-component] { cursor: pointer; position: relative; }
                     [data-component]::before { content: \\\'\\\'; position: absolute; inset: 0; pointer-events: none; z-index: 9999; transition: box-shadow 0.15s ease; }
-                    [data-component]:hover::before { box-shadow: inset 0 0 0 2px #3b82f6; }
+                    [data-component]:hover::before, .group:hover > [data-component]::before { box-shadow: inset 0 0 0 2px #3b82f6; }
                     [data-component].selected::before { box-shadow: inset 0 0 0 3px #3b82f6; }
                 </style>\';
             ?>';

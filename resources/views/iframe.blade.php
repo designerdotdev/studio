@@ -100,10 +100,22 @@
                     $renderedHtml = \Illuminate\Support\Facades\Blade::render($component['html'], $componentVariables[$component['id']] ?? []);
                 @endphp
 
-                <div
-                    data-component="{{ $component['id'] }}"
-                    x-on:click="selectComponent('{{ $component['id'] }}', $event)"
-                >{!! $renderedHtml !!}</div>
+                <div class="group relative">
+                    <button
+                        class="absolute left-1/2 top-0 z-[10000] -translate-x-1/2 rounded-b-md bg-blue-500 px-4 py-1.5 text-sm font-medium text-white whitespace-nowrap border-none cursor-pointer opacity-0 pointer-events-none group-hover:opacity-70 group-hover:pointer-events-auto hover:!opacity-100 transition-opacity duration-150"
+                        @click.stop="window.parent.postMessage({ type: 'add-section', insertAtIndex: {{ $loop->index }} }, '*')"
+                    >+ Add Section</button>
+
+                    <div
+                        data-component="{{ $component['id'] }}"
+                        x-on:click="selectComponent('{{ $component['id'] }}', $event)"
+                    >{!! $renderedHtml !!}</div>
+
+                    <button
+                        class="absolute left-1/2 bottom-0 z-[10000] -translate-x-1/2 rounded-t-md bg-blue-500 px-4 py-1.5 text-sm font-medium text-white whitespace-nowrap border-none cursor-pointer opacity-0 pointer-events-none group-hover:opacity-70 group-hover:pointer-events-auto hover:!opacity-100 transition-opacity duration-150"
+                        @click.stop="window.parent.postMessage({ type: 'add-section', insertAtIndex: {{ $loop->index + 1 }} }, '*')"
+                    >+ Add Section</button>
+                </div>
             @endforeach
         @else
             <div class="flex items-center justify-center min-h-screen">
