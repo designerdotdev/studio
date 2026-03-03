@@ -86,7 +86,7 @@ class PageRepository
         return $this->storage->delete("pages/{$slug}.json");
     }
 
-    public function addComponent(string $pageSlug, string $componentRef, array $variables = [], ?int $order = null): ?PageData
+    public function addComponent(string $pageSlug, string $componentRef, array $variables = [], ?int $insertAtIndex = null): ?PageData
     {
         $page = $this->storage->read("pages/{$pageSlug}.json");
 
@@ -95,17 +95,30 @@ class PageRepository
         }
 
         $components = $page['components'] ?? [];
-        $maxOrder = collect($components)->max('order') ?? -1;
 
-        $components[] = [
+        // Sort existing by order
+        usort($components, fn($a, $b) => $a['order'] <=> $b['order']);
+
+        $newComponent = [
             'id' => (string) Str::uuid(),
             'component_ref' => $componentRef,
-            'order' => $order ?? ($maxOrder + 1),
+            'order' => 0,
             'variables' => $variables,
         ];
 
-        // Re-sort by order
-        usort($components, fn($a, $b) => $a['order'] <=> $b['order']);
+        if ($insertAtIndex !== null && $insertAtIndex >= 0 && $insertAtIndex <= count($components)) {
+            // Insert at specific position
+            array_splice($components, $insertAtIndex, 0, [$newComponent]);
+        } else {
+            // Append at end
+            $components[] = $newComponent;
+        }
+
+        // Re-number orders sequentially
+        foreach ($components as $i => &$comp) {
+            $comp['order'] = $i;
+        }
+        unset($comp);
 
         return $this->update($pageSlug, ['components' => $components]);
     }

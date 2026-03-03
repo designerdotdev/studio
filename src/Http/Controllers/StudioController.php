@@ -179,6 +179,7 @@ class StudioController extends Controller
     {
         $validated = $request->validate([
             'component_ref' => 'required|string',
+            'insert_at' => 'nullable|integer|min:0',
         ]);
 
         $component = $this->components->find($validated['component_ref']);
@@ -193,7 +194,8 @@ class StudioController extends Controller
             $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? '';
         }
 
-        $page = $this->pages->addComponent($slug, $validated['component_ref'], $defaultVariables);
+        $insertAt = $validated['insert_at'] ?? null;
+        $page = $this->pages->addComponent($slug, $validated['component_ref'], $defaultVariables, $insertAt);
 
         return response()->json([
             'success' => true,

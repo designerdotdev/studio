@@ -4,6 +4,7 @@
             iframe: null,
             showAddSectionModal: false,
             addingSectionRef: null,
+            insertAtIndex: null,
 
             init() {
                 this.iframe = document.getElementById('preview-iframe');
@@ -15,6 +16,7 @@
                     } else if (event.data.type === 'component-deselected') {
                         Livewire.dispatch('component-deselected');
                     } else if (event.data.type === 'add-section') {
+                        this.insertAtIndex = event.data.insertAtIndex ?? null;
                         this.showAddSectionModal = true;
                     }
                 });
@@ -38,11 +40,12 @@
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
                         },
-                        body: JSON.stringify({ component_ref: componentRef }),
+                        body: JSON.stringify({ component_ref: componentRef, insert_at: this.insertAtIndex }),
                     });
                     const data = await response.json();
                     if (data.success) {
                         this.showAddSectionModal = false;
+                        this.insertAtIndex = null;
                         window.location.reload();
                     }
                 } catch (e) {
