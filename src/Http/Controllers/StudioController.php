@@ -117,7 +117,24 @@ class StudioController extends Controller
                 // Build per-component variables
                 $vars = [];
                 foreach ($component->fields as $key => $config) {
-                    $vars[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
+                    $fieldType = $config['type'] ?? 'text';
+                    if ($fieldType === 'repeater') {
+                        $default = $config['default'] ?? [];
+                        $stored = $instance['variables'][$key] ?? null;
+                        $items = is_array($stored) ? $stored : (is_array($default) ? $default : []);
+                        // Ensure children key exists for nestable repeaters
+                        if (!empty($config['nestable'])) {
+                            $items = array_map(function ($item) {
+                                if (!isset($item['children'])) {
+                                    $item['children'] = [];
+                                }
+                                return $item;
+                            }, $items);
+                        }
+                        $vars[$key] = $items;
+                    } else {
+                        $vars[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
+                    }
                 }
                 $componentVariables[$instance['id']] = $vars;
             }
@@ -191,7 +208,12 @@ class StudioController extends Controller
         // Use preview_variables as default variable values
         $defaultVariables = [];
         foreach ($component->fields as $key => $config) {
-            $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? '';
+            $fieldType = $config['type'] ?? 'text';
+            if ($fieldType === 'repeater') {
+                $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? [];
+            } else {
+                $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? '';
+            }
         }
 
         $insertAt = $validated['insert_at'] ?? null;

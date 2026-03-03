@@ -15,21 +15,23 @@
 
     <!-- Links Section -->
     <nav :class="{ 'h-0 overflow-hidden md:h-auto' : !mobileMenuOpen, 'h-auto' : mobileMenuOpen }" class="relative left-1/2 z-10 flex w-full -translate-x-1/2 flex-col items-start space-x-0 text-sm md:absolute md:block md:w-auto md:py-0 lg:space-x-1">
-      <a href="#_" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-3">Link One</a>
-      <a href="#_" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-3">Link Two</a>
-      <a href="#_" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-3">Link Three</a>
-      <div class="group relative inline-block">
-        <a href="#_" class="flex items-center py-3 text-black/60 duration-150 hover:text-black/80 md:p-3">
-          <span>Link Four</span>
-          <svg class="ml-1 h-5 w-5 duration-300 ease-out group-hover:rotate-180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M8.12 9.29 12 13.17l3.88-3.88a.996.996 0 1 1 1.41 1.41l-4.59 4.59a.996.996 0 0 1-1.41 0L6.7 10.7a.996.996 0 0 1 0-1.41c.39-.38 1.03-.39 1.42 0z"></path></svg>
-        </a>
-        <div class="left-0 hidden w-full translate-y-3 flex-col border-black/10 bg-white py-2 whitespace-nowrap duration-150 ease-linear group-hover:visible group-hover:flex group-hover:translate-y-0 group-hover:duration-300 group-hover:ease-out md:invisible md:absolute md:flex md:w-auto md:rounded-md md:border md:px-3 md:shadow-md">
-          <!-- Dropdown items go here -->
-          <a href="#_" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-2">Link Five</a>
-          <a href="#_" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-2">Link Six</a>
-          <a href="#_" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-2">Link Seven</a>
-        </div>
-      </div>
+      @foreach($nav_links as $link)
+        @if(count($link['children']) > 0)
+          <div class="group relative inline-block">
+            <a href="{{ $link['url'] }}" class="flex items-center py-3 text-black/60 duration-150 hover:text-black/80 md:p-3">
+              <span>{{ $link['text'] }}</span>
+              <svg class="ml-1 h-5 w-5 duration-300 ease-out group-hover:rotate-180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M8.12 9.29 12 13.17l3.88-3.88a.996.996 0 1 1 1.41 1.41l-4.59 4.59a.996.996 0 0 1-1.41 0L6.7 10.7a.996.996 0 0 1 0-1.41c.39-.38 1.03-.39 1.42 0z"></path></svg>
+            </a>
+            <div class="left-0 hidden w-full translate-y-3 flex-col border-black/10 bg-white py-2 whitespace-nowrap duration-150 ease-linear group-hover:visible group-hover:flex group-hover:translate-y-0 group-hover:duration-300 group-hover:ease-out md:invisible md:absolute md:flex md:w-auto md:rounded-md md:border md:px-3 md:shadow-md">
+              @foreach($link['children'] as $child)
+                <a href="{{ $child['url'] }}" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-2">{{ $child['text'] }}</a>
+              @endforeach
+            </div>
+          </div>
+        @else
+          <a href="{{ $link['url'] }}" class="py-3 text-black/60 duration-150 hover:text-black/80 md:p-3">{{ $link['text'] }}</a>
+        @endif
+      @endforeach
     </nav>
 
     <!-- Buttons Section -->
