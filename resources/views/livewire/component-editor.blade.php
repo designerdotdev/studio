@@ -38,13 +38,12 @@
                     @php $fieldType = $field['type'] ?? 'text'; @endphp
 
                     @if($fieldType === 'textarea')
-                        <textarea
+                        <x-katana.textarea
                             id="field-{{ $key }}"
                             rows="4"
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             wire:model.blur="variables.{{ $selectedComponentId }}.{{ $key }}"
                             x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
-                        ></textarea>
+                        />
                     @elseif($fieldType === 'select')
                         <select
                             id="field-{{ $key }}"
@@ -67,10 +66,10 @@
                             <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{ ($variables[$selectedComponentId][$key] ?? false) ? 'translate-x-5' : 'translate-x-0' }}"></span>
                         </button>
                     @elseif($fieldType === 'colorpicker')
-                        <input
+                        <x-katana.input
                             type="color"
                             id="field-{{ $key }}"
-                            class="block h-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            class="h-10"
                             wire:model.live="variables.{{ $selectedComponentId }}.{{ $key }}"
                             x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         />
@@ -118,10 +117,10 @@
                                     <div class="p-3 space-y-2">
                                         @foreach($subFields as $subKey => $subConfig)
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-500 mb-0.5">{{ $subConfig['label'] ?? ucfirst($subKey) }}</label>
-                                                <input
+                                                <x-katana.label class="text-xs text-gray-500">{{ $subConfig['label'] ?? ucfirst($subKey) }}</x-katana.label>
+                                                <x-katana.input
                                                     type="text"
-                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                    class="text-sm"
                                                     value="{{ $item[$subKey] ?? $subConfig['default'] ?? '' }}"
                                                     x-on:input.debounce.400ms="
                                                         $wire.updateRepeaterSubField('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, '{{ $subKey }}', $event.target.value).then(() => {
@@ -154,10 +153,10 @@
                                                     <div class="p-2 space-y-2">
                                                         @foreach($subFields as $subKey => $subConfig)
                                                             <div>
-                                                                <label class="block text-xs font-medium text-gray-500 mb-0.5">{{ $subConfig['label'] ?? ucfirst($subKey) }}</label>
-                                                                <input
+                                                                <x-katana.label class="text-xs text-gray-500">{{ $subConfig['label'] ?? ucfirst($subKey) }}</x-katana.label>
+                                                                <x-katana.input
                                                                     type="text"
-                                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                                                    class="text-sm"
                                                                     value="{{ $child[$subKey] ?? $subConfig['default'] ?? '' }}"
                                                                     x-on:input.debounce.400ms="
                                                                         $wire.updateRepeaterChildSubField('{{ $selectedComponentId }}', '{{ $key }}', {{ $itemIndex }}, {{ $childIndex }}, '{{ $subKey }}', $event.target.value).then(() => {
@@ -176,15 +175,15 @@
                             @endforeach
 
                             {{-- Add button --}}
-                            <button
-                                type="button"
-                                class="flex items-center justify-center w-full px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 border border-dashed border-indigo-300 rounded-md hover:bg-indigo-100 transition-colors"
+                            <x-katana.button
+                                variant="outline"
+                                class="w-full border-dashed"
                                 wire:click="addRepeaterItem('{{ $selectedComponentId }}', '{{ $key }}')"
                                 x-on:click.debounce.300ms="$nextTick(() => notifyIframeRepeater('{{ $selectedComponentId }}', '{{ $key }}'))"
                             >
                                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                 {{ $addLabel }}
-                            </button>
+                            </x-katana.button>
                         </div>
                     @else
                         <x-katana.input

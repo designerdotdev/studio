@@ -68,12 +68,13 @@
                         </p>
                     </div>
                     <div class="mt-8">
-                        <button
+                        <x-katana.button
                             @click="step = 2"
-                            class="w-full inline-flex justify-center rounded-lg border border-transparent px-5 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                            size="lg"
+                            class="w-full"
                         >
                             Next
-                        </button>
+                        </x-katana.button>
                     </div>
                 </div>
 
@@ -116,20 +117,23 @@
                     </div>
 
                     <div class="mt-8 flex gap-3">
-                        <button
+                        <x-katana.button
+                            variant="outline"
                             @click="step = 1"
-                            class="flex-1 inline-flex justify-center rounded-lg border border-gray-300 px-5 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                            size="lg"
+                            class="flex-1"
                         >
                             Back
-                        </button>
-                        <button
+                        </x-katana.button>
+                        <x-katana.button
                             @click="apply()"
-                            :disabled="!selectedTemplate || applying"
-                            class="flex-1 inline-flex justify-center rounded-lg border border-transparent px-5 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            x-bind:disabled="!selectedTemplate || applying"
+                            size="lg"
+                            class="flex-1"
                         >
                             <span x-show="!applying">Get Started</span>
                             <span x-show="applying">Setting up...</span>
-                        </button>
+                        </x-katana.button>
                     </div>
                 </div>
             </div>

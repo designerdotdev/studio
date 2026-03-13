@@ -25,6 +25,8 @@ Route::group([
         Route::delete('/pages/{slug}', [StudioController::class, 'deletePage'])->name('api.pages.destroy');
         Route::put('/pages/{slug}/components', [StudioController::class, 'updatePageComponents'])->name('api.pages.components.update');
         Route::post('/pages/{slug}/components/add', [StudioController::class, 'addComponentToPage'])->name('api.pages.components.add');
+        Route::delete('/pages/{slug}/components/{componentId}', [StudioController::class, 'removeComponentFromPage'])->name('api.pages.components.remove');
+        Route::post('/pages/{slug}/components/{componentId}/move', [StudioController::class, 'moveComponentOnPage'])->name('api.pages.components.move');
 
         // Onboarding
         Route::post('/onboarding/apply-template', [StudioController::class, 'applyTemplate'])->name('api.onboarding.apply');

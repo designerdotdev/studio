@@ -234,6 +234,52 @@ class StudioController extends Controller
         ]);
     }
 
+    public function removeComponentFromPage(string $slug, string $componentId)
+    {
+        $page = $this->pages->removeComponent($slug, $componentId);
+
+        return response()->json([
+            'success' => true,
+            'page' => $page?->toArray(),
+        ]);
+    }
+
+    public function moveComponentOnPage(Request $request, string $slug, string $componentId)
+    {
+        $validated = $request->validate([
+            'direction' => 'required|in:up,down',
+        ]);
+
+        $page = $this->pages->find($slug);
+        if (!$page) {
+            return response()->json(['success' => false, 'error' => 'Page not found'], 404);
+        }
+
+        $components = collect($page->components)->sortBy('order')->values();
+        $currentIndex = $components->search(fn($c) => $c['id'] === $componentId);
+
+        if ($currentIndex === false) {
+            return response()->json(['success' => false, 'error' => 'Component not found'], 404);
+        }
+
+        $newIndex = $validated['direction'] === 'up' ? $currentIndex - 1 : $currentIndex + 1;
+
+        if ($newIndex < 0 || $newIndex >= $components->count()) {
+            return response()->json(['success' => false, 'error' => 'Cannot move further'], 400);
+        }
+
+        // Swap
+        $ids = $components->pluck('id')->toArray();
+        [$ids[$currentIndex], $ids[$newIndex]] = [$ids[$newIndex], $ids[$currentIndex]];
+
+        $page = $this->pages->reorderComponents($slug, $ids);
+
+        return response()->json([
+            'success' => true,
+            'page' => $page?->toArray(),
+        ]);
+    }
+
     public function updatePageComponents(Request $request, string $slug)
     {
         $validated = $request->validate([
