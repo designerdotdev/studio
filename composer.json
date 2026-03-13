@@ -14,10 +14,8 @@
         "illuminate/support": "^11.0|^12.0",
         "livewire/livewire": "^3.0",
         "filament/forms": "^3.2",
-        "symfony/yaml": "^7.0"
-    },
-    "require-dev": {
-        "katanaui/katana": "@dev"
+        "symfony/yaml": "^7.0",
+        "katanaui/katana": "dev-dev"
     },
     "autoload": {
         "psr-4": {
@@ -31,6 +29,6 @@
             ]
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true
 }
