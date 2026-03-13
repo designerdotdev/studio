@@ -37,12 +37,9 @@ class="h-full flex flex-col">
         </div>
 
         <div class="p-4 border-t border-gray-200 bg-gray-50">
-            <button
-                type="submit"
-                class="w-full inline-flex justify-center items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition"
-            >
+            <x-katana.button type="submit" class="w-full">
                 Save Changes
-            </button>
+            </x-katana.button>
         </div>
     </form>
 </div>

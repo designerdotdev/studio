@@ -18,6 +18,10 @@
                     } else if (event.data.type === 'add-section') {
                         this.insertAtIndex = event.data.insertAtIndex ?? null;
                         this.showAddSectionModal = true;
+                    } else if (event.data.type === 'move-component') {
+                        this.moveComponent(event.data.componentId, event.data.direction);
+                    } else if (event.data.type === 'delete-component') {
+                        this.deleteComponent(event.data.componentId);
                     }
                 });
             },
@@ -28,6 +32,43 @@
             sendToIframe(type, data) {
                 if (this.iframe && this.iframe.contentWindow) {
                     this.iframe.contentWindow.postMessage({ type, ...data }, '*');
+                }
+            },
+
+            async moveComponent(componentId, direction) {
+                try {
+                    const response = await fetch(`{{ url(config('studio.path', 'studio')) }}/api/pages/{{ $page->slug }}/components/${componentId}/move`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        },
+                        body: JSON.stringify({ direction }),
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.reload();
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            },
+
+            async deleteComponent(componentId) {
+                try {
+                    const response = await fetch(`{{ url(config('studio.path', 'studio')) }}/api/pages/{{ $page->slug }}/components/${componentId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        },
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.reload();
+                    }
+                } catch (e) {
+                    console.error(e);
                 }
             },
 
@@ -141,14 +182,12 @@
                     </div>
 
                     <div style="padding:12px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;">
-                        <button
+                        <x-katana.button
+                            variant="outline"
                             @click="showAddSectionModal = false"
-                            style="padding:8px 16px;font-size:14px;font-weight:500;color:#374151;background:white;border:1px solid #d1d5db;border-radius:8px;cursor:pointer;transition:background 0.15s;"
-                            onmouseover="this.style.background='#f9fafb'"
-                            onmouseout="this.style.background='white'"
                         >
                             Cancel
-                        </button>
+                        </x-katana.button>
                     </div>
                 </div>
         </template>
@@ -233,7 +272,7 @@
                         @endforeach
 
                         {{-- Divider --}}
-                        <div class="border-t border-gray-100 my-1"></div>
+                        <x-katana.separator class="my-1" />
 
                         {{-- Create Page Button --}}
                         <button
@@ -250,16 +289,17 @@
 
                 <div class="flex items-center gap-1.5">
                     {{-- Preview Button --}}
-                    <a
-                        href="{{ $page->slug === config('studio.page_routing.home_slug', 'home') ? '/' : '/' . $page->slug }}"
+                    <x-katana.button
+                        type="a"
+                        :href="$page->slug === config('studio.page_routing.home_slug', 'home') ? '/' : '/' . $page->slug"
                         target="_blank"
-                        class="px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-md hover:bg-black transition-colors inline-flex items-center gap-1"
+                        size="xs"
                     >
                         Preview
-                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                         </svg>
-                    </a>
+                    </x-katana.button>
                 </div>
             </div>
 
@@ -307,51 +347,50 @@
                                     Create New Page
                                 </h3>
                                 <div class="mt-4">
-                                    <label for="page-title" class="block text-sm font-medium text-gray-700">Page Title</label>
-                                    <input
+                                    <x-katana.label for="page-title">Page Title</x-katana.label>
+                                    <x-katana.input
                                         type="text"
                                         id="page-title"
                                         x-model="newPageTitle"
                                         @input="if (!slugManuallyEdited) { newPageSlug = newPageTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''); }"
                                         @keydown.enter="createPage()"
-                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        class="mt-1"
                                         placeholder="e.g., About Us"
-                                    >
+                                    />
                                 </div>
                                 <div class="mt-3">
-                                    <label for="page-slug" class="block text-sm font-medium text-gray-700">URL Slug</label>
+                                    <x-katana.label for="page-slug">URL Slug</x-katana.label>
                                     <div class="mt-1 flex rounded-md shadow-sm">
-                                        <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">/</span>
-                                        <input
+                                        <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-gray-50 text-gray-500 sm:text-sm">/</span>
+                                        <x-katana.input
                                             type="text"
                                             id="page-slug"
                                             x-model="newPageSlug"
                                             @input="slugManuallyEdited = true"
                                             @keydown.enter="createPage()"
-                                            class="flex-1 min-w-0 block w-full border-gray-300 rounded-none rounded-r-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            class="flex-1 rounded-none rounded-r-md"
                                             placeholder="about-us"
-                                        >
+                                        />
                                     </div>
                                     <p class="mt-1 text-xs text-gray-500">This will be the URL where the page lives.</p>
                                 </div>
                             </div>
                             <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-                                <button
-                                    type="button"
+                                <x-katana.button
                                     @click="createPage()"
-                                    :disabled="creating"
-                                    class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
+                                    x-bind:disabled="creating"
+                                    class="w-full sm:col-start-2"
                                 >
                                     <span x-show="!creating">Create Page</span>
                                     <span x-show="creating">Creating...</span>
-                                </button>
-                                <button
-                                    type="button"
+                                </x-katana.button>
+                                <x-katana.button
+                                    variant="outline"
                                     @click="showCreateModal = false; newPageTitle = ''; newPageSlug = ''; slugManuallyEdited = false"
-                                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                                    class="mt-3 w-full sm:mt-0 sm:col-start-1"
                                 >
                                     Cancel
-                                </button>
+                                </x-katana.button>
                             </div>
                         </div>
                     </div>
