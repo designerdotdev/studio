@@ -1,31 +1,18 @@
 # Designer Studio
 
-A visual component builder/editor for Laravel applications. Build beautiful pages visually and export them as Blade files.
+A visual page builder for Laravel applications. Design pages with a live preview editor and export them as Blade files.
 
 ## Features
 
-- Visual page editor with live preview
+- Visual page editor with iframe-based live preview
 - Component library with customizable fields
-- JSON-based storage (no database pollution)
+- Repeater fields for dynamic lists and nested menu builders
+- JSON-based storage (no database required)
+- Automatic page routing (pages become live routes instantly)
 - Export to Blade files
 - Easy install and uninstall
 
 ## Installation
-
-Add the package repository to your `composer.json`:
-
-```json
-{
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/designerdotdev/studio.git"
-        }
-    ]
-}
-```
-
-Then require the package:
 
 ```bash
 composer require designer/studio
@@ -33,19 +20,16 @@ composer require designer/studio
 
 ## Quick Start
 
-1. **Seed sample data** (optional):
-   ```bash
-   php artisan studio:seed
-   ```
-
-2. **Visit the studio**:
+1. **Visit the studio**:
    ```
    http://your-app.test/studio
    ```
 
-3. **Edit a page** by clicking on it in the dashboard
+2. **Choose a template** from the onboarding screen, or create a blank page
 
-4. **Generate Blade files** by clicking "Generate All Blade Files"
+3. **Edit a page** by clicking on components in the live preview
+
+4. **Generate Blade files** when you're ready to export
 
 ## Configuration
 
@@ -71,8 +55,28 @@ return [
     // Where generated Blade files go
     'output_path' => resource_path('views/designer'),
 
-    // Default layout for generated pages
-    'default_layout' => 'layouts.app',
+    // Default layout component for generated pages
+    'default_layout' => 'layout',
+
+    // Automatically regenerate Blade files on save
+    'auto_generate' => true,
+
+    // Auto-routing: pages become live public routes without generation
+    'page_routing' => [
+        'enabled' => true,
+        'middleware' => ['web'],
+        'home_slug' => 'home',
+    ],
+
+    // Editor sidebar position: 'left' or 'right'
+    'sidebar_position' => 'left',
+
+    // Iframe preview settings (Tailwind CDN, Alpine.js, custom styles/scripts)
+    'iframe' => [
+        'tailwind_cdn' => true,
+        'alpine_cdn' => true,
+        // ...
+    ],
 ];
 ```
 
@@ -89,7 +93,7 @@ storage/studio/
 │   └── about.json
 └── components/library/
     ├── hero-basic.json
-    └── features-grid.json
+    └── header-nav.json
 ```
 
 ### Output
@@ -104,32 +108,188 @@ resources/views/designer/
 
 ## Creating Components
 
-Components are JSON files with this structure:
+Components are defined as a pair of YAML + HTML files in `resources/views/designer/`:
+
+```
+resources/views/designer/
+├── heroes/
+│   ├── hero-01.yml
+│   └── hero-01.html
+├── headers/
+│   ├── header-01.yml
+│   └── header-01.html
+└── features/
+    ├── features-01.yml
+    └── features-01.html
+```
+
+### YAML Definition
+
+The `.yml` file defines the component metadata and editable fields:
+
+```yaml
+name: hero-basic
+title: Basic Hero Section
+description: A simple hero with title, subtitle, and CTA
+category: heroes
+tags:
+    - hero
+    - landing
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "Build faster."
+        required: true
+
+    description:
+        type: textarea
+        label: Description
+        default: "A short description of your product."
+
+    show_cta:
+        type: toggle
+        label: Show CTA Button
+        default: true
+```
+
+### HTML Template
+
+The `.html` file contains the component markup using Blade syntax:
+
+```html
+<section class="py-20 text-center">
+    <h1>{{ $heading ?? 'Build faster.' }}</h1>
+    <p>{{ $description ?? 'A short description.' }}</p>
+    @if($show_cta ?? false)
+        <a href="#">Get Started</a>
+    @endif
+</section>
+```
+
+Variables use standard Blade syntax: `{{ $var ?? 'default' }}` for escaped output and `{!! $var ?? '' !!}` for raw HTML.
+
+## Field Types
+
+### Basic Fields
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `text` | Single line text input | Headings, button labels, URLs |
+| `textarea` | Multi-line text input | Descriptions, SVG code |
+| `select` | Dropdown with predefined options | Alignment, style variants |
+| `toggle` | Boolean on/off switch | Show/hide elements |
+| `colorpicker` | Color picker | Background colors, accents |
+
+### Repeater
+
+The `repeater` field type allows dynamic lists of items with defined sub-fields. Use it for navigation links, feature lists, testimonials, or any repeating content.
+
+```yaml
+fields:
+    features:
+        type: repeater
+        label: Features
+        add_button_label: "Add Feature"
+        sub_fields:
+            title:
+                type: text
+                label: Title
+                default: "Feature"
+            description:
+                type: text
+                label: Description
+                default: "Feature description"
+```
+
+In the HTML template, use `@foreach` to loop over repeater items:
+
+```html
+<div class="grid grid-cols-3 gap-8">
+    @foreach($features as $feature)
+        <div>
+            <h3>{{ $feature['title'] }}</h3>
+            <p>{{ $feature['description'] }}</p>
+        </div>
+    @endforeach
+</div>
+```
+
+#### Nestable Repeaters (Menu Builder)
+
+Add `nestable: true` to enable hierarchical nesting, turning the repeater into a menu builder. Each item automatically gets a `children` array. Use `max_depth` to limit nesting levels.
+
+```yaml
+fields:
+    nav_links:
+        type: repeater
+        label: Navigation Links
+        nestable: true
+        max_depth: 2
+        add_button_label: "Add Link"
+        sub_fields:
+            text:
+                type: text
+                label: Link Text
+                default: "Link"
+            url:
+                type: text
+                label: URL
+                default: "#"
+        default:
+            - text: "Home"
+              url: "/"
+            - text: "About"
+              url: "/about"
+```
+
+In the HTML template, check `children` to render dropdowns:
+
+```html
+<nav>
+    @foreach($nav_links as $link)
+        @if(count($link['children']) > 0)
+            <div class="dropdown">
+                <span>{{ $link['text'] }}</span>
+                <div class="dropdown-menu">
+                    @foreach($link['children'] as $child)
+                        <a href="{{ $child['url'] }}">{{ $child['text'] }}</a>
+                    @endforeach
+                </div>
+            </div>
+        @else
+            <a href="{{ $link['url'] }}">{{ $link['text'] }}</a>
+        @endif
+    @endforeach
+</nav>
+```
+
+The sidebar UI provides:
+- Add/remove items
+- Reorder with up/down arrows
+- Indent (make child of item above) and outdent (move back to top level) for nestable repeaters
+- Inline editing of sub-fields with live preview updates
+
+#### Repeater Data Structure
+
+Repeater data is stored as arrays within the existing page JSON:
 
 ```json
 {
-  "name": "hero-basic",
-  "title": "Basic Hero Section",
-  "description": "A simple hero with title and subtitle",
-  "category": "heroes",
-  "html": "<section class=\"py-20\"><h1>{{ $title ?? \"Welcome\" }}</h1></section>",
-  "fields": {
-    "title": {
-      "type": "text",
-      "label": "Title",
-      "default": "Welcome"
+    "variables": {
+        "company_name": "Acme",
+        "nav_links": [
+            { "text": "Home", "url": "/", "children": [] },
+            { "text": "Products", "url": "#", "children": [
+                { "text": "Widget A", "url": "/widget-a", "children": [] }
+            ]}
+        ]
     }
-  }
 }
 ```
 
-### Field Types
-
-- `text` - Single line text input
-- `textarea` - Multi-line text
-- `select` - Dropdown with options
-- `toggle` - Boolean switch
-- `colorpicker` - Color picker
+Flat repeaters (without `nestable: true`) omit the `children` key.
 
 ## Artisan Commands
 

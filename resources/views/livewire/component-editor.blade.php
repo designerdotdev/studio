@@ -187,10 +187,9 @@
                             </button>
                         </div>
                     @else
-                        <input
+                        <x-katana.input
                             type="text"
                             id="field-{{ $key }}"
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             wire:model.blur="variables.{{ $selectedComponentId }}.{{ $key }}"
                             x-on:input="notifyIframe('{{ $selectedComponentId }}', '{{ $key }}', $event.target.value)"
                         />
