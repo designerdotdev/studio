@@ -16,6 +16,9 @@
         "filament/forms": "^3.2",
         "symfony/yaml": "^7.0"
     },
+    "require-dev": {
+        "katanaui/katana": "@dev"
+    },
     "autoload": {
         "psr-4": {
             "Designer\\Studio\\": "src/"
