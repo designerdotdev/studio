@@ -43,7 +43,7 @@
             :class="{ 'h-0 md:h-auto' : !mobileMenuOpen, 'h-auto' : mobileMenuOpen }"
             class="relative left-1/2 z-10 flex w-full -translate-x-1/2 flex-col items-start space-x-0 text-sm md:absolute md:block md:w-auto md:py-0 lg:space-x-1"
         >
-            @foreach($nav_links as $link) @if(count($link['children']) > 0)
+            @foreach($nav_links as $link) @if(!empty($link['children']))
             <div class="group relative inline-block">
                 <a
                     href="{{ $link['url'] }}"
