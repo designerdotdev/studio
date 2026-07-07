@@ -1,16 +1,19 @@
 # Designer Studio
 
-A visual page builder for Laravel applications. Design pages with a live preview editor and export them as Blade files.
+**The visual editor for your Laravel site.** Developers define sections as plain Blade + YAML files — then anyone on the team (marketing, HR, founders) edits pages visually with a live preview. No database, no lock-in: everything is files, and every page can be exported as a plain Blade view.
 
-## Features
+- 🎨 **Visual editor** — click any section on the live preview and edit its content in place
+- 🧱 **30+ pre-built sections** — heroes, features, pricing, testimonials, FAQs, footers, and more, organized by category with live thumbnails
+- 📄 **Multi-page** — create, duplicate, and manage as many pages as you need, with SEO settings per page
+- ⚡ **Instant publishing** — pages become live routes the moment they're created (`/`, `/about`, `/pricing`, …)
+- 📦 **File-based** — pages are JSON in `storage/studio/`, sections are Blade + YAML in `resources/views/designer/`. Everything versions cleanly in git
+- 🛠 **Exportable** — one click writes any page to a plain `.blade.php` file you fully own
+- 🪶 **Light footprint** — Livewire 3 + Alpine.js; no database tables, no migrations
 
-- Visual page editor with iframe-based live preview
-- Component library with customizable fields
-- Repeater fields for dynamic lists and nested menu builders
-- JSON-based storage (no database required)
-- Automatic page routing (pages become live routes instantly)
-- Export to Blade files
-- Easy install and uninstall
+## Requirements
+
+- PHP 8.2+
+- Laravel 11 or 12
 
 ## Installation
 
@@ -18,310 +21,151 @@ A visual page builder for Laravel applications. Design pages with a live preview
 composer require designer/studio
 ```
 
-## Quick Start
+That's it. Visit `/studio` in your app and pick a starting template — Blank, Starter, Launch (SaaS landing), Studio (agency portfolio), or Horizon (three-page company site).
 
-1. **Visit the studio**:
-   ```
-   http://your-app.test/studio
-   ```
+> **Production note:** the Studio editor ships with the `web` middleware only. Before deploying,
+> protect it with your own auth — see [Securing the Studio](#securing-the-studio).
 
-2. **Choose a template** from the onboarding screen, or create a blank page
-
-3. **Edit a page** by clicking on components in the live preview
-
-4. **Generate Blade files** when you're ready to export
-
-## Configuration
-
-Publish the configuration file:
-
-```bash
-php artisan vendor:publish --tag=studio-config
-```
-
-### Config Options
-
-```php
-return [
-    // Route prefix (e.g., 'admin/studio' → /admin/studio)
-    'path' => 'studio',
-
-    // Middleware for studio routes
-    'middleware' => ['web'],
-
-    // Where JSON data is stored
-    'storage_path' => storage_path('studio'),
-
-    // Where generated Blade files go
-    'output_path' => resource_path('views/designer'),
-
-    // Default layout component for generated pages
-    'default_layout' => 'layout',
-
-    // Automatically regenerate Blade files on save
-    'auto_generate' => true,
-
-    // Auto-routing: pages become live public routes without generation
-    'page_routing' => [
-        'enabled' => true,
-        'middleware' => ['web'],
-        'home_slug' => 'home',
-    ],
-
-    // Editor sidebar position: 'left' or 'right'
-    'sidebar_position' => 'left',
-
-    // Iframe preview settings (Tailwind CDN, Alpine.js, custom styles/scripts)
-    'iframe' => [
-        'tailwind_cdn' => true,
-        'alpine_cdn' => true,
-        // ...
-    ],
-];
-```
-
-## How It Works
-
-### Storage
-
-All data is stored as JSON files in `storage/studio/`:
+## How it works
 
 ```
+resources/views/designer/          ← section designs (Blade + YAML, published on install)
+    heroes/hero-split.html         ← the template
+    heroes/hero-split.yml          ← its editable fields
 storage/studio/
-├── pages/
-│   ├── home.json
-│   └── about.json
-└── components/library/
-    ├── hero-basic.json
-    └── header-nav.json
+    pages/home.json                ← page = ordered list of section instances + their content
+    components/library/*.json      ← synced library (regenerated from the design files)
 ```
 
-### Output
+1. **Developers** create section designs: an `.html` file (Blade template) plus a `.yml` file
+   declaring which parts are editable (text, images, toggles, repeaters, …).
+2. **Editors** open `/studio`, click sections, and change content with a live preview.
+   Everything autosaves.
+3. **Pages go live automatically** at their slug (`home` → `/`, `about` → `/about`), or you can
+   export them as Blade files and route them yourself.
 
-Generated Blade files are placed in `resources/views/designer/`:
+## The editor
 
-```
-resources/views/designer/
-├── home.blade.php
-└── about.blade.php
-```
+- **Click a section** in the canvas to edit its fields; changes render instantly as you type.
+- **Sections panel** — drag to reorder; duplicate, hide, or delete from the row actions.
+- **Add section** — browse the library by category with live-rendered previews and search.
+- **Page tab** — rename the page, change its URL, set SEO title/description, duplicate or delete.
+- **Device toggle** — preview at desktop, tablet (768px), and mobile (390px) widths.
+- **Publish** — copy the live URL or export the page as a Blade file.
+- Shortcuts: `Esc` deselect · `⌘D` duplicate section · `⌫` delete section.
 
-## Creating Components
+## Creating your own sections
 
-Components are defined as a pair of YAML + HTML files in `resources/views/designer/`:
-
-```
-resources/views/designer/
-├── heroes/
-│   ├── hero-01.yml
-│   └── hero-01.html
-├── headers/
-│   ├── header-01.yml
-│   └── header-01.html
-└── features/
-    ├── features-01.yml
-    └── features-01.html
-```
-
-### YAML Definition
-
-The `.yml` file defines the component metadata and editable fields:
+Add a pair of files under `resources/views/designer/<category>/`:
 
 ```yaml
-name: hero-basic
-title: Basic Hero Section
-description: A simple hero with title, subtitle, and CTA
+# resources/views/designer/heroes/hero-simple.yml
+name: hero-simple
+title: Simple hero
+description: Big heading with a button
 category: heroes
-tags:
-    - hero
-    - landing
 
 fields:
     heading:
         type: text
         label: Heading
-        default: "Build faster."
-        required: true
+        default: "A better way to work"
 
-    description:
-        type: textarea
-        label: Description
-        default: "A short description of your product."
-
-    show_cta:
-        type: toggle
-        label: Show CTA Button
-        default: true
+    button_text:
+        type: text
+        label: Button text
+        default: "Get started"
 ```
 
-### HTML Template
-
-The `.html` file contains the component markup using Blade syntax:
-
-```html
-<section class="py-20 text-center">
-    <h1>{{ $heading ?? 'Build faster.' }}</h1>
-    <p>{{ $description ?? 'A short description.' }}</p>
-    @if($show_cta ?? false)
-        <a href="#">Get Started</a>
-    @endif
+```blade
+{{-- resources/views/designer/heroes/hero-simple.html --}}
+<section class="w-full bg-white px-6 py-24 text-center">
+    <h1 class="text-5xl font-semibold tracking-tight text-neutral-950">
+        {{ $heading ?? 'A better way to work' }}
+    </h1>
+    <a href="#" class="mt-8 inline-block rounded-xl bg-neutral-900 px-6 py-3 text-sm font-medium text-white">
+        {{ $button_text ?? 'Get started' }}
+    </a>
 </section>
 ```
 
-Variables use standard Blade syntax: `{{ $var ?? 'default' }}` for escaped output and `{!! $var ?? '' !!}` for raw HTML.
+Reload `/studio` — your section appears in the library, fully editable.
 
-## Field Types
+**Field types:** `text`, `textarea`, `url`, `select`, `toggle`, `colorpicker`, `image`
+(with built-in uploads), and `repeater` (repeating groups, optionally nestable for menus).
 
-### Basic Fields
+Sections support a well-defined Blade subset (`{{ $var ?? '…' }}`, `@if`/`@else`, `@foreach`
+over repeaters) so they render identically in the live editor, on published pages, and in Blade
+exports. The full authoring guide — including the design-language conventions the built-in
+library follows — lives in [`docs/authoring-sections.md`](docs/authoring-sections.md).
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `text` | Single line text input | Headings, button labels, URLs |
-| `textarea` | Multi-line text input | Descriptions, SVG code |
-| `select` | Dropdown with predefined options | Alignment, style variants |
-| `toggle` | Boolean on/off switch | Show/hide elements |
-| `colorpicker` | Color picker | Background colors, accents |
-
-### Repeater
-
-The `repeater` field type allows dynamic lists of items with defined sub-fields. Use it for navigation links, feature lists, testimonials, or any repeating content.
-
-```yaml
-fields:
-    features:
-        type: repeater
-        label: Features
-        add_button_label: "Add Feature"
-        sub_fields:
-            title:
-                type: text
-                label: Title
-                default: "Feature"
-            description:
-                type: text
-                label: Description
-                default: "Feature description"
-```
-
-In the HTML template, use `@foreach` to loop over repeater items:
-
-```html
-<div class="grid grid-cols-3 gap-8">
-    @foreach($features as $feature)
-        <div>
-            <h3>{{ $feature['title'] }}</h3>
-            <p>{{ $feature['description'] }}</p>
-        </div>
-    @endforeach
-</div>
-```
-
-#### Nestable Repeaters (Menu Builder)
-
-Add `nestable: true` to enable hierarchical nesting, turning the repeater into a menu builder. Each item automatically gets a `children` array. Use `max_depth` to limit nesting levels.
-
-```yaml
-fields:
-    nav_links:
-        type: repeater
-        label: Navigation Links
-        nestable: true
-        max_depth: 2
-        add_button_label: "Add Link"
-        sub_fields:
-            text:
-                type: text
-                label: Link Text
-                default: "Link"
-            url:
-                type: text
-                label: URL
-                default: "#"
-        default:
-            - text: "Home"
-              url: "/"
-            - text: "About"
-              url: "/about"
-```
-
-In the HTML template, check `children` to render dropdowns:
-
-```html
-<nav>
-    @foreach($nav_links as $link)
-        @if(count($link['children']) > 0)
-            <div class="dropdown">
-                <span>{{ $link['text'] }}</span>
-                <div class="dropdown-menu">
-                    @foreach($link['children'] as $child)
-                        <a href="{{ $child['url'] }}">{{ $child['text'] }}</a>
-                    @endforeach
-                </div>
-            </div>
-        @else
-            <a href="{{ $link['url'] }}">{{ $link['text'] }}</a>
-        @endif
-    @endforeach
-</nav>
-```
-
-The sidebar UI provides:
-- Add/remove items
-- Reorder with up/down arrows
-- Indent (make child of item above) and outdent (move back to top level) for nestable repeaters
-- Inline editing of sub-fields with live preview updates
-
-#### Repeater Data Structure
-
-Repeater data is stored as arrays within the existing page JSON:
-
-```json
-{
-    "variables": {
-        "company_name": "Acme",
-        "nav_links": [
-            { "text": "Home", "url": "/", "children": [] },
-            { "text": "Products", "url": "#", "children": [
-                { "text": "Widget A", "url": "/widget-a", "children": [] }
-            ]}
-        ]
-    }
-}
-```
-
-Flat repeaters (without `nestable: true`) omit the `children` key.
-
-## Artisan Commands
+## Configuration
 
 ```bash
-# Seed sample components and page
-php artisan studio:seed
-
-# Uninstall and remove all data
-php artisan studio:uninstall
-
-# Uninstall but keep generated Blade files
-php artisan studio:uninstall --keep-generated
-
-# Uninstall but keep JSON data
-php artisan studio:uninstall --keep-data
+php artisan vendor:publish --tag=studio-config
 ```
 
-## Uninstall
+Key options in `config/studio.php`:
 
-To completely remove Designer Studio:
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `path` | `studio` | URL prefix for the editor |
+| `middleware` | `['web']` | Middleware for the editor + its API |
+| `gate` | `null` | Optional ability name required for every Studio route |
+| `storage_path` | `storage_path('studio')` | Where page/component JSON lives |
+| `output_path` | `resource_path('views/designer')` | Where exported Blade files are written |
+| `page_routing.enabled` | `true` | Auto-register a live route per page |
+| `page_routing.home_slug` | `home` | Which page serves `/` |
+| `iframe.*` | — | CDN toggles, extra assets, body classes for rendered pages |
+
+## Securing the Studio
+
+Anyone who can reach the Studio can edit your marketing site. Lock it down with either:
+
+```php
+// config/studio.php — simplest: require login
+'middleware' => ['web', 'auth'],
+```
+
+or a gate for finer control:
+
+```php
+// AppServiceProvider::boot()
+Gate::define('viewStudio', fn ($user) => $user->is_admin);
+
+// config/studio.php
+'gate' => 'viewStudio',
+```
+
+Image uploads (used by image fields) are stored in `public/studio-uploads/` and validated to
+raster image types, 5 MB max.
+
+## Artisan commands
 
 ```bash
-# Remove data
-php artisan studio:uninstall
+php artisan studio:sync         # Re-sync section designs into the library
+php artisan studio:seed         # Seed the starter template
+php artisan studio:dev-reset    # Wipe studio data back to a fresh install (dev only)
+php artisan studio:uninstall    # Remove studio data (--keep-generated, --keep-data)
+```
 
-# Remove package
+## Exporting pages
+
+Every page can be written to a plain Blade file (`Publish → Export Blade file`, or
+`POST /studio/api/generate/{slug}`). Exports land in `resources/views/designer/{slug}.blade.php`,
+wrapped in the layout component configured by `default_layout`. From there they're ordinary
+views — route them, edit them, or delete the package entirely; your pages keep working.
+
+## Uninstalling
+
+```bash
+php artisan studio:uninstall    # interactive; removes storage + generated files
 composer remove designer/studio
-
-# Remove config (if published)
-rm config/studio.php
 ```
+
+Because published pages are just files, `--keep-generated` leaves your exported Blade views in
+place so nothing on your site breaks.
 
 ## License
 
-MIT
+MIT © [Designer](https://designer.dev)

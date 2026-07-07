@@ -1,0 +1,24 @@
+<section class="w-full bg-white py-24 sm:py-36">
+    <div class="mx-auto w-full max-w-6xl px-6 lg:px-8">
+        @if($eyebrow)
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-neutral-400">{{ $eyebrow }}</p>
+        @endif
+
+        <h1 class="mt-8 max-w-4xl text-[2.6rem] font-medium leading-[1.08] tracking-tight text-neutral-950 sm:text-6xl lg:text-7xl">
+            {{ $statement_start ?? 'We design identities and interfaces for companies' }}
+            <em class="font-serif italic text-neutral-400">{{ $statement_accent ?? 'worth remembering.' }}</em>
+        </h1>
+
+        @if($link_text)
+            <a href="{{ $link_url ?? '#' }}" class="group mt-10 inline-flex items-center gap-2 text-[15px] font-medium text-neutral-950">
+                <span class="border-b border-neutral-300 pb-0.5 transition-colors group-hover:border-neutral-950">{{ $link_text }}</span>
+                <svg class="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
+            </a>
+        @endif
+
+        <div class="mt-20 flex flex-col gap-2 border-t border-neutral-200 pt-5 text-sm text-neutral-400 sm:flex-row sm:items-center sm:justify-between">
+            <span>{{ $meta_left ?? '' }}</span>
+            <span>{{ $meta_right ?? '' }}</span>
+        </div>
+    </div>
+</section>

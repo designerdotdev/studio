@@ -1,0 +1,25 @@
+<section class="w-full bg-white py-20 sm:py-28">
+    <div class="mx-auto w-full max-w-6xl px-6 lg:px-8">
+        <div class="relative overflow-hidden rounded-[2.5rem] bg-neutral-950 px-6 py-20 sm:px-16 sm:py-24">
+            <div class="pointer-events-none absolute inset-0">
+                <div class="absolute left-1/2 top-[-160px] h-[380px] w-[640px] -translate-x-1/2 rounded-full opacity-20 blur-3xl" style="background: {{ $glow_color ?? '#4c7dfa' }}"></div>
+                <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 24px 24px;"></div>
+            </div>
+
+            <div class="relative mx-auto max-w-2xl text-center">
+                <h2 class="text-balance text-3xl font-semibold tracking-tight text-white sm:text-5xl">{{ $heading ?? 'Stop answering the same email twice' }}</h2>
+
+                <p class="mx-auto mt-5 max-w-xl text-balance text-lg leading-relaxed text-neutral-400">{{ $text ?? 'Every thread gets one owner the moment it lands, so replies never collide.' }}</p>
+
+                <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    @if($button_text)
+                        <a href="{{ $button_link ?? '#' }}" class="inline-flex w-full items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-neutral-950 shadow-lg shadow-white/10 transition hover:bg-neutral-100 sm:w-auto">{{ $button_text }}</a>
+                    @endif
+                    @if($button_text_2)
+                        <a href="{{ $button_link_2 ?? '#' }}" class="inline-flex w-full items-center justify-center rounded-xl border border-white/15 px-6 py-3 text-sm font-medium text-neutral-200 transition hover:border-white/25 hover:bg-white/5 sm:w-auto">{{ $button_text_2 }}</a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

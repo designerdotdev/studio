@@ -1,0 +1,20 @@
+<section class="w-full bg-neutral-50 py-20 sm:py-28">
+    <div class="mx-auto w-full max-w-6xl px-6 lg:px-8">
+        <div class="mx-auto max-w-xl text-center">
+            <h2 class="text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">{{ $heading ?? 'The changelog, in your inbox' }}</h2>
+            @if($text)
+                <p class="mt-4 text-base leading-relaxed text-neutral-500">{{ $text }}</p>
+            @endif
+
+            <form action="{{ $form_action ?? '#' }}" method="post" class="mt-8 flex flex-col gap-3 sm:flex-row">
+                <label for="newsletter-email" class="sr-only">Email address</label>
+                <input id="newsletter-email" type="email" name="email" required placeholder="{{ $placeholder ?? 'you@company.com' }}" class="h-12 w-full flex-1 rounded-xl border border-neutral-200 bg-white px-4 text-sm text-neutral-950 placeholder:text-neutral-400 transition-colors focus:border-neutral-400 focus:outline-none">
+                <button type="submit" class="h-12 shrink-0 rounded-xl bg-neutral-900 px-6 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800">{{ $button_text ?? 'Subscribe' }}</button>
+            </form>
+
+            @if($fine_print)
+                <p class="mt-4 text-xs text-neutral-400">{{ $fine_print }}</p>
+            @endif
+        </div>
+    </div>
+</section>

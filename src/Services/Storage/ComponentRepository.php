@@ -8,9 +8,48 @@ use Illuminate\Support\Str;
 
 class ComponentRepository
 {
+    /**
+     * Canonical display order for library categories — roughly the order
+     * sections appear on a real marketing page, top to bottom.
+     */
+    public const CATEGORY_ORDER = [
+        'banners',
+        'headers',
+        'heroes',
+        'logos',
+        'features',
+        'stats',
+        'content',
+        'gallery',
+        'testimonials',
+        'pricing',
+        'faq',
+        'team',
+        'blog',
+        'contact',
+        'newsletter',
+        'cta',
+        'footers',
+    ];
+
     public function __construct(
         protected StudioStorage $storage
     ) {}
+
+    /**
+     * All components grouped by category, in canonical category order.
+     *
+     * @return Collection<string, Collection<int, ComponentData>>
+     */
+    public function grouped(): Collection
+    {
+        $order = array_flip(self::CATEGORY_ORDER);
+
+        return $this->all()
+            ->sortBy(fn(ComponentData $comp) => $comp->name)
+            ->groupBy(fn(ComponentData $comp) => $comp->category)
+            ->sortBy(fn($group, $category) => $order[$category] ?? (count($order) + ord(substr($category, 0, 1))));
+    }
 
     public function all(): Collection
     {

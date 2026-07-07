@@ -1,0 +1,87 @@
+name: footer-dark
+title: Dark footer with newsletter
+description: Dark footer with a newsletter signup, link columns, and social icons
+category: footers
+tags:
+    - footer
+    - dark
+    - newsletter
+
+fields:
+    company_name:
+        type: text
+        label: Company name
+        default: "Acme"
+        required: true
+
+    blurb:
+        type: textarea
+        label: Blurb
+        default: "Support software that keeps every reply fast, owned, and on the record."
+
+    label_text:
+        type: text
+        label: Newsletter label
+        default: "Get product updates"
+
+    button_text:
+        type: text
+        label: Submit button text
+        default: "Subscribe"
+
+    form_action:
+        type: url
+        label: Form action URL
+        default: "#"
+
+    columns:
+        type: repeater
+        label: Link columns
+        nestable: true
+        max_depth: 2
+        add_button_label: Add column
+        description: Top-level items are column headings. Nest links beneath them.
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Product"
+              url: "#"
+              children:
+                  - text: "Features"
+                    url: "#"
+                  - text: "Pricing"
+                    url: "#"
+                  - text: "Changelog"
+                    url: "#"
+                  - text: "Docs"
+                    url: "#"
+            - text: "Company"
+              url: "#"
+              children:
+                  - text: "About"
+                    url: "#"
+                  - text: "Blog"
+                    url: "#"
+                  - text: "Careers"
+                    url: "#"
+                  - text: "Contact"
+                    url: "#"
+            - text: "Legal"
+              url: "#"
+              children:
+                  - text: "Privacy policy"
+                    url: "#"
+                  - text: "Terms of service"
+                    url: "#"
+
+    copyright:
+        type: text
+        label: Copyright
+        default: "© 2026 Acme, Inc. All rights reserved."

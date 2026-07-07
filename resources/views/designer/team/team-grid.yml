@@ -1,0 +1,70 @@
+name: team-grid
+title: Team grid
+description: Four-across grid of portraits with names and roles
+category: team
+tags:
+    - team
+    - people
+    - grid
+    - about
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small label above the heading. Clear to hide.
+        default: "The team"
+
+    heading:
+        type: text
+        label: Heading
+        default: "The people building it"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        default: "We keep the team small on purpose — everyone ships product, and everyone spends two days a month answering support."
+
+    members:
+        type: repeater
+        label: Team members
+        add_button_label: Add member
+        sub_fields:
+            name:
+                type: text
+                label: Name
+                default: "Full name"
+            role:
+                type: text
+                label: Role
+                default: "Role"
+            photo:
+                type: image
+                label: Photo
+                default: "https://i.pravatar.cc/300?img=5"
+        default:
+            - name: "Imani Bakari"
+              role: "Co-founder & CEO"
+              photo: "https://i.pravatar.cc/300?img=49"
+            - name: "Chen Wei"
+              role: "Co-founder & CTO"
+              photo: "https://i.pravatar.cc/300?img=11"
+            - name: "Sofia Lindqvist"
+              role: "Head of design"
+              photo: "https://i.pravatar.cc/300?img=45"
+            - name: "Rafael Mendes"
+              role: "Staff engineer"
+              photo: "https://i.pravatar.cc/300?img=12"
+            - name: "Aisha Osman"
+              role: "Product manager"
+              photo: "https://i.pravatar.cc/300?img=27"
+            - name: "Daniel Novak"
+              role: "Engineering manager"
+              photo: "https://i.pravatar.cc/300?img=59"
+            - name: "Grace Kim"
+              role: "Developer advocate"
+              photo: "https://i.pravatar.cc/300?img=44"
+            - name: "Owen Gallagher"
+              role: "Customer success lead"
+              photo: "https://i.pravatar.cc/300?img=68"

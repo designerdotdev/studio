@@ -2,14 +2,17 @@
 
 namespace Designer\Studio\Http\Controllers;
 
+use Designer\Studio\Services\BladeGenerator;
 use Designer\Studio\Services\DesignSyncService;
 use Designer\Studio\Services\SampleDataSeeder;
-use Designer\Studio\Services\TemplateRegistry;
-use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
-use Designer\Studio\Services\BladeGenerator;
+use Designer\Studio\Services\Storage\PageRepository;
+use Designer\Studio\Services\TemplateRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class StudioController extends Controller
 {
@@ -27,7 +30,7 @@ class StudioController extends Controller
         // Always sync designs from resource files so edits are reflected
         $this->designSync->syncAll();
 
-        $pages = $this->pages->all();
+        $pages = $this->pages->all()->sortBy('title')->values();
 
         // Show onboarding when no pages exist
         if ($pages->isEmpty()) {
@@ -40,7 +43,6 @@ class StudioController extends Controller
         $slug = $request->query('page', $pages->first()?->slug);
         $page = $slug ? $this->pages->find($slug) : null;
 
-        // If page not found, fall back to first page
         if (!$page && $pages->isNotEmpty()) {
             $page = $pages->first();
         }
@@ -49,31 +51,106 @@ class StudioController extends Controller
             abort(404);
         }
 
-        // Build component data with full definitions
-        $componentsData = [];
-        foreach ($page->components as $instance) {
-            $component = $this->components->find($instance['component_ref']);
-            if ($component) {
-                $componentsData[$instance['id']] = [
-                    'id' => $instance['id'],
-                    'component_ref' => $instance['component_ref'],
-                    'name' => $component->name,
-                    'title' => $component->title,
-                    'description' => $component->description,
-                    'html' => $component->html,
-                    'fields' => $component->fields,
-                    'variables' => $instance['variables'] ?? [],
-                    'order' => $instance['order'],
-                ];
-            }
-        }
-
         return view('studio::home', [
             'page' => $page,
             'pages' => $pages,
-            'components' => $componentsData,
-            'componentLibrary' => $this->components->all(),
+            'library' => $this->components->grouped(),
         ]);
+    }
+
+    /**
+     * The live-editing preview document loaded inside the canvas iframe.
+     */
+    public function iframe(string $slug)
+    {
+        $page = $this->pages->find($slug);
+
+        if (!$page) {
+            abort(404);
+        }
+
+        $sections = [];
+        $componentVariables = [];
+
+        foreach (collect($page->components)->sortBy('order')->values() as $instance) {
+            $component = $this->components->find($instance['component_ref']);
+
+            if (!$component) {
+                continue;
+            }
+
+            $sections[] = [
+                'id' => $instance['id'],
+                'ref' => $component->name,
+                'title' => $component->title,
+                'html' => $component->html,
+                'hidden' => (bool) ($instance['hidden'] ?? false),
+            ];
+
+            $componentVariables[$instance['id']] = $component->resolveVariables($instance['variables'] ?? []);
+        }
+
+        return view('studio::iframe', [
+            'page' => $page,
+            'sections' => $sections,
+            'componentVariables' => $componentVariables,
+        ]);
+    }
+
+    /**
+     * Standalone rendered preview of a single library component
+     * (used for the thumbnails inside the section picker).
+     */
+    public function componentPreview(string $name)
+    {
+        $component = $this->components->find($name);
+
+        if (!$component) {
+            abort(404);
+        }
+
+        $html = $this->renderSection(
+            $component->html,
+            $component->resolveVariables([], usePreviewDefaults: true),
+            $component->name
+        );
+
+        return response()
+            ->view('studio::preview', ['title' => $component->title, 'sections' => [$html]])
+            ->header('Cache-Control', 'private, max-age=30');
+    }
+
+    /**
+     * Standalone rendered preview of an onboarding template's first page.
+     */
+    public function templatePreview(string $name)
+    {
+        $template = $this->templates->find($name);
+
+        if (!$template) {
+            abort(404);
+        }
+
+        $sections = [];
+        $pageDef = $template['pages'][0] ?? null;
+
+        foreach ($pageDef['components'] ?? [] as $instance) {
+            $component = $this->components->find($instance['component_ref']);
+
+            if (!$component) {
+                continue;
+            }
+
+            $sections[] = $this->renderSection(
+                $component->html,
+                $component->resolveVariables($instance['variables'] ?? [], usePreviewDefaults: true),
+                $component->name
+            );
+        }
+
+        return response()
+            ->view('studio::preview', ['title' => $template['title'], 'sections' => $sections])
+            ->header('Cache-Control', 'private, max-age=30');
     }
 
     public function applyTemplate(Request $request)
@@ -91,61 +168,6 @@ class StudioController extends Controller
             'redirect' => $firstPage
                 ? route('studio.index', ['page' => $firstPage->slug])
                 : route('studio.index'),
-        ]);
-    }
-
-    public function iframe(string $slug)
-    {
-        $page = $this->pages->find($slug);
-
-        if (!$page) {
-            abort(404);
-        }
-
-        $components = [];
-        $componentVariables = [];
-
-        foreach ($page->components as $instance) {
-            $component = $this->components->find($instance['component_ref']);
-            if ($component) {
-                $components[] = [
-                    'id' => $instance['id'],
-                    'html' => $component->html,
-                    'order' => $instance['order'],
-                ];
-
-                // Build per-component variables
-                $vars = [];
-                foreach ($component->fields as $key => $config) {
-                    $fieldType = $config['type'] ?? 'text';
-                    if ($fieldType === 'repeater') {
-                        $default = $config['default'] ?? [];
-                        $stored = $instance['variables'][$key] ?? null;
-                        $items = is_array($stored) ? $stored : (is_array($default) ? $default : []);
-                        // Ensure children key exists for nestable repeaters
-                        if (!empty($config['nestable'])) {
-                            $items = array_map(function ($item) {
-                                if (!isset($item['children'])) {
-                                    $item['children'] = [];
-                                }
-                                return $item;
-                            }, $items);
-                        }
-                        $vars[$key] = $items;
-                    } else {
-                        $vars[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
-                    }
-                }
-                $componentVariables[$instance['id']] = $vars;
-            }
-        }
-
-        // Sort by order
-        usort($components, fn($a, $b) => $a['order'] <=> $b['order']);
-
-        return view('studio::iframe', [
-            'components' => $components,
-            'componentVariables' => $componentVariables,
         ]);
     }
 
@@ -168,6 +190,7 @@ class StudioController extends Controller
             return response()->json([
                 'success' => true,
                 'path' => $path,
+                'relative_path' => str_replace(base_path() . '/', '', $path),
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -189,6 +212,83 @@ class StudioController extends Controller
         return response()->json([
             'success' => true,
             'page' => $page->toArray(),
+            'editor_url' => route('studio.index', ['page' => $page->slug]),
+        ]);
+    }
+
+    public function updatePage(Request $request, string $slug)
+    {
+        $validated = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'slug' => 'sometimes|string|max:255',
+            'description' => 'sometimes|nullable|string|max:1000',
+            'meta' => 'sometimes|array',
+            'meta.seo_title' => 'sometimes|nullable|string|max:255',
+            'meta.seo_description' => 'sometimes|nullable|string|max:500',
+        ]);
+
+        $page = $this->pages->update($slug, $validated);
+
+        if (!$page) {
+            return response()->json(['success' => false, 'error' => 'Page not found'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'page' => $page->toArray(),
+            'editor_url' => route('studio.index', ['page' => $page->slug]),
+        ]);
+    }
+
+    public function duplicatePage(string $slug)
+    {
+        $page = $this->pages->duplicate($slug);
+
+        if (!$page) {
+            return response()->json(['success' => false, 'error' => 'Page not found'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'page' => $page->toArray(),
+            'editor_url' => route('studio.index', ['page' => $page->slug]),
+        ]);
+    }
+
+    public function deletePage(string $slug)
+    {
+        $this->pages->delete($slug);
+
+        return response()->json([
+            'success' => true,
+            'redirect' => route('studio.index'),
+        ]);
+    }
+
+    /**
+     * Image uploads for image fields. Files are stored in
+     * public/studio-uploads so they work without a storage symlink.
+     */
+    public function upload(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|image|mimes:jpeg,jpg,png,gif,webp,avif|max:5120',
+        ]);
+
+        $file = $request->file('file');
+
+        $directory = public_path('studio-uploads');
+
+        if (!File::isDirectory($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = Str::uuid() . '.' . strtolower($file->getClientOriginalExtension());
+        $file->move($directory, $filename);
+
+        return response()->json([
+            'success' => true,
+            'url' => url('studio-uploads/' . $filename),
         ]);
     }
 
@@ -205,16 +305,8 @@ class StudioController extends Controller
             return response()->json(['success' => false, 'error' => 'Component not found'], 404);
         }
 
-        // Use preview_variables as default variable values
-        $defaultVariables = [];
-        foreach ($component->fields as $key => $config) {
-            $fieldType = $config['type'] ?? 'text';
-            if ($fieldType === 'repeater') {
-                $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? [];
-            } else {
-                $defaultVariables[$key] = $component->preview_variables[$key] ?? $config['default'] ?? '';
-            }
-        }
+        // Snapshot curated preview values as the instance's starting content
+        $defaultVariables = $component->resolveVariables([], usePreviewDefaults: true);
 
         $insertAt = $validated['insert_at'] ?? null;
         $page = $this->pages->addComponent($slug, $validated['component_ref'], $defaultVariables, $insertAt);
@@ -222,15 +314,6 @@ class StudioController extends Controller
         return response()->json([
             'success' => true,
             'page' => $page?->toArray(),
-        ]);
-    }
-
-    public function deletePage(string $slug)
-    {
-        $this->pages->delete($slug);
-
-        return response()->json([
-            'success' => true,
         ]);
     }
 
@@ -268,7 +351,6 @@ class StudioController extends Controller
             return response()->json(['success' => false, 'error' => 'Cannot move further'], 400);
         }
 
-        // Swap
         $ids = $components->pluck('id')->toArray();
         [$ids[$currentIndex], $ids[$newIndex]] = [$ids[$newIndex], $ids[$currentIndex]];
 
@@ -292,5 +374,22 @@ class StudioController extends Controller
             'success' => true,
             'page' => $page?->toArray(),
         ]);
+    }
+
+    /**
+     * Render a section's Blade template, never letting a broken
+     * template take down the whole preview document.
+     */
+    protected function renderSection(string $html, array $variables, string $ref): string
+    {
+        try {
+            return Blade::render($html, $variables);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return '<div style="padding:48px 24px;text-align:center;font-family:ui-sans-serif,system-ui,sans-serif;color:#991b1b;background:#fef2f2;border:1px dashed #fecaca;">'
+                . 'Section “' . e($ref) . '” failed to render: ' . e($e->getMessage())
+                . '</div>';
+        }
     }
 }

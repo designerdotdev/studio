@@ -1,0 +1,33 @@
+name: logos-strip
+title: Logo strip
+description: One-line trust statement with a row of text wordmarks
+category: logos
+tags:
+    - logos
+    - social-proof
+    - trust
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        description: The short line above the wordmarks. Clear to hide.
+        default: "Trusted by teams at"
+
+    logos:
+        type: repeater
+        label: Logos
+        add_button_label: Add logo
+        description: Rendered as styled text wordmarks.
+        sub_fields:
+            name:
+                type: text
+                label: Company name
+                default: "Company"
+        default:
+            - name: "Meridian"
+            - name: "Corelink"
+            - name: "Fathom"
+            - name: "Baseline"
+            - name: "Novabright"
+            - name: "Arcline"

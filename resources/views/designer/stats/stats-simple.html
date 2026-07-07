@@ -1,0 +1,24 @@
+<section class="w-full bg-white py-20 sm:py-28">
+    <div class="mx-auto w-full max-w-6xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl text-center">
+            <h2 class="text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">
+                {{ $heading ?? 'Numbers that back it up' }}
+            </h2>
+            @if($subheading)
+                <p class="mt-4 text-lg leading-relaxed text-neutral-500">{{ $subheading }}</p>
+            @endif
+        </div>
+
+        <div class="mt-14 grid grid-cols-2 gap-x-6 gap-y-12 sm:mt-16 lg:grid-cols-4 lg:gap-x-0 lg:divide-x lg:divide-neutral-200">
+            @foreach($stats as $item)
+                <div class="text-center lg:px-6">
+                    <p class="text-4xl font-semibold tracking-tight text-neutral-950 tabular-nums sm:text-5xl">{{ $item['value'] }}</p>
+                    <p class="mt-2.5 text-sm font-medium text-neutral-600">{{ $item['label'] }}</p>
+                    @if($item['note'])
+                        <p class="mt-1 text-xs text-neutral-400">{{ $item['note'] }}</p>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    </div>
+</section>

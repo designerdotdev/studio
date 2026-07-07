@@ -1,141 +1,182 @@
 <x-studio::layouts.app>
-    <div class="w-full h-full flex items-center justify-center bg-gray-100">
-        <p class="text-gray-400 text-sm">Complete the setup to get started.</p>
-    </div>
+    <x-slot:title>Welcome — Designer Studio</x-slot:title>
 
-    <x-slot:sidebar>
-        <div class="flex flex-col h-full">
-            <div class="p-4 border-b border-gray-200 bg-white">
-                <span class="font-medium text-gray-900">Designer Studio</span>
-            </div>
-        </div>
-    </x-slot:sidebar>
+    <style>
+        @keyframes onboard-up {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-    {{-- Onboarding Modal --}}
+        .onboard-up {
+            opacity: 0;
+            animation: onboard-up 600ms cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+        }
+    </style>
+
     <div
+        class="s-canvas relative h-full w-full overflow-y-auto"
         x-data="{
             step: 1,
-            selectedTemplate: null,
+            selected: 'starter',
             applying: false,
 
-            async apply() {
-                if (!this.selectedTemplate || this.applying) return;
+            showTemplates() {
+                this.step = 2;
+                this.$nextTick(() => {
+                    this.$root.querySelectorAll('[data-template-preview]').forEach((el) => {
+                        const frame = el.querySelector('iframe');
+                        if (!frame) return;
+                        const scale = el.offsetWidth / 1280;
+                        frame.style.transform = `scale(${scale})`;
+                        frame.style.height = `${Math.ceil(el.offsetHeight / scale)}px`;
+                    });
+                });
+            },
 
+            async apply() {
+                if (!this.selected || this.applying) return;
                 this.applying = true;
                 try {
-                    const response = await fetch('{{ route('studio.api.onboarding.apply') }}', {
+                    const response = await fetch(@js(route('studio.api.onboarding.apply')), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
                         },
-                        body: JSON.stringify({ template: this.selectedTemplate }),
+                        body: JSON.stringify({ template: this.selected }),
                     });
                     const data = await response.json();
                     if (data.success && data.redirect) {
                         window.location.href = data.redirect;
+                        return;
                     }
                 } catch (e) {
-                    console.error(e);
-                    this.applying = false;
+                    window.Studio?.toast('Something went wrong — please try again', 'error');
                 }
+                this.applying = false;
             }
         }"
-        class="fixed inset-0 z-50 overflow-y-auto"
-        aria-labelledby="onboarding-title"
-        role="dialog"
-        aria-modal="true"
     >
-        <div class="flex items-center justify-center min-h-screen px-4">
-            {{-- Backdrop --}}
-            <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
+        {{-- Step 1 — Welcome --}}
+        <div x-show="step === 1" class="flex min-h-full flex-col items-center justify-center px-6 py-16 text-center">
+            <div class="onboard-up flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] ring-1 ring-white/10" style="animation-delay: 60ms">
+                <svg class="h-9 w-9" viewBox="0 0 32 32" fill="none">
+                    <path d="M10 9.5h7.25a6.5 6.5 0 0 1 0 13H10v-13Z" stroke="#fff" stroke-width="2.5"/>
+                    <circle cx="23.5" cy="23.5" r="2.5" fill="#4c7dfa"/>
+                </svg>
+            </div>
 
-            {{-- Modal --}}
-            <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full p-8">
-                {{-- Step 1: Welcome --}}
-                <div x-show="step === 1">
-                    <div class="text-center">
-                        <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-blue-100 mb-5">
-                            <svg class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
-                            </svg>
-                        </div>
-                        <h2 id="onboarding-title" class="text-2xl font-bold text-gray-900">
-                            Welcome to Designer
-                        </h2>
-                        <p class="mt-3 text-gray-600 leading-relaxed">
-                            Build beautiful pages visually with a drag-and-drop editor. Choose a starting template and you'll be up and running in seconds.
-                        </p>
-                    </div>
-                    <div class="mt-8">
-                        <x-katana.button
-                            @click="step = 2"
-                            size="lg"
-                            class="w-full"
-                        >
-                            Next
-                        </x-katana.button>
-                    </div>
+            <h1 class="onboard-up mt-8 text-4xl font-semibold tracking-tight text-ink" style="animation-delay: 140ms">
+                Welcome to Designer Studio
+            </h1>
+            <p class="onboard-up mt-4 max-w-md text-[15px] leading-relaxed text-soft" style="animation-delay: 220ms">
+                The visual editor for your Laravel site. Developers define the sections — anyone on the team edits the pages.
+            </p>
+
+            <div class="onboard-up mt-10" style="animation-delay: 300ms">
+                <button @click="showTemplates()" class="s-btn-primary !h-11 !px-7 !text-sm">
+                    Choose a template
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+
+            <p class="onboard-up mt-16 text-xs text-faint" style="animation-delay: 380ms">
+                Everything can be changed later — templates are just a starting point.
+            </p>
+        </div>
+
+        {{-- Step 2 — Template picker --}}
+        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
+            <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                    <p class="s-microlabel">Step 2 of 2</p>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-ink">Pick a starting point</h1>
+                    <p class="mt-1.5 text-[13.5px] text-soft">Live previews, built from the section library. You can add, remove, and rewrite everything.</p>
                 </div>
+                <button @click="step = 1" class="s-btn-ghost shrink-0">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>
+                    Back
+                </button>
+            </div>
 
-                {{-- Step 2: Template Selection --}}
-                <div x-show="step === 2" x-cloak>
-                    <div class="text-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-900">
-                            Choose a Template
-                        </h2>
-                        <p class="mt-2 text-gray-600">
-                            Pick a starting point for your first page.
-                        </p>
-                    </div>
+            <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach($templates as $key => $template)
+                    <button
+                        type="button"
+                        @click="selected = @js($key)"
+                        @dblclick="selected = @js($key); apply()"
+                        class="group relative flex flex-col overflow-hidden rounded-2xl border bg-raised text-left transition-all duration-150"
+                        :class="selected === @js($key)
+                            ? 'border-accent shadow-[0_0_0_3px_color-mix(in_srgb,#4c7dfa_25%,transparent)] -translate-y-0.5'
+                            : 'border-line hover:border-line-strong hover:-translate-y-0.5'"
+                    >
+                        {{-- Preview --}}
+                        <span
+                            data-template-preview
+                            class="pointer-events-none relative block w-full overflow-hidden bg-white"
+                            style="aspect-ratio: 16/11"
+                        >
+                            @if(($template['pages'][0]['components'] ?? []) === [])
+                                <span class="absolute inset-0 flex items-center justify-center bg-[#fafafa]">
+                                    <span class="flex h-full w-full items-center justify-center" style="background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px); background-size: 18px 18px;">
+                                        <span class="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 text-neutral-300">
+                                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                                        </span>
+                                    </span>
+                                </span>
+                            @else
+                                <iframe
+                                    src="{{ route('studio.preview.template', ['name' => $key]) }}"
+                                    loading="lazy"
+                                    tabindex="-1"
+                                    title="{{ $template['title'] }} preview"
+                                    class="absolute left-0 top-0 origin-top-left border-0 bg-white"
+                                    style="width: 1280px; height: 880px; transform: scale(0.264)"
+                                ></iframe>
+                                <span class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/5 to-transparent"></span>
+                            @endif
 
-                    <div class="space-y-3">
-                        @foreach($templates as $key => $template)
-                            <button
-                                @click="selectedTemplate = '{{ $key }}'"
-                                :class="selectedTemplate === '{{ $key }}'
-                                    ? 'border-blue-500 ring-2 ring-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'"
-                                class="w-full text-left p-4 rounded-lg border-2 transition-all"
+                            {{-- Selected check --}}
+                            <span
+                                x-show="selected === @js($key)"
+                                x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-75"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                class="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-white shadow-lg"
                             >
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">{{ $template['title'] }}</h3>
-                                        <p class="text-sm text-gray-500 mt-0.5">{{ $template['description'] }}</p>
-                                    </div>
-                                    <div
-                                        x-show="selectedTemplate === '{{ $key }}'"
-                                        class="flex-shrink-0 ml-3"
-                                    >
-                                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </button>
-                        @endforeach
-                    </div>
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                            </span>
+                        </span>
 
-                    <div class="mt-8 flex gap-3">
-                        <x-katana.button
-                            variant="outline"
-                            @click="step = 1"
-                            size="lg"
-                            class="flex-1"
-                        >
-                            Back
-                        </x-katana.button>
-                        <x-katana.button
-                            @click="apply()"
-                            x-bind:disabled="!selectedTemplate || applying"
-                            size="lg"
-                            class="flex-1"
-                        >
-                            <span x-show="!applying">Get Started</span>
-                            <span x-show="applying">Setting up...</span>
-                        </x-katana.button>
-                    </div>
-                </div>
+                        {{-- Meta --}}
+                        <span class="flex flex-1 flex-col border-t border-line p-4">
+                            <span class="flex items-center gap-2">
+                                <span class="text-[13.5px] font-semibold text-ink">{{ $template['title'] }}</span>
+                                @if(count($template['pages']) > 1)
+                                    <span class="s-chip">{{ count($template['pages']) }} pages</span>
+                                @endif
+                            </span>
+                            <span class="mt-1 text-xs leading-relaxed text-soft">{{ $template['description'] }}</span>
+                        </span>
+                    </button>
+                @endforeach
+            </div>
+
+            <div class="mt-8 flex items-center justify-end gap-3 border-t border-line pt-6">
+                <p class="mr-auto text-xs text-faint">Tip: double-click a template to jump straight in.</p>
+                <button
+                    @click="apply()"
+                    :disabled="!selected || applying"
+                    class="s-btn-primary !h-10 !px-6"
+                >
+                    <span x-show="!applying">Use this template</span>
+                    <span x-show="applying" x-cloak class="flex items-center gap-2">
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                        Setting up your site…
+                    </span>
+                </button>
             </div>
         </div>
     </div>

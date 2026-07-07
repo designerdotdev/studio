@@ -1,0 +1,43 @@
+name: newsletter-cta
+title: Newsletter signup
+description: Centered email capture on a tinted background with fine print
+category: newsletter
+tags:
+    - newsletter
+    - signup
+    - email
+    - cta
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "The changelog, in your inbox"
+        required: true
+
+    text:
+        type: textarea
+        label: Description
+        default: "One email a month covering what shipped, what's coming next, and one thing we learned building it — written by the team, never automated."
+
+    placeholder:
+        type: text
+        label: Input placeholder
+        default: "you@company.com"
+
+    button_text:
+        type: text
+        label: Button text
+        default: "Subscribe"
+
+    form_action:
+        type: url
+        label: Form action URL
+        description: Where the form posts to. Leave as # for a decorative form.
+        default: "#"
+
+    fine_print:
+        type: text
+        label: Fine print
+        description: Small reassurance line under the form. Clear to hide.
+        default: "One email a month. Unsubscribe any time."

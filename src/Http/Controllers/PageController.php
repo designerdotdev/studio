@@ -30,30 +30,25 @@ class PageController extends Controller
 
         $renderedSections = [];
 
-        foreach ($page->components as $instance) {
+        foreach (collect($page->components)->sortBy('order')->values() as $instance) {
+            if (!empty($instance['hidden'])) {
+                continue;
+            }
+
             $component = $this->components->find($instance['component_ref']);
 
             if (!$component) {
                 continue;
             }
 
-            // Merge instance variables with field defaults
-            $vars = [];
-            foreach ($component->fields as $key => $config) {
-                $vars[$key] = $instance['variables'][$key] ?? $config['default'] ?? '';
+            $vars = $component->resolveVariables($instance['variables'] ?? []);
+
+            try {
+                $renderedSections[] = Blade::render($component->html, $vars);
+            } catch (\Throwable $e) {
+                report($e);
             }
-
-            $renderedSections[] = [
-                'html' => Blade::render($component->html, $vars),
-                'order' => $instance['order'],
-            ];
         }
-
-        // Sort by order
-        usort($renderedSections, fn($a, $b) => $a['order'] <=> $b['order']);
-
-        // Extract just the rendered HTML strings
-        $renderedSections = array_map(fn($s) => $s['html'], $renderedSections);
 
         return view('studio::page', [
             'renderedSections' => $renderedSections,

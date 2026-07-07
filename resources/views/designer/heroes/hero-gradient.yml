@@ -1,0 +1,68 @@
+name: hero-gradient
+title: Dark hero with product shot
+description: Dark backdrop, glow accents, and a framed product screenshot
+category: heroes
+tags:
+    - hero
+    - dark
+    - saas
+    - screenshot
+
+fields:
+    badge_text:
+        type: text
+        label: Badge text
+        description: Clear to hide.
+        default: "Now in public beta"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Customer conversations, finally in"
+        required: true
+
+    heading_accent:
+        type: text
+        label: Heading accent (gradient text)
+        default: "one place"
+        description: Appended to the heading with a soft gradient highlight.
+
+    text:
+        type: textarea
+        label: Description
+        default: "Relay pulls email, chat, and social threads into a single shared inbox, so support and product teams answer together."
+
+    button_text:
+        type: text
+        label: Primary button text
+        default: "Start for free"
+
+    button_link:
+        type: url
+        label: Primary button link
+        default: "#"
+
+    button_text_2:
+        type: text
+        label: Secondary button text
+        default: "Book a demo"
+
+    button_link_2:
+        type: url
+        label: Secondary button link
+        default: "#"
+
+    footnote:
+        type: text
+        label: Footnote
+        default: "Free for teams up to 5 — no credit card required"
+
+    image:
+        type: image
+        label: Product screenshot
+        default: "https://picsum.photos/seed/relay-inbox/2000/1160"
+
+    glow_color:
+        type: colorpicker
+        label: Glow color
+        default: "#4c7dfa"

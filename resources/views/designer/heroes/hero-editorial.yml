@@ -1,0 +1,47 @@
+name: hero-editorial
+title: Editorial statement hero
+description: A large serif statement for studios and portfolios
+category: heroes
+tags:
+    - hero
+    - editorial
+    - agency
+    - minimal
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        default: "Foundry — design practice"
+
+    statement_start:
+        type: text
+        label: Statement (regular part)
+        default: "We design identities and interfaces for companies"
+        required: true
+
+    statement_accent:
+        type: text
+        label: Statement (italic accent)
+        default: "worth remembering."
+
+    meta_left:
+        type: text
+        label: Meta line, left
+        default: "Selected work 2019–2026"
+
+    meta_right:
+        type: text
+        label: Meta line, right
+        default: "Based in Copenhagen, working worldwide"
+
+    link_text:
+        type: text
+        label: Link text
+        description: Clear to hide the link.
+        default: "See the work"
+
+    link_url:
+        type: url
+        label: Link URL
+        default: "#"

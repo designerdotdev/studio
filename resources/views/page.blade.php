@@ -3,7 +3,20 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $page->meta['seo_title'] ?? $page->title ?? config('app.name', 'Laravel') }}</title>
+
+    @php
+        $seoTitle = $page->meta['seo_title'] ?? $page->title ?? config('app.name', 'Laravel');
+        $seoDescription = $page->meta['seo_description'] ?? $page->description ?? null;
+    @endphp
+
+    <title>{{ $seoTitle }}</title>
+    @if($seoDescription)
+        <meta name="description" content="{{ $seoDescription }}">
+        <meta property="og:description" content="{{ $seoDescription }}">
+    @endif
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ url()->current() }}">
 
     @if(config('studio.iframe.tailwind_cdn', true))
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -15,6 +28,8 @@
         @endforeach
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     @endif
+
+    <style>[x-cloak] { display: none !important; }</style>
 
     @foreach(config('studio.iframe.extra_styles', []) as $style)
         <link rel="stylesheet" href="{{ $style }}">

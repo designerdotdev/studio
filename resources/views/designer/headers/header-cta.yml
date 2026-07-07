@@ -1,0 +1,61 @@
+name: header-cta
+title: Header with single CTA
+description: Compact header with one prominent action button
+category: headers
+tags:
+    - header
+    - navigation
+    - cta
+
+fields:
+    company_name:
+        type: text
+        label: Company name
+        default: "Relay"
+        required: true
+
+    logo_svg:
+        type: textarea
+        label: Logo SVG
+        rows: 3
+        description: Paste inline SVG markup. Clear it to show the company name only.
+        default: '<svg class="h-7 w-7" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="9" fill="#0a0a0a"/><path d="M9 22V10h7a4.5 4.5 0 0 1 1.9 8.58L21.5 22h-3.9l-3-3H12.4v3H9Zm3.4-6h3.4a1.5 1.5 0 0 0 0-3h-3.4v3Z" fill="#fff"/></svg>'
+
+    nav_links:
+        type: repeater
+        label: Navigation links
+        add_button_label: Add link
+        sub_fields:
+            text:
+                type: text
+                label: Link text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Features"
+              url: "#"
+            - text: "Customers"
+              url: "#"
+            - text: "Pricing"
+              url: "#"
+            - text: "Docs"
+              url: "#"
+
+    button_text:
+        type: text
+        label: Button text
+        default: "Get started"
+
+    button_link:
+        type: url
+        label: Button link
+        default: "#"
+
+    button_note:
+        type: text
+        label: Small note next to button
+        description: Clear to hide.
+        default: "Free 14-day trial"

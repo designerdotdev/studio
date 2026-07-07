@@ -1,0 +1,32 @@
+<section class="w-full bg-white py-20 sm:py-28">
+    <div class="mx-auto w-full max-w-6xl px-6 lg:px-8">
+        <div class="rounded-3xl border border-neutral-200/70 bg-neutral-50 p-8 sm:p-12 lg:p-16">
+            <div class="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+                <div>
+                    <h2 class="text-balance text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">{{ $heading ?? 'Switch your whole team this week' }}</h2>
+                    <p class="mt-4 max-w-lg text-balance text-lg leading-relaxed text-neutral-500">{{ $text ?? 'Import from your current tool in one afternoon. We carry over your macros, tags, and full conversation history.' }}</p>
+                </div>
+
+                <div class="w-full lg:max-w-sm lg:justify-self-end">
+                    <div class="flex flex-col gap-3">
+                        @if($button_text)
+                            <a href="{{ $button_link ?? '#' }}" class="inline-flex w-full items-center justify-center rounded-xl bg-neutral-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800">{{ $button_text }}</a>
+                        @endif
+                        @if($button_text_2)
+                            <a href="{{ $button_link_2 ?? '#' }}" class="inline-flex w-full items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100">{{ $button_text_2 }}</a>
+                        @endif
+                    </div>
+
+                    <ul class="mt-6 space-y-2.5">
+                        @foreach($bullets as $item)
+                            <li class="flex items-start gap-2.5">
+                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                                <span class="text-sm leading-relaxed text-neutral-600">{{ $item['text'] }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

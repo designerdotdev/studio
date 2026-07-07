@@ -39,6 +39,51 @@ class ComponentData
         );
     }
 
+    /**
+     * Resolve the full variable set for this component.
+     *
+     * Merges stored instance values over field defaults, normalising by field
+     * type so every declared field always resolves to a usable value
+     * (repeaters always resolve to arrays, scalars to strings/bools).
+     *
+     * @param array $overrides Stored instance variables (take precedence)
+     * @param bool $usePreviewDefaults Prefer preview_variables over field defaults
+     */
+    public function resolveVariables(array $overrides = [], bool $usePreviewDefaults = false): array
+    {
+        $vars = [];
+
+        foreach ($this->fields as $key => $config) {
+            $type = $config['type'] ?? 'text';
+
+            $default = $config['default'] ?? ($type === 'repeater' ? [] : '');
+
+            if ($usePreviewDefaults && array_key_exists($key, $this->preview_variables)) {
+                $default = $this->preview_variables[$key];
+            }
+
+            $value = array_key_exists($key, $overrides) ? $overrides[$key] : $default;
+
+            if ($type === 'repeater') {
+                $value = is_array($value) ? array_values($value) : [];
+
+                if (!empty($config['nestable'])) {
+                    $value = array_map(function ($item) {
+                        if (is_array($item) && !isset($item['children'])) {
+                            $item['children'] = [];
+                        }
+
+                        return $item;
+                    }, $value);
+                }
+            }
+
+            $vars[$key] = $value;
+        }
+
+        return $vars;
+    }
+
     public function toArray(): array
     {
         return [

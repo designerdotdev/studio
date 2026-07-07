@@ -1,0 +1,50 @@
+name: content-split
+title: Text and image
+description: Two-column story block with copy left and a framed photo right
+category: content
+tags:
+    - content
+    - image
+    - split
+    - about
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small uppercase label above the heading. Clear to hide.
+        default: "How we build"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Shipped in small batches, every Tuesday"
+        required: true
+
+    text_1:
+        type: textarea
+        label: First paragraph
+        rows: 3
+        default: "Every change goes out behind a feature flag, gets measured against a two-week holdout, and only graduates when the numbers hold. No big-bang launches, no hero deploys at midnight."
+
+    text_2:
+        type: textarea
+        label: Second paragraph
+        rows: 3
+        default: "The habit dates back to 2021, when a single migration took checkout down for six hours. Since then the team has shipped more than 1,400 releases without a customer-facing incident lasting longer than four minutes."
+
+    link_text:
+        type: text
+        label: Link text
+        description: Inline arrow link under the copy. Clear to hide.
+        default: "Read the engineering handbook"
+
+    link_url:
+        type: url
+        label: Link URL
+        default: "#"
+
+    image:
+        type: image
+        label: Image
+        default: "https://picsum.photos/seed/content-split-studio/900/1125"

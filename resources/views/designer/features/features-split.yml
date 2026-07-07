@@ -1,0 +1,70 @@
+name: features-split
+title: Alternating feature rows
+description: Image and text rows that alternate direction as they stack
+category: features
+tags:
+    - features
+    - split
+    - rows
+    - zigzag
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small label above the heading. Clear to hide.
+        default: "Product"
+
+    heading:
+        type: text
+        label: Heading
+        default: "From kickoff to shipped, without the drift"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        default: "Three views of the same source of truth — so the plan, the work, and the report never disagree."
+
+    rows:
+        type: repeater
+        label: Feature rows
+        add_button_label: Add row
+        description: Rows alternate image left / image right automatically.
+        sub_fields:
+            title:
+                type: text
+                label: Title
+                default: "A feature worth a row"
+            description:
+                type: textarea
+                label: Description
+                default: "Two or three sentences on how it works and what it replaces."
+            image:
+                type: image
+                label: Image
+                default: "https://picsum.photos/seed/features-split-new/1200/900"
+            link_text:
+                type: text
+                label: Link text
+                default: "Learn more"
+            link_url:
+                type: url
+                label: Link URL
+                default: "#"
+        default:
+            - title: "Plan the quarter on one timeline"
+              description: "Drag tasks, link dependencies, and set milestones. When one date slips, every downstream date shifts with it — and the owners affected get pinged automatically."
+              image: "https://picsum.photos/seed/features-split-timeline/1200/900"
+              link_text: "Explore the timeline"
+              link_url: "#"
+            - title: "Let the busywork run itself"
+              description: "Rules watch for the moments you would normally chase: a stalled review, an unassigned bug, a brief past its due date. They reassign, remind, and escalate so you don't have to."
+              image: "https://picsum.photos/seed/features-split-automation/1200/900"
+              link_text: "See automation recipes"
+              link_url: "#"
+            - title: "Report without opening a spreadsheet"
+              description: "Live dashboards read straight from the work — burndown, workload, and budget against actuals. Share a link instead of pasting screenshots into slides."
+              image: "https://picsum.photos/seed/features-split-reports/1200/900"
+              link_text: "Browse report templates"
+              link_url: "#"

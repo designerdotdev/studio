@@ -1,173 +1,417 @@
 <x-studio::layouts.iframe>
-    {{-- Store templates in JavaScript to avoid HTML escaping issues --}}
+    @push('iframe-head')
+        <style>
+            /* ---- Designer Studio editing overlay (never shipped to production pages) ---- */
+            .studio-section {
+                position: relative;
+            }
+
+            .studio-section::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 2147483000;
+                transition: box-shadow 120ms ease;
+            }
+
+            .studio-section:hover::after,
+            .studio-section.is-hinted::after {
+                box-shadow: inset 0 0 0 1.5px rgba(76, 125, 250, 0.75);
+            }
+
+            .studio-section.is-selected::after {
+                box-shadow: inset 0 0 0 2px #4c7dfa;
+            }
+
+            .studio-section [data-section-content] {
+                cursor: default;
+            }
+
+            /* Name chip */
+            .studio-chip {
+                position: absolute;
+                top: 0;
+                left: 0;
+                z-index: 2147483002;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 3px 9px 4px;
+                border-radius: 0 0 8px 0;
+                background: #4c7dfa;
+                color: #fff;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: -0.01em;
+                line-height: 1.4;
+                opacity: 0;
+                transform: translateY(-2px);
+                transition: opacity 120ms ease, transform 120ms ease;
+                pointer-events: none;
+                white-space: nowrap;
+            }
+
+            .studio-section:hover .studio-chip,
+            .studio-section.is-hinted .studio-chip,
+            .studio-section.is-selected .studio-chip {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Floating toolbar */
+            .studio-toolbar {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                z-index: 2147483003;
+                display: flex;
+                align-items: center;
+                gap: 2px;
+                padding: 3px;
+                border-radius: 10px;
+                background: rgba(12, 12, 14, 0.92);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                opacity: 0;
+                transform: translateY(-4px);
+                transition: opacity 130ms ease, transform 130ms ease;
+                pointer-events: none;
+            }
+
+            .studio-section:hover .studio-toolbar,
+            .studio-section.is-selected .studio-toolbar {
+                opacity: 1;
+                transform: translateY(0);
+                pointer-events: auto;
+            }
+
+            .studio-toolbar button {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 26px;
+                border: 0;
+                border-radius: 7px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.65);
+                cursor: pointer;
+                transition: background 100ms ease, color 100ms ease;
+                padding: 0;
+            }
+
+            .studio-toolbar button:hover {
+                background: rgba(255, 255, 255, 0.12);
+                color: #fff;
+            }
+
+            .studio-toolbar button.studio-danger:hover {
+                background: rgba(243, 114, 114, 0.18);
+                color: #f37272;
+            }
+
+            .studio-toolbar button:disabled {
+                opacity: 0.3;
+                pointer-events: none;
+            }
+
+            .studio-toolbar svg {
+                width: 14px;
+                height: 14px;
+            }
+
+            .studio-toolbar .studio-toolbar-sep {
+                width: 1px;
+                height: 14px;
+                margin: 0 2px;
+                background: rgba(255, 255, 255, 0.14);
+            }
+
+            /* Insert affordance between sections */
+            .studio-insert {
+                position: absolute;
+                left: 0;
+                right: 0;
+                height: 28px;
+                z-index: 2147483004;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                transition: opacity 130ms ease;
+            }
+
+            .studio-insert:hover {
+                opacity: 1;
+            }
+
+            .studio-insert--top { top: -14px; }
+            .studio-insert--bottom { bottom: -14px; }
+
+            /* Keep the very first insert zone inside the viewport */
+            .studio-section:first-of-type .studio-insert--top { top: 4px; }
+
+            .studio-insert::before {
+                content: '';
+                position: absolute;
+                left: 12px;
+                right: 12px;
+                top: 50%;
+                height: 2px;
+                margin-top: -1px;
+                border-radius: 2px;
+                background: #4c7dfa;
+                box-shadow: 0 0 12px rgba(76, 125, 250, 0.55);
+            }
+
+            .studio-insert button {
+                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                height: 26px;
+                padding: 0 12px;
+                border: 0;
+                border-radius: 999px;
+                background: #4c7dfa;
+                color: #fff;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 11.5px;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 4px 16px -2px rgba(76, 125, 250, 0.55);
+                transition: transform 120ms ease, background 120ms ease;
+            }
+
+            .studio-insert button:hover {
+                background: #3d6ef2;
+                transform: scale(1.04);
+            }
+
+            .studio-insert svg {
+                width: 12px;
+                height: 12px;
+            }
+
+            /* Hidden sections — dimmed with stripes in the editor only */
+            .studio-section.is-hidden [data-section-content] {
+                opacity: 0.35;
+                filter: grayscale(0.6);
+            }
+
+            .studio-section.is-hidden::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: 2147483001;
+                pointer-events: none;
+                background: repeating-linear-gradient(
+                    -45deg,
+                    rgba(120, 120, 135, 0.08) 0,
+                    rgba(120, 120, 135, 0.08) 10px,
+                    transparent 10px,
+                    transparent 20px
+                );
+            }
+
+            .studio-hidden-badge {
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                z-index: 2147483002;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 3px 8px;
+                border-radius: 6px;
+                background: rgba(12, 12, 14, 0.85);
+                color: rgba(255, 255, 255, 0.85);
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 10.5px;
+                font-weight: 600;
+                pointer-events: none;
+            }
+
+            .studio-hidden-badge svg {
+                width: 11px;
+                height: 11px;
+            }
+
+            /* Empty page state */
+            .studio-empty {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                background:
+                    radial-gradient(circle at 50% 30%, rgba(76, 125, 250, 0.04), transparent 60%),
+                    #fff;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+            }
+
+            .studio-empty-inner {
+                text-align: center;
+                padding: 24px;
+                max-width: 380px;
+            }
+
+            .studio-empty-mark {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 52px;
+                height: 52px;
+                margin: 0 auto 18px;
+                border-radius: 14px;
+                background: #0b0b0d;
+                box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.35);
+            }
+
+            .studio-empty h2 {
+                margin: 0 0 6px;
+                font-size: 17px;
+                font-weight: 650;
+                letter-spacing: -0.02em;
+                color: #18181b;
+            }
+
+            .studio-empty p {
+                margin: 0 0 20px;
+                font-size: 13.5px;
+                line-height: 1.6;
+                color: #71717a;
+            }
+
+            .studio-empty button {
+                display: inline-flex;
+                align-items: center;
+                gap: 7px;
+                height: 38px;
+                padding: 0 18px;
+                border: 0;
+                border-radius: 10px;
+                background: #4c7dfa;
+                color: #fff;
+                font-size: 13.5px;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 8px 24px -6px rgba(76, 125, 250, 0.55);
+                transition: transform 120ms ease, background 120ms ease;
+            }
+
+            .studio-empty button:hover {
+                background: #3d6ef2;
+                transform: translateY(-1px);
+            }
+
+            .studio-empty svg {
+                width: 14px;
+                height: 14px;
+            }
+        </style>
+    @endpush
+
+    {{-- Section templates + variables for client-side re-rendering --}}
     <script>
-        window.__componentTemplates = @js(collect($components)->pluck('html', 'id')->toArray());
+        window.__studioPreview = {
+            templates: @js(collect($sections)->pluck('html', 'id')->toArray()),
+            variables: @js($componentVariables),
+        };
     </script>
 
-    <div
-        x-data="{
-            componentVariables: {{ Js::from($componentVariables) }},
-            selectedComponentId: null,
-            templates: window.__componentTemplates,
-
-            selectComponent(componentId, event) {
-                event.stopPropagation();
-
-                // Remove previous selection
-                document.querySelectorAll('[data-component].selected').forEach(el => {
-                    el.classList.remove('selected');
-                });
-
-                // Add selection to clicked component
-                const el = document.querySelector('[data-component=\'' + componentId + '\']');
-                if (el) {
-                    el.classList.add('selected');
+    @if(count($sections) > 0)
+        @foreach($sections as $section)
+            @php
+                $rendered = '';
+                try {
+                    $rendered = \Illuminate\Support\Facades\Blade::render($section['html'], $componentVariables[$section['id']] ?? []);
+                } catch (\Throwable $e) {
+                    $rendered = '<div style="padding:48px 24px;text-align:center;font-family:ui-sans-serif,system-ui,sans-serif;color:#991b1b;background:#fef2f2;border:1px dashed #fecaca;">Section “' . e($section['ref']) . '” failed to render: ' . e($e->getMessage()) . '</div>';
                 }
+            @endphp
 
-                this.selectedComponentId = componentId;
-
-                // Notify parent window
-                window.parent.postMessage({
-                    type: 'component-selected',
-                    componentId: componentId
-                }, '*');
-            },
-
-            deselectAll() {
-                document.querySelectorAll('[data-component].selected').forEach(el => {
-                    el.classList.remove('selected');
-                });
-                this.selectedComponentId = null;
-
-                window.parent.postMessage({
-                    type: 'component-deselected'
-                }, '*');
-            },
-
-            updateVariables(componentId, newVariables) {
-                if (this.componentVariables[componentId]) {
-                    this.componentVariables[componentId] = { ...this.componentVariables[componentId], ...newVariables };
-                }
-                this.renderComponent(componentId);
-            },
-
-            renderComponent(componentId) {
-                const el = document.querySelector('[data-component=\'' + componentId + '\']');
-                if (!el) return;
-
-                const template = this.templates[componentId];
-                const vars = this.componentVariables[componentId] || {};
-                if (template && typeof blade !== 'undefined') {
-                    el.innerHTML = blade.renderBladeTemplate(template, vars);
-                }
-            },
-
-            renderComponents() {
-                const previouslySelected = this.selectedComponentId;
-
-                document.querySelectorAll('[data-component]').forEach(el => {
-                    const componentId = el.dataset.component;
-                    const template = this.templates[componentId];
-                    const vars = this.componentVariables[componentId] || {};
-                    if (template && typeof blade !== 'undefined') {
-                        el.innerHTML = blade.renderBladeTemplate(template, vars);
-                    }
-                });
-
-                // Re-apply selection
-                if (previouslySelected) {
-                    const el = document.querySelector('[data-component=\'' + previouslySelected + '\']');
-                    if (el) {
-                        el.classList.add('selected');
-                    }
-                }
-            },
-
-            init() {
-                // Listen for messages from parent
-                window.addEventListener('message', (event) => {
-                    if (event.data.type === 'update-variables') {
-                        this.updateVariables(event.data.componentId, event.data.variables);
-                    }
-                });
-            }
-        }"
-        x-on:click="deselectAll()"
-    >
-        @if(count($components) > 0)
-            @foreach($components as $component)
-                @php
-                    $renderedHtml = \Illuminate\Support\Facades\Blade::render($component['html'], $componentVariables[$component['id']] ?? []);
-                @endphp
-
-                <div class="group relative">
-                    <button
-                        class="absolute left-1/2 top-0 z-[10000] -translate-x-1/2 rounded-b-md bg-blue-500 px-4 py-1.5 text-sm font-medium text-white whitespace-nowrap border-none cursor-pointer opacity-0 pointer-events-none group-hover:opacity-70 group-hover:pointer-events-auto hover:!opacity-100 transition-opacity duration-150"
-                        @click.stop="window.parent.postMessage({ type: 'add-section', insertAtIndex: {{ $loop->index }} }, '*')"
-                    >+ Add Section</button>
-
-                    <div
-                        data-component="{{ $component['id'] }}"
-                        x-on:click="selectComponent('{{ $component['id'] }}', $event)"
-                    >{!! $renderedHtml !!}</div>
-
-                    {{-- Component action buttons (bottom-right on hover) --}}
-                    <div class="absolute bottom-2 right-2 z-[10000] flex items-center gap-0.5 rounded-md bg-gray-900/90 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-150">
-                        @if(!$loop->first)
-                            <button
-                                class="p-1.5 text-white/70 hover:text-white cursor-pointer border-none bg-transparent transition-colors"
-                                @click.stop="window.parent.postMessage({ type: 'move-component', componentId: '{{ $component['id'] }}', direction: 'up' }, '*')"
-                                title="Move up"
-                            >
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                            </button>
-                        @endif
-                        @if(!$loop->last)
-                            <button
-                                class="p-1.5 text-white/70 hover:text-white cursor-pointer border-none bg-transparent transition-colors"
-                                @click.stop="window.parent.postMessage({ type: 'move-component', componentId: '{{ $component['id'] }}', direction: 'down' }, '*')"
-                                title="Move down"
-                            >
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-                            </button>
-                        @endif
-                        <button
-                            class="p-1.5 text-red-400/70 hover:text-red-400 cursor-pointer border-none bg-transparent transition-colors"
-                            @click.stop="if(confirm('Delete this section?')) window.parent.postMessage({ type: 'delete-component', componentId: '{{ $component['id'] }}' }, '*')"
-                            title="Delete section"
-                        >
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                        </button>
-                    </div>
-
-                    <button
-                        class="absolute left-1/2 bottom-0 z-[10000] -translate-x-1/2 rounded-t-md bg-blue-500 px-4 py-1.5 text-sm font-medium text-white whitespace-nowrap border-none cursor-pointer opacity-0 pointer-events-none group-hover:opacity-70 group-hover:pointer-events-auto hover:!opacity-100 transition-opacity duration-150"
-                        @click.stop="window.parent.postMessage({ type: 'add-section', insertAtIndex: {{ $loop->index + 1 }} }, '*')"
-                    >+ Add Section</button>
-                </div>
-            @endforeach
-        @else
-            <div class="flex items-center justify-center min-h-screen">
-                <div class="text-center px-6">
-                    <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
-                        <svg class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-medium text-gray-900">No sections yet</h3>
-                    <p class="mt-1 text-sm text-gray-500">Add your first section to start building this page.</p>
-                    <button
-                        type="button"
-                        @click.stop="window.parent.postMessage({ type: 'add-section' }, '*')"
-                        class="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-                    >
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Add Section
+            <div
+                data-section="{{ $section['id'] }}"
+                class="studio-section {{ $section['hidden'] ? 'is-hidden' : '' }}"
+                onclick="Studio.preview.select('{{ $section['id'] }}', event)"
+            >
+                {{-- Insert above --}}
+                <div class="studio-insert studio-insert--top">
+                    <button type="button" onclick="Studio.preview.addAt({{ $loop->index }}, event)">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                        Add section
                     </button>
                 </div>
+
+                {{-- Name chip --}}
+                <span class="studio-chip">{{ $section['title'] }}</span>
+
+                @if($section['hidden'])
+                    <span class="studio-hidden-badge">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
+                        Hidden
+                    </span>
+                @endif
+
+                {{-- Toolbar --}}
+                <div class="studio-toolbar" onclick="event.stopPropagation()">
+                    <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-up', event)" title="Move up" {{ $loop->first ? 'disabled' : '' }}>
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25Z" clip-rule="evenodd"/></svg>
+                    </button>
+                    <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-down', event)" title="Move down" {{ $loop->last ? 'disabled' : '' }}>
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.53 13.53a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 1.06-1.06L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25Z" clip-rule="evenodd"/></svg>
+                    </button>
+                    <span class="studio-toolbar-sep"></span>
+                    <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'duplicate', event)" title="Duplicate (⌘D)">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
+                    </button>
+                    <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'toggle-hidden', event)" title="{{ $section['hidden'] ? 'Show' : 'Hide' }}">
+                        @if($section['hidden'])
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
+                        @else
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
+                        @endif
+                    </button>
+                    <span class="studio-toolbar-sep"></span>
+                    <button type="button" class="studio-danger" onclick="Studio.preview.action('{{ $section['id'] }}', 'delete', event)" title="Delete (⌫)">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>
+                    </button>
+                </div>
+
+                {{-- Rendered section --}}
+                <div data-section-content>{!! $rendered !!}</div>
+
+                {{-- Insert below (last section only — other boundaries use the next section's top zone) --}}
+                @if($loop->last)
+                    <div class="studio-insert studio-insert--bottom">
+                        <button type="button" onclick="Studio.preview.addAt({{ $loop->index + 1 }}, event)">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                            Add section
+                        </button>
+                    </div>
+                @endif
             </div>
-        @endif
-    </div>
+        @endforeach
+    @else
+        <div class="studio-empty">
+            <div class="studio-empty-inner">
+                <div class="studio-empty-mark">
+                    <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+                        <path d="M10 9.5h7.25a6.5 6.5 0 0 1 0 13H10v-13Z" stroke="#fff" stroke-width="2.5"/>
+                        <circle cx="23.5" cy="23.5" r="2.5" fill="#4c7dfa"/>
+                    </svg>
+                </div>
+                <h2>{{ $page->title }} is empty</h2>
+                <p>Add your first section from the library — heroes, features, pricing, testimonials, and more.</p>
+                <button type="button" onclick="Studio.preview.addAt(null, event)">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                    Add a section
+                </button>
+            </div>
+        </div>
+    @endif
 </x-studio::layouts.iframe>

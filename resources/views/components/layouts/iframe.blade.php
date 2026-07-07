@@ -30,6 +30,8 @@
 
     @studioIframeCore
 
+    <style>[x-cloak] { display: none !important; }</style>
+
     {!! $headHtml !!}
 
     @stack('iframe-head')

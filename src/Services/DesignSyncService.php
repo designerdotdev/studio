@@ -70,8 +70,11 @@ class DesignSyncService
             $existing = $this->components->find($name);
 
             if ($existing) {
-                $this->components->update($name, $data);
-                $updated++;
+                // Only write when the design file actually changed
+                if ($this->isDirty($existing, $data)) {
+                    $this->components->update($name, $data);
+                    $updated++;
+                }
             } else {
                 $this->components->create($data);
                 $created++;
@@ -83,5 +86,16 @@ class DesignSyncService
             'created' => $created,
             'updated' => $updated,
         ];
+    }
+
+    protected function isDirty(\Designer\Studio\DataTransferObjects\ComponentData $existing, array $data): bool
+    {
+        return $existing->html !== ($data['html'] ?? '')
+            || $existing->title !== ($data['title'] ?? 'Untitled Component')
+            || $existing->description !== ($data['description'] ?? '')
+            || $existing->category !== ($data['category'] ?? 'general')
+            || $existing->fields != ($data['fields'] ?? [])
+            || $existing->preview_variables != ($data['preview_variables'] ?? [])
+            || $existing->tags != ($data['tags'] ?? []);
     }
 }

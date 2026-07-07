@@ -59,12 +59,24 @@ class BladeGenerator
     }
 
     /**
-     * Build the Blade content for a page
+     * Build the Blade content for a page.
+     *
+     * With no layout configured the export is a fully standalone HTML
+     * document (works in any app, zero setup). When `studio.default_layout`
+     * (or the page's own layout) is set, the sections are wrapped in that
+     * Blade component instead.
      */
     protected function buildPageBlade(PageData $page): string
     {
-        $layout = $page->layout ?: config('studio.default_layout', 'layout');
+        $layout = $page->layout ?: config('studio.default_layout');
 
+        return $layout
+            ? $this->buildLayoutWrappedBlade($page, $layout)
+            : $this->buildStandaloneBlade($page);
+    }
+
+    protected function buildLayoutWrappedBlade(PageData $page, string $layout): string
+    {
         $sections = [];
         $sections[] = "<x-{$layout}>";
 
@@ -76,38 +88,101 @@ class BladeGenerator
             $sections[] = "    </x-slot>";
         }
 
-        // Sort components by order and render each
-        $sortedComponents = collect($page->components)->sortBy('order');
-
-        foreach ($sortedComponents as $instance) {
-            $component = $this->components->find($instance['component_ref']);
-
-            if (!$component) {
-                $sections[] = "    {{-- Component not found: {$instance['component_ref']} --}}";
-                continue;
-            }
-
-            $sections[] = "";
-            $sections[] = "    {{-- {$component->title} --}}";
-
-            // Render the component HTML with variables
-            $rendered = $this->renderComponentWithVariables(
-                $component->html,
-                $instance['variables'] ?? []
-            );
-
-            // Indent the rendered HTML
-            $indented = collect(explode("\n", $rendered))
-                ->map(fn($line) => "    " . $line)
-                ->implode("\n");
-
-            $sections[] = $indented;
+        foreach ($this->renderSections($page, indent: '    ') as $block) {
+            $sections[] = $block;
         }
 
         $sections[] = "";
         $sections[] = "</x-{$layout}>";
 
-        // Add header comment
+        return $this->withGeneratedHeader($page, implode("\n", $sections));
+    }
+
+    protected function buildStandaloneBlade(PageData $page): string
+    {
+        $seoTitle = e($page->meta['seo_title'] ?? $page->title);
+        $seoDescription = e($page->meta['seo_description'] ?? $page->description ?? '');
+
+        $head = [
+            '<!DOCTYPE html>',
+            '<html lang="{{ str_replace(\'_\', \'-\', app()->getLocale()) }}">',
+            '<head>',
+            '    <meta charset="utf-8">',
+            '    <meta name="viewport" content="width=device-width, initial-scale=1">',
+            "    <title>{$seoTitle}</title>",
+        ];
+
+        if ($seoDescription !== '') {
+            $head[] = "    <meta name=\"description\" content=\"{$seoDescription}\">";
+        }
+
+        if (config('studio.iframe.tailwind_cdn', true)) {
+            $head[] = '    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>';
+        }
+
+        if (config('studio.iframe.alpine_cdn', true)) {
+            $head[] = '    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>';
+        }
+
+        $head[] = '    <style>[x-cloak] { display: none !important; }</style>';
+        $head[] = '</head>';
+        $head[] = '<body class="' . e(config('studio.iframe.body_class', 'min-h-screen w-full')) . '">';
+
+        $sections = $head;
+
+        foreach ($this->renderSections($page, indent: '    ') as $block) {
+            $sections[] = $block;
+        }
+
+        $sections[] = '';
+        $sections[] = '</body>';
+        $sections[] = '</html>';
+
+        return $this->withGeneratedHeader($page, implode("\n", $sections));
+    }
+
+    /**
+     * Render every visible section of a page as indented Blade blocks.
+     *
+     * @return array<int, string>
+     */
+    protected function renderSections(PageData $page, string $indent = ''): array
+    {
+        $blocks = [];
+
+        $sortedComponents = collect($page->components)->sortBy('order')->values();
+
+        foreach ($sortedComponents as $instance) {
+            if (!empty($instance['hidden'])) {
+                continue;
+            }
+
+            $component = $this->components->find($instance['component_ref']);
+
+            if (!$component) {
+                $blocks[] = "{$indent}{{-- Component not found: {$instance['component_ref']} --}}";
+                continue;
+            }
+
+            $blocks[] = "";
+            $blocks[] = "{$indent}{{-- {$component->title} --}}";
+
+            // Render the component HTML with the fully resolved variable set
+            $rendered = $this->renderComponentWithVariables(
+                $component->html,
+                $component->resolveVariables($instance['variables'] ?? [])
+            );
+
+            $blocks[] = collect(explode("\n", $rendered))
+                ->map(fn($line) => $indent . $line)
+                ->implode("\n");
+        }
+
+        return $blocks;
+    }
+
+    protected function withGeneratedHeader(PageData $page, string $content): string
+    {
         $header = [
             "{{--",
             "    Generated by Designer Studio",
@@ -119,7 +194,7 @@ class BladeGenerator
             "",
         ];
 
-        return implode("\n", array_merge($header, $sections));
+        return implode("\n", $header) . $content;
     }
 
     /**
@@ -128,6 +203,11 @@ class BladeGenerator
      */
     protected function renderComponentWithVariables(string $html, array $variables): string
     {
+        // Statically evaluate @if blocks over known variables first, so
+        // toggle fields collapse into clean markup instead of leaving
+        // conditions over undefined variables in the generated file.
+        $html = $this->evaluateConditionals($html, $variables);
+
         $preamble = '';
         $arrayVars = [];
 
@@ -140,24 +220,26 @@ class BladeGenerator
             }
         }
 
-        // Replace scalar Blade variable syntax with actual values
-        // Pattern: {{ $varName ?? 'default' }} or {{ $varName ?? "default" }}
-        $pattern = '/{{\s*\$(\w+)\s*\?\?\s*[\'"]([^\'"]*)[\'"]?\s*}}/';
+        // Replace scalar Blade variable syntax with actual values.
+        // Two passes so 'single' and "double" quoted defaults can each
+        // contain the other quote character (e.g. "What we've built").
+        $result = $html;
+        foreach (['/{{\s*\$(\w+)\s*\?\?\s*\'([^\']*)\'\s*}}/', '/{{\s*\$(\w+)\s*\?\?\s*"([^"]*)"\s*}}/'] as $pattern) {
+            $result = preg_replace_callback($pattern, function ($matches) use ($variables, $arrayVars) {
+                $varName = $matches[1];
+                $default = $matches[2];
 
-        $result = preg_replace_callback($pattern, function ($matches) use ($variables, $arrayVars) {
-            $varName = $matches[1];
-            $default = $matches[2];
+                // Skip array variables — they're handled by @foreach in the template
+                if (isset($arrayVars[$varName])) {
+                    return $matches[0];
+                }
 
-            // Skip array variables — they're handled by @foreach in the template
-            if (isset($arrayVars[$varName])) {
-                return $matches[0];
-            }
+                $value = $variables[$varName] ?? $default;
 
-            $value = $variables[$varName] ?? $default;
-
-            // Escape for HTML output
-            return e($value);
-        }, $html);
+                // Escape for HTML output
+                return e($value);
+            }, $result);
+        }
 
         // Also handle {{ $varName }} without defaults for scalar vars
         $result = preg_replace_callback('/{{\s*\$(\w+)\s*}}/', function ($matches) use ($variables, $arrayVars) {
@@ -188,6 +270,56 @@ class BladeGenerator
         }
 
         return $result;
+    }
+
+    /**
+     * Statically evaluate simple @if / @else / @endif blocks against the
+     * known variable set. Only handles conditions of the form
+     * `@if($var)` or `@if($var ?? false)` where $var is a page-level
+     * variable — conditions referencing loop items (e.g. `$item['x']`)
+     * are left untouched for runtime evaluation.
+     */
+    protected function evaluateConditionals(string $html, array $variables): string
+    {
+        // Loop item names must never be statically evaluated
+        $reserved = ['loop' => true];
+        if (preg_match_all('/@foreach\s*\(\s*\$\w+\s+as\s+\$(\w+)\s*\)/', $html, $matches)) {
+            foreach ($matches[1] as $itemName) {
+                $reserved[$itemName] = true;
+            }
+        }
+
+        $pattern = '/@if\s*\(\s*\$(\w+)(?:\s*\?\?\s*(false|true|\'[^\']*\'|"[^"]*"))?\s*\)([\s\S]*?)@endif/';
+
+        return preg_replace_callback($pattern, function ($matches) use ($variables, $reserved) {
+            $varName = $matches[1];
+
+            if (isset($reserved[$varName])) {
+                return $matches[0];
+            }
+
+            $fallback = false;
+            if (isset($matches[2]) && $matches[2] !== '') {
+                $raw = $matches[2];
+                $fallback = match (true) {
+                    $raw === 'false' => false,
+                    $raw === 'true' => true,
+                    default => trim($raw, '\'"'),
+                };
+            }
+
+            $value = array_key_exists($varName, $variables) ? $variables[$varName] : $fallback;
+
+            $truthy = is_array($value)
+                ? count($value) > 0
+                : !($value === false || $value === null || $value === '' || $value === '0' || $value === 'false' || $value === 0);
+
+            $parts = explode('@else', $matches[3], 2);
+            $ifContent = $parts[0];
+            $elseContent = $parts[1] ?? '';
+
+            return $truthy ? $ifContent : $elseContent;
+        }, $html) ?? $html;
     }
 
     /**
@@ -229,14 +361,28 @@ class BladeGenerator
     }
 
     /**
-     * Remove all generated Blade files (for clean uninstall)
+     * Remove generated Blade files (for clean uninstall).
+     *
+     * Only exported pages (root-level *.blade.php) and generated partials
+     * are removed — section design sources living in category
+     * subdirectories are never touched.
      */
     public function purge(): bool
     {
         $outputPath = $this->getOutputPath();
 
-        if (File::isDirectory($outputPath)) {
-            return File::deleteDirectory($outputPath);
+        if (!File::isDirectory($outputPath)) {
+            return true;
+        }
+
+        foreach (File::files($outputPath) as $file) {
+            if (str_ends_with($file->getFilename(), '.blade.php')) {
+                File::delete($file->getPathname());
+            }
+        }
+
+        if (File::isDirectory($outputPath . '/partials')) {
+            File::deleteDirectory($outputPath . '/partials');
         }
 
         return true;

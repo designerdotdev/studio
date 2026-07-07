@@ -6,8 +6,7 @@ use Designer\Studio\Console\Commands\DevReset;
 use Designer\Studio\Console\Commands\SeedSampleData;
 use Designer\Studio\Console\Commands\SyncDesigns;
 use Designer\Studio\Console\Commands\Uninstall;
-use Designer\Studio\Livewire\ComponentEditor;
-use Designer\Studio\Livewire\TemplateEditor;
+use Designer\Studio\Livewire\EditorPanel;
 use Designer\Studio\Services\BladeGenerator;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\PageRepository;
@@ -62,8 +61,7 @@ class StudioServiceProvider extends ServiceProvider
         Blade::component('studio::layouts.iframe', Iframe::class);
 
         // Register Livewire components
-        Livewire::component('studio::component-editor', ComponentEditor::class);
-        Livewire::component('studio::template-editor', TemplateEditor::class);
+        Livewire::component('studio::editor-panel', EditorPanel::class);
 
         // Register Blade directives for self-contained assets
         $this->registerAssetDirectives();
@@ -108,19 +106,61 @@ class StudioServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Copy the packaged design files into resources/views/designer.
+     *
+     * Existing files are never overwritten (they belong to the app once
+     * published), but new sections shipped in package updates are added.
+     * Runs only for studio requests to keep application boot free of
+     * filesystem scans.
+     */
     protected function publishDesignsOnInstall(): void
     {
-        $destination = resource_path('views/designer');
-
-        if (is_dir($destination)) {
+        if ($this->app->runningInConsole()) {
             return;
         }
 
+        $prefix = trim(config('studio.path', 'studio'), '/');
+        $request = $this->app['request'] ?? null;
+
+        if (!$request || (!$request->is($prefix) && !$request->is($prefix . '/*'))) {
+            return;
+        }
+
+        $destination = resource_path('views/designer');
         $source = __DIR__ . '/../resources/views/designer';
 
+        if (!is_dir($source)) {
+            return;
+        }
+
         $filesystem = new Filesystem;
-        $filesystem->ensureDirectoryExists($destination);
-        $filesystem->copyDirectory($source, $destination);
+
+        if (!is_dir($destination)) {
+            $filesystem->ensureDirectoryExists($destination);
+            $filesystem->copyDirectory($source, $destination);
+
+            return;
+        }
+
+        // Merge-copy: add files that don't exist locally yet
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isDir()) {
+                continue;
+            }
+
+            $relative = substr($file->getPathname(), strlen($source) + 1);
+            $target = $destination . '/' . $relative;
+
+            if (!file_exists($target)) {
+                $filesystem->ensureDirectoryExists(dirname($target));
+                $filesystem->copy($file->getPathname(), $target);
+            }
+        }
     }
 
     protected function registerAssetDirectives(): void
@@ -146,12 +186,6 @@ class StudioServiceProvider extends ServiceProvider
                 $__studioVersion = app("studio.asset.version");
                 $__studioPrefix = config("studio.path", "studio");
                 echo \'<script src="\' . url($__studioPrefix . "/assets/studio.js") . \'?v=\' . $__studioVersion . \'" defer></script>\';
-                echo \'<style>
-                    [data-component] { cursor: pointer; position: relative; }
-                    [data-component]::before { content: \\\'\\\'; position: absolute; inset: 0; pointer-events: none; z-index: 9999; transition: box-shadow 0.15s ease; }
-                    [data-component]:hover::before, .group:hover > [data-component]::before { box-shadow: inset 0 0 0 2px #3b82f6; }
-                    [data-component].selected::before { box-shadow: inset 0 0 0 3px #3b82f6; }
-                </style>\';
             ?>';
         });
     }

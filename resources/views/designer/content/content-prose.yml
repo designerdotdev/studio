@@ -1,0 +1,51 @@
+name: content-prose
+title: Article prose
+description: Narrow reading column with a lead paragraph and a pull quote
+category: content
+tags:
+    - content
+    - article
+    - prose
+    - quote
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small uppercase label above the heading. Clear to hide.
+        default: "Field notes"
+
+    heading:
+        type: text
+        label: Heading
+        default: "How Meridian cut onboarding from three weeks to four days"
+        required: true
+
+    lead:
+        type: textarea
+        label: Lead paragraph
+        rows: 3
+        default: "When the first invoice takes 21 days to go out, customers churn before they see any value. Meridian's operations team rebuilt onboarding around a single rule: nothing waits on a meeting."
+
+    body_1:
+        type: textarea
+        label: Body paragraph one
+        rows: 4
+        default: "The old process routed every new account through five hand-offs — sales to legal, legal to finance, finance to implementation, and back again for signatures. Each hop looked quick on paper. Together they averaged 16 working days, and nobody owned the total."
+
+    quote:
+        type: textarea
+        label: Pull quote
+        rows: 3
+        default: "We stopped asking customers to adapt to our process and started asking which steps deserved to exist at all."
+
+    attribution:
+        type: text
+        label: Quote attribution
+        default: "Dana Whitfield, VP of operations at Meridian"
+
+    body_2:
+        type: textarea
+        label: Body paragraph two
+        rows: 4
+        default: "The fix was unglamorous: one shared checklist, a default deadline of 24 hours per step, and a rule that any hand-off without a named owner gets deleted. Four weeks in, median time to first invoice sat at four days — and it has held there for two quarters."

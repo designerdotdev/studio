@@ -5,37 +5,9 @@ export default {
         // Step 0: Handle @foreach loops (must run before @if and variable replacement)
         result = this.renderForeach(result, variables);
 
-        // Step 1: Handle @if($var ?? false) ... @endif blocks
-        // This pattern checks if a variable is truthy
-        const ifFalseRegex = /@if\s*\(\s*\$(\w+)\s*\?\?\s*false\s*\)([\s\S]*?)@endif/g;
-        result = result.replace(ifFalseRegex, (match, varName, content) => {
-            const value = variables[varName];
-            // Show content only if variable exists and is truthy
-            if (value && value !== '' && value !== '0' && value !== 'false') {
-                return content;
-            }
-            return '';
-        });
-
-        // Step 2: Handle @if($var) ... @endif blocks (simple truthy check)
-        const ifSimpleRegex = /@if\s*\(\s*\$(\w+)\s*\)([\s\S]*?)@endif/g;
-        result = result.replace(ifSimpleRegex, (match, varName, content) => {
-            const value = variables[varName];
-            if (value && value !== '' && value !== '0' && value !== 'false') {
-                return content;
-            }
-            return '';
-        });
-
-        // Step 3: Handle @if($var ?? 'default') ... @endif blocks
-        const ifDefaultRegex = /@if\s*\(\s*\$(\w+)\s*\?\?\s*['"]([^'"]*)['"]\s*\)([\s\S]*?)@endif/g;
-        result = result.replace(ifDefaultRegex, (match, varName, defaultValue, content) => {
-            const value = variables[varName] ?? defaultValue;
-            if (value && value !== '' && value !== '0' && value !== 'false') {
-                return content;
-            }
-            return '';
-        });
+        // Step 1: Handle @if($var) / @if($var ?? false) / @if($var ?? 'default')
+        // blocks, with optional @else branches
+        result = this.renderConditionals(result, variables);
 
         // Step 4: Handle {{ $var ?? 'default' }} - escaped output with default
         // Single-quoted defaults (may contain double quotes inside)
@@ -79,6 +51,46 @@ export default {
         });
 
         return result;
+    },
+
+    renderConditionals(template, variables) {
+        // Matches @if($var), @if($var ?? false), @if($var ?? true),
+        // @if($var ?? 'default') with an optional @else branch.
+        // Conditions referencing loop items ($item['key']) never match this
+        // pattern — those are resolved inside renderForeach.
+        const ifRegex = /@if\s*\(\s*\$(\w+)(?:\s*\?\?\s*(false|true|'[^']*'|"[^"]*"))?\s*\)([\s\S]*?)@endif/g;
+
+        return template.replace(ifRegex, (match, varName, rawFallback, content) => {
+            let fallback = false;
+            if (rawFallback === 'true') {
+                fallback = true;
+            } else if (rawFallback && rawFallback !== 'false') {
+                fallback = rawFallback.slice(1, -1);
+            }
+
+            const value = Object.hasOwnProperty.call(variables, varName)
+                ? variables[varName]
+                : fallback;
+
+            const elseParts = content.split('@else');
+            const ifContent = elseParts[0];
+            const elseContent = elseParts.length > 1 ? elseParts.slice(1).join('@else') : '';
+
+            return this.isTruthy(value) ? ifContent : elseContent;
+        });
+    },
+
+    isTruthy(value) {
+        if (Array.isArray(value)) return value.length > 0;
+        return !(
+            value === false ||
+            value === null ||
+            value === undefined ||
+            value === '' ||
+            value === '0' ||
+            value === 'false' ||
+            value === 0
+        );
     },
 
     renderForeach(template, variables) {
@@ -156,6 +168,11 @@ export default {
                     return this.escapeHtml(val);
                 });
 
+                // Replace {!! $item['key'] ?? 'default' !!} — unescaped with default
+                itemHtml = itemHtml.replace(new RegExp('\\{!!\\s*\\$' + itemName + "\\[\\s*['\"]([^'\"]+)['\"]\\s*\\]\\s*\\?\\?\\s*['\"]([^'\"]*)['\"]\\s*!!\\}", 'g'), (m, key, def) => {
+                    return item[key] ?? def;
+                });
+
                 // Handle @if(count($item['children']) > 0) ... @else ... @endif style checks
                 // (must run before the simpler @if check below)
                 itemHtml = itemHtml.replace(new RegExp('@if\\s*\\(\\s*count\\s*\\(\\s*\\$' + itemName + "\\[\\s*['\"]([^'\"]+)['\"]\\s*\\]\\s*\\)\\s*>\\s*0\\s*\\)([\\s\\S]*?)@endif", 'g'), (m, key, fullContent) => {
@@ -190,6 +207,16 @@ export default {
                     for (let j = 0; j < children.length; j++) {
                         const child = children[j];
                         let childHtml = childBody;
+
+                        // {{ $child['key'] ?? 'default' }} — escaped with default
+                        childHtml = childHtml.replace(new RegExp('\\{\\{\\s*\\$' + childName + "\\[\\s*['\"]([^'\"]+)['\"]\\s*\\]\\s*\\?\\?\\s*['\"]([^'\"]*)['\"]\\s*\\}\\}", 'g'), (cm, ck, def) => {
+                            return this.escapeHtml(child[ck] ?? def);
+                        });
+
+                        // {!! $child['key'] ?? 'default' !!} — raw with default
+                        childHtml = childHtml.replace(new RegExp('\\{!!\\s*\\$' + childName + "\\[\\s*['\"]([^'\"]+)['\"]\\s*\\]\\s*\\?\\?\\s*['\"]([^'\"]*)['\"]\\s*!!\\}", 'g'), (cm, ck, def) => {
+                            return child[ck] ?? def;
+                        });
 
                         childHtml = childHtml.replace(new RegExp('\\{\\{\\s*\\$' + childName + "\\[\\s*['\"]([^'\"]+)['\"]\\s*\\]\\s*\\}\\}", 'g'), (cm, ck) => {
                             return this.escapeHtml(child[ck] ?? '');
