@@ -25,43 +25,43 @@
             });
         </script>
 
-        {{-- Brand --}}
-        <a href="{{ route('studio.index') }}" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white/6" title="Designer Studio">
-            <svg class="h-5 w-5" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="8" fill="transparent"/>
-                <path d="M10 9.5h7.25a6.5 6.5 0 0 1 0 13H10v-13Z" stroke="#fff" stroke-width="2.5"/>
-                <circle cx="23.5" cy="23.5" r="2.5" fill="#4c7dfa"/>
-            </svg>
-        </a>
-
-        <div class="h-4 w-px bg-line-strong"></div>
-
-        {{-- Page switcher --}}
+        {{-- Menu --}}
         <div
             class="relative"
             x-data="{
                 open: false,
-                title: @js($page->title),
-                slug: @js($page->slug),
-            }"
-            @studio:page-meta-updated.window="
-                title = $event.detail.title ?? title;
-                if ($event.detail.slug && $event.detail.slug !== slug) {
-                    slug = $event.detail.slug;
-                    history.replaceState({}, '', '{{ route('studio.index') }}?page=' + slug);
+
+                async duplicatePage() {
+                    this.open = false;
+                    try {
+                        const response = await fetch(@js(route('studio.api.pages.duplicate', ['slug' => $page->slug])), {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = data.editor_url;
+                            return;
+                        }
+                        window.Studio.toast(data.error || 'Could not duplicate the page', 'error');
+                    } catch (e) {
+                        window.Studio.toast('Could not duplicate the page', 'error');
+                    }
+                },
+
+                exportBlade() {
+                    this.open = false;
+                    window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
                 }
-            "
+            }"
             @click.outside="open = false"
             @keydown.escape.window="open = false"
         >
-            <button
-                @click="open = !open"
-                class="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 font-medium text-ink transition-colors hover:bg-white/6"
-            >
-                <span x-text="title">{{ $page->title }}</span>
-                <svg class="h-3.5 w-3.5 text-faint transition-transform duration-150" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
-                </svg>
+            <button @click="open = !open" class="s-box-btn" title="Menu" aria-label="Menu">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
 
             <div
@@ -73,32 +73,91 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute left-0 top-full mt-1.5 w-64 origin-top-left"
+                class="s-pop absolute left-0 top-full mt-1.5 w-60 origin-top-left"
             >
-                <p class="s-microlabel px-2.5 pb-1 pt-2">Pages</p>
-                @foreach($pages as $p)
-                    <a href="{{ route('studio.index', ['page' => $p->slug]) }}" class="s-menu-item {{ $p->slug === $page->slug ? 'bg-white/6 !text-ink' : '' }}">
-                        <svg class="h-3.5 w-3.5 shrink-0 {{ $p->slug === $page->slug ? 'text-accent' : 'text-transparent' }}" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="min-w-0 flex-1 truncate">{{ $p->title }}</span>
-                        <span class="font-mono text-[10.5px] text-faint">/{{ $p->slug === $homeSlug ? '' : $p->slug }}</span>
-                    </a>
-                @endforeach
+                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5">
+                    <svg class="h-5 w-5 shrink-0" viewBox="0 0 32 32" fill="none">
+                        <rect width="32" height="32" rx="8" fill="rgba(255,255,255,0.06)"/>
+                        <path d="M10 9.5h7.25a6.5 6.5 0 0 1 0 13H10v-13Z" stroke="#fff" stroke-width="2.5"/>
+                        <circle cx="23.5" cy="23.5" r="2.5" fill="#4c7dfa"/>
+                    </svg>
+                    <span class="text-[13px] font-semibold text-ink">Designer Studio</span>
+                </div>
+
+                <div class="s-divider mb-1"></div>
+
+                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                    New page…
+                </button>
+                <button @click="duplicatePage()" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
+                    Duplicate this page
+                </button>
 
                 <div class="s-divider my-1"></div>
 
-                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
-                    </svg>
-                    New page
+                <button @click="exportBlade()" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
+                    Export Blade file
                 </button>
+                @if($liveUrl)
+                    <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        View live site
+                    </a>
+                @endif
             </div>
         </div>
 
-        {{-- Device switcher (centered) --}}
-        <div class="absolute left-1/2 -translate-x-1/2" x-data>
+        {{-- Browser navigation --}}
+        <div class="ml-1 flex items-center" x-data>
+            <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+            </button>
+            <button class="s-nav-btn" title="Forward" aria-label="Forward" @click="history.forward()">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+            </button>
+            <button class="s-nav-btn" title="Reload preview" aria-label="Reload preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
+            </button>
+        </div>
+
+        {{-- URL bar (centered) --}}
+        @php $displayHost = parse_url(url('/'), PHP_URL_HOST); @endphp
+        <div
+            class="pointer-events-none absolute left-1/2 top-1/2 w-[40%] max-w-[620px] min-w-[260px] -translate-x-1/2 -translate-y-1/2"
+            x-data="{ state: 'idle' }"
+            @studio:status.window="state = $event.detail.state"
+        >
+            @if($liveUrl)<a href="{{ $liveUrl }}" target="_blank" title="Open the live page in a new tab" class="s-urlbar pointer-events-auto">@else<span class="s-urlbar pointer-events-auto">@endif
+                <span
+                    class="s-status-dot shrink-0 transition-colors duration-300"
+                    :class="{
+                        'bg-ok': state === 'idle' || state === 'saved',
+                        'bg-warn animate-pulse': state === 'saving',
+                        'bg-danger': state === 'error',
+                    }"
+                ></span>
+                <span class="min-w-0 flex-1 truncate text-[12.5px]">
+                    <span class="text-soft">{{ $displayHost }}</span>
+                    <span class="mx-1 text-faint">/</span><span class="font-mono text-xs text-ink">{{ $page->slug === $homeSlug ? '' : $page->slug }}</span>
+                </span>
+                <span class="flex shrink-0 items-center gap-2 text-[11px] text-faint">
+                    <span x-show="state === 'saving'" x-cloak>Saving…</span>
+                    <span x-show="state === 'saved'" x-cloak class="text-ok/80">Saved</span>
+                    <span x-show="state === 'error'" x-cloak class="text-danger">Offline</span>
+                    @if($liveUrl)
+                        <svg x-show="state === 'idle'" class="s-urlbar-open h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                    @endif
+                </span>
+            @if($liveUrl)</a>@else</span>@endif
+        </div>
+
+        <div class="flex-1"></div>
+
+        {{-- Device switcher --}}
+        <div x-data>
             <div class="s-seg">
                 <button
                     class="s-seg-btn"
@@ -127,43 +186,63 @@
             </div>
         </div>
 
-        <div class="flex-1"></div>
-
-        {{-- Save status --}}
+        {{-- Page dropdown --}}
         <div
-            x-data="{ state: 'idle' }"
-            @studio:status.window="state = $event.detail.state"
-            class="mr-1 flex w-20 items-center justify-end gap-1.5 text-xs text-faint"
+            class="relative"
+            x-data="{
+                open: false,
+                title: @js($page->title),
+                slug: @js($page->slug),
+            }"
+            @studio:page-meta-updated.window="
+                title = $event.detail.title ?? title;
+                if ($event.detail.slug && $event.detail.slug !== slug) {
+                    slug = $event.detail.slug;
+                    history.replaceState({}, '', '{{ route('studio.index') }}?page=' + slug);
+                }
+            "
+            @click.outside="open = false"
+            @keydown.escape.window="open = false"
         >
-            <template x-if="state === 'saving'">
-                <span class="flex items-center gap-1.5">
-                    <svg class="h-3 w-3 animate-spin text-soft" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
-                    Saving…
-                </span>
-            </template>
-            <template x-if="state === 'saved'">
-                <span class="flex items-center gap-1.5 text-soft">
-                    <span class="s-status-dot bg-ok"></span>
-                    Saved
-                </span>
-            </template>
-            <template x-if="state === 'error'">
-                <span class="flex items-center gap-1.5 text-danger">
-                    <span class="s-status-dot bg-danger"></span>
-                    Error
-                </span>
-            </template>
-        </div>
-
-        @if($liveUrl)
-            <a href="{{ $liveUrl }}" target="_blank" class="s-btn-ghost" title="Open the live page in a new tab">
-                Preview
-                <svg class="h-3.5 w-3.5 text-faint" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/>
-                    <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/>
+            <button @click="open = !open" class="s-drop-btn min-w-36 max-w-56" title="Switch page">
+                <span class="min-w-0 flex-1 truncate text-left" x-text="title">{{ $page->title }}</span>
+                <svg class="h-3.5 w-3.5 shrink-0 text-faint transition-transform duration-150" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
                 </svg>
-            </a>
-        @endif
+            </button>
+
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0 -translate-y-1"
+                class="s-pop absolute right-0 top-full mt-1.5 w-64 origin-top-right"
+            >
+                <p class="s-microlabel px-2.5 pb-1 pt-2">Pages</p>
+                @foreach($pages as $p)
+                    <a href="{{ route('studio.index', ['page' => $p->slug]) }}" class="s-menu-item {{ $p->slug === $page->slug ? 'bg-white/6 !text-ink' : '' }}">
+                        <svg class="h-3.5 w-3.5 shrink-0 {{ $p->slug === $page->slug ? 'text-accent' : 'text-transparent' }}" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="min-w-0 flex-1 truncate">{{ $p->title }}</span>
+                        <span class="font-mono text-[10.5px] text-faint">/{{ $p->slug === $homeSlug ? '' : $p->slug }}</span>
+                    </a>
+                @endforeach
+
+                <div class="s-divider my-1"></div>
+
+                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+                    </svg>
+                    New page
+                </button>
+            </div>
+        </div>
 
         {{-- Publish --}}
         <div class="relative" x-data="{
@@ -180,24 +259,8 @@
 
             async exportBlade() {
                 this.exporting = true;
-                try {
-                    const response = await fetch(@js(route('studio.api.generate.page', ['slug' => $page->slug])), {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                            'Accept': 'application/json',
-                        },
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                        window.Studio.toast('Blade file exported to ' + data.relative_path);
-                        this.open = false;
-                    } else {
-                        window.Studio.toast(data.error || 'Export failed', 'error');
-                    }
-                } catch (e) {
-                    window.Studio.toast('Export failed', 'error');
-                }
+                const ok = await window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
+                if (ok) this.open = false;
                 this.exporting = false;
             }
         }" @click.outside="open = false" @keydown.escape.window="open = false">
@@ -261,33 +324,11 @@
     {{-- Canvas                                                        --}}
     {{-- ============================================================ --}}
     <div class="s-canvas h-full w-full overflow-auto" x-data>
-        <div class="flex h-full flex-col p-4 lg:px-8 lg:py-6">
+        <div class="flex h-full flex-col p-4 lg:p-5">
             <div
                 class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
                 :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
             >
-                {{-- Browser chrome --}}
-                <div class="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-raised px-3">
-                    <div class="flex gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
-                        <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
-                        <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
-                    </div>
-                    <div class="flex flex-1 justify-center">
-                        <div class="flex h-6 w-56 items-center justify-center gap-1.5 rounded-md bg-shell px-3 font-mono text-[11px] text-faint">
-                            <svg class="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd"/></svg>
-                            <span class="truncate">{{ parse_url(url('/'), PHP_URL_HOST) }}/{{ $page->slug === $homeSlug ? '' : $page->slug }}</span>
-                        </div>
-                    </div>
-                    <button
-                        class="s-icon-btn !h-6 !w-6"
-                        title="Reload preview"
-                        @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))"
-                    >
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd"/></svg>
-                    </button>
-                </div>
-
                 {{-- Live preview --}}
                 <iframe
                     id="studio-canvas-frame"

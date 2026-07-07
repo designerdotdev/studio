@@ -55,7 +55,7 @@ There are no tests or linting configured in this package. Verify changes against
 ### Views
 
 - `components/layouts/app.blade.php` — editor shell (topbar/sidebar/main slots, dark chrome)
-- `home.blade.php` — editor page: topbar (page switcher, device toggle, save status, Publish popover), canvas iframe, Add-Section modal (live scaled preview iframes per component), create-page modal
+- `home.blade.php` — editor page: browser-style topbar (hamburger menu, back/forward/reload, centered URL bar with integrated save-status dot, device toggle, bordered page dropdown, Publish popover), canvas iframe, Add-Section modal (live scaled preview iframes per component), create-page modal
 - `livewire/editor-panel.blade.php` + `livewire/fields/*.blade.php` — panel views; field partials: text, url, textarea, select, toggle, colorpicker, image (with upload), repeater (+ `sub-input` shared partial)
 - `iframe.blade.php` — canvas preview document: section wrappers with hover/selection overlay, name chips, floating toolbar, insert-between affordances; exposes `window.__studioPreview`
 - `preview.blade.php` — non-interactive render used by picker + onboarding thumbnails
