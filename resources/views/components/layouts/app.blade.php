@@ -26,15 +26,23 @@
             @endisset
 
             <div class="flex min-h-0 flex-1 items-stretch">
-                @isset($sidebar)
-                    <aside class="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-line bg-panel">
-                        {{ $sidebar }}
-                    </aside>
-                @endisset
-
                 <main class="relative min-w-0 flex-1 overflow-hidden">
                     {{ $slot }}
                 </main>
+
+                @isset($sidebar)
+                    <aside
+                        x-data
+                        class="flex w-[320px] shrink-0 flex-col overflow-hidden border-l border-line bg-panel transition-[width] duration-200 ease-out"
+                        :class="$store.studio.sidebar ? '' : '!w-0 !border-l-0'"
+                        :aria-hidden="!$store.studio.sidebar"
+                        :inert="!$store.studio.sidebar"
+                    >
+                        <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden">
+                            {{ $sidebar }}
+                        </div>
+                    </aside>
+                @endisset
             </div>
         </div>
 

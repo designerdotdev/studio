@@ -17,6 +17,11 @@
                 Alpine.store('studio', {
                     device: 'desktop',
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
+                    sidebar: localStorage.getItem('studio.sidebar') !== '0',
+                    toggleSidebar() {
+                        this.sidebar = !this.sidebar;
+                        localStorage.setItem('studio.sidebar', this.sidebar ? '1' : '0');
+                    },
                 });
             });
 
@@ -60,8 +65,9 @@
             @click.outside="open = false"
             @keydown.escape.window="open = false"
         >
-            <button @click="open = !open" class="s-box-btn" title="Menu" aria-label="Menu">
-                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+            <button @click="open = !open" class="s-box-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
+                <svg class="s-logo-btn-logo h-[17px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
+                <svg class="s-logo-btn-menu h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
 
             <div
@@ -75,12 +81,8 @@
                 x-transition:leave-end="opacity-0 -translate-y-1"
                 class="s-pop absolute left-0 top-full mt-1.5 w-60 origin-top-left"
             >
-                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5">
-                    <svg class="h-5 w-5 shrink-0" viewBox="0 0 32 32" fill="none">
-                        <rect width="32" height="32" rx="8" fill="rgba(255,255,255,0.06)"/>
-                        <path d="M10 9.5h7.25a6.5 6.5 0 0 1 0 13H10v-13Z" stroke="#fff" stroke-width="2.5"/>
-                        <circle cx="23.5" cy="23.5" r="2.5" fill="#4c7dfa"/>
-                    </svg>
+                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
+                    <svg class="h-[17px] w-auto -translate-y-0.5 text-neutral-100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
                     <span class="text-[13px] font-semibold text-ink">Designer Studio</span>
                 </div>
 
@@ -110,83 +112,53 @@
             </div>
         </div>
 
-        {{-- Page dropdown --}}
+        {{-- Browser navigation --}}
+        <div x-data class="flex shrink-0 items-center">
+            <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+            </button>
+            <button class="s-nav-btn" title="Forward" aria-label="Forward" @click="history.forward()">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+            </button>
+            <button class="s-nav-btn" title="Reload preview" aria-label="Reload preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
+                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
+            </button>
+        </div>
+
+        {{-- URL bar — full width, doubles as the page switcher --}}
+        @php $displayHost = parse_url(url('/'), PHP_URL_HOST); @endphp
         <div
-            class="relative ml-1"
+            class="relative mx-1 min-w-0 flex-1"
             x-data="{
-                open: false,
-                title: @js($page->title),
+                state: 'idle',
+                pagesOpen: false,
                 slug: @js($page->slug),
+                homeSlug: @js($homeSlug),
+                get path() { return this.slug === this.homeSlug ? '' : this.slug },
+                get liveUrl() { return @js(rtrim(url('/'), '/')) + '/' + this.path },
             }"
+            @studio:status.window="state = $event.detail.state"
             @studio:page-meta-updated.window="
-                title = $event.detail.title ?? title;
                 if ($event.detail.slug && $event.detail.slug !== slug) {
                     slug = $event.detail.slug;
                     history.replaceState({}, '', '{{ route('studio.index') }}?page=' + slug);
                 }
             "
-            @click.outside="open = false"
-            @keydown.escape.window="open = false"
+            @click.outside="pagesOpen = false"
+            @keydown.escape.window="pagesOpen = false"
         >
-            <button @click="open = !open" class="s-drop-btn min-w-36 max-w-56" title="Switch page">
-                <span class="min-w-0 flex-1 truncate text-left" x-text="title">{{ $page->title }}</span>
-                <svg class="h-3.5 w-3.5 shrink-0 text-faint transition-transform duration-150" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
-                </svg>
-            </button>
-
             <div
-                x-show="open"
-                x-cloak
-                x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute left-0 top-full mt-1.5 w-64 origin-top-left"
+                class="s-urlbar w-full"
+                :class="pagesOpen && 'is-open'"
+                role="button"
+                tabindex="0"
+                :aria-expanded="pagesOpen"
+                aria-haspopup="menu"
+                title="Switch page"
+                @click="pagesOpen = !pagesOpen"
+                @keydown.enter.prevent="pagesOpen = !pagesOpen"
+                @keydown.space.prevent="pagesOpen = !pagesOpen"
             >
-                <p class="s-microlabel px-2.5 pb-1 pt-2">Pages</p>
-                @foreach($pages as $p)
-                    <a href="{{ route('studio.index', ['page' => $p->slug]) }}" class="s-menu-item {{ $p->slug === $page->slug ? 'bg-white/6 !text-ink' : '' }}">
-                        <svg class="h-3.5 w-3.5 shrink-0 {{ $p->slug === $page->slug ? 'text-accent' : 'text-transparent' }}" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="min-w-0 flex-1 truncate">{{ $p->title }}</span>
-                        <span class="font-mono text-[10.5px] text-faint">/{{ $p->slug === $homeSlug ? '' : $p->slug }}</span>
-                    </a>
-                @endforeach
-
-                <div class="s-divider my-1"></div>
-
-                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
-                    </svg>
-                    New page
-                </button>
-            </div>
-        </div>
-
-        {{-- Center: browser navigation + URL bar --}}
-        @php $displayHost = parse_url(url('/'), PHP_URL_HOST); @endphp
-        <div
-            class="pointer-events-none absolute left-1/2 top-1/2 flex w-[48%] max-w-[760px] min-w-[340px] -translate-x-1/2 -translate-y-1/2 items-center gap-1"
-            x-data="{ state: 'idle' }"
-            @studio:status.window="state = $event.detail.state"
-        >
-            <div class="pointer-events-auto flex shrink-0 items-center">
-                <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
-                    <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
-                </button>
-                <button class="s-nav-btn" title="Forward" aria-label="Forward" @click="history.forward()">
-                    <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
-                </button>
-                <button class="s-nav-btn mr-1" title="Reload preview" aria-label="Reload preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
-                    <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
-                </button>
-            </div>
-            @if($liveUrl)<a href="{{ $liveUrl }}" target="_blank" title="Open the live page in a new tab" class="s-urlbar pointer-events-auto min-w-0 flex-1">@else<span class="s-urlbar pointer-events-auto min-w-0 flex-1">@endif
                 <span
                     class="s-status-dot shrink-0 transition-colors duration-300"
                     :class="{
@@ -197,20 +169,72 @@
                 ></span>
                 <span class="min-w-0 flex-1 truncate text-[12.5px]">
                     <span class="text-soft">{{ $displayHost }}</span>
-                    <span class="mx-1 text-faint">/</span><span class="font-mono text-xs text-ink">{{ $page->slug === $homeSlug ? '' : $page->slug }}</span>
+                    <span class="mx-1 text-faint">/</span><span class="font-mono text-xs text-ink" x-text="path">{{ $page->slug === $homeSlug ? '' : $page->slug }}</span>
                 </span>
-                <span class="flex shrink-0 items-center gap-2 text-[11px] text-faint">
-                    <span x-show="state === 'saving'" x-cloak>Saving…</span>
-                    <span x-show="state === 'saved'" x-cloak class="text-ok/80">Saved</span>
-                    <span x-show="state === 'error'" x-cloak class="text-danger">Offline</span>
+                <span class="flex shrink-0 items-center gap-1">
+                    <span class="mr-1 text-[11px] text-faint">
+                        <span x-show="state === 'saving'" x-cloak>Saving…</span>
+                        <span x-show="state === 'saved'" x-cloak class="text-ok/80">Saved</span>
+                        <span x-show="state === 'error'" x-cloak class="text-danger">Offline</span>
+                    </span>
+                    <span class="s-urlbar-action" :class="pagesOpen && 'is-active'">
+                        <svg class="h-3.5 w-3.5 transition-transform duration-150" :class="pagesOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                    </span>
                     @if($liveUrl)
-                        <svg x-show="state === 'idle'" class="s-urlbar-open h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        <a
+                            :href="liveUrl"
+                            href="{{ $liveUrl }}"
+                            target="_blank"
+                            class="s-urlbar-action"
+                            title="Open the live page in a new tab"
+                            aria-label="Open the live page in a new tab"
+                            @click.stop
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        </a>
                     @endif
                 </span>
-            @if($liveUrl)</a>@else</span>@endif
-        </div>
+            </div>
 
-        <div class="flex-1"></div>
+            {{-- Pages dropdown --}}
+            <div
+                x-show="pagesOpen"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.99]"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0 -translate-y-1"
+                class="s-pop absolute inset-x-0 top-full z-50 mt-1.5 origin-top"
+                role="menu"
+                aria-label="Pages"
+            >
+                <p class="s-microlabel px-2.5 pb-1 pt-2">Pages</p>
+                @foreach($pages as $p)
+                    <a
+                        href="{{ route('studio.index', ['page' => $p->slug]) }}"
+                        class="s-menu-item {{ $p->slug === $page->slug ? 'bg-white/6 !text-ink' : '' }}"
+                        role="menuitem"
+                    >
+                        <svg class="h-3.5 w-3.5 shrink-0 {{ $p->slug === $page->slug ? 'text-accent' : 'text-transparent' }}" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="min-w-0 flex-1 truncate">{{ $p->title }}</span>
+                        <span class="font-mono text-[10.5px] text-faint">/{{ $p->slug === $homeSlug ? '' : $p->slug }}</span>
+                    </a>
+                @endforeach
+
+                <div class="s-divider my-1"></div>
+
+                <button @click="pagesOpen = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item" role="menuitem">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+                    </svg>
+                    New page
+                </button>
+            </div>
+        </div>
 
         {{-- Device switcher --}}
         <div x-data>
@@ -309,6 +333,23 @@
                 </button>
             </div>
         </div>
+
+        {{-- Sidebar toggle --}}
+        <button
+            x-data
+            @click="$store.studio.toggleSidebar()"
+            class="s-box-btn"
+            :class="$store.studio.sidebar || '!text-faint'"
+            :title="$store.studio.sidebar ? 'Hide sidebar' : 'Show sidebar'"
+            :aria-expanded="$store.studio.sidebar"
+            aria-label="Toggle sidebar"
+        >
+            <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <rect x="3.75" y="4.75" width="16.5" height="14.5" rx="2.5"/>
+                <path d="M15.25 4.75v14.5"/>
+                <path x-show="$store.studio.sidebar" d="M15.25 4.75h2.5a2.5 2.5 0 0 1 2.5 2.5v9.5a2.5 2.5 0 0 1-2.5 2.5h-2.5z" fill="currentColor" stroke="none" opacity="0.35"/>
+            </svg>
+        </button>
     </x-slot:topbar>
 
     {{-- ============================================================ --}}

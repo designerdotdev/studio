@@ -477,8 +477,16 @@ window.Studio = {
     /**
      * Upload an image through the Studio upload endpoint.
      * Returns the public URL of the stored file.
+     * Max size must match the `max:` rule in StudioController::upload().
      */
+    maxUploadMb: 5,
+
     async upload(file, { url, csrf }) {
+        const sizeMb = file.size / (1024 * 1024);
+        if (sizeMb > this.maxUploadMb) {
+            throw new Error(`This image is ${sizeMb.toFixed(1)} MB — the maximum upload size is ${this.maxUploadMb} MB.`);
+        }
+
         const body = new FormData();
         body.append('file', file);
 
@@ -494,11 +502,25 @@ window.Studio = {
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok || !data.success) {
-            const message = data.message || data.error || 'Upload failed';
-            throw new Error(message);
+            throw new Error(this.uploadErrorMessage(response.status, data));
         }
 
         return data.url;
+    },
+
+    uploadErrorMessage(status, data) {
+        const serverMessage = data.errors?.file?.[0] || data.message || data.error;
+
+        if (status === 413) {
+            return `The server rejected this image as too large before it reached Studio (HTTP 413). Raise the web server body limit (e.g. nginx \`client_max_body_size\`) and php.ini \`upload_max_filesize\`/\`post_max_size\` to at least ${this.maxUploadMb}M.`;
+        }
+        if (status === 419) {
+            return 'Your session expired — refresh the page and try uploading again.';
+        }
+        if (serverMessage) {
+            return serverMessage;
+        }
+        return status ? `Upload failed (HTTP ${status}).` : 'Upload failed — the server did not respond.';
     },
 };
 
