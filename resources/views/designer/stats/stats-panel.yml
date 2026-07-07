@@ -1,0 +1,42 @@
+name: stats-panel
+title: Dark stats panel
+description: Rounded dark panel with a heading on the left and three numbers on the right
+category: stats
+tags:
+    - stats
+    - dark
+    - panel
+    - numbers
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "The numbers customers report back"
+        required: true
+
+    text:
+        type: textarea
+        label: Text
+        default: "We surveyed 312 operations leads a year after they moved their planning in. These are the medians, not the highlights."
+
+    stats:
+        type: repeater
+        label: Stats
+        add_button_label: Add stat
+        sub_fields:
+            value:
+                type: text
+                label: Value
+                default: "2.4x"
+            label:
+                type: text
+                label: Label
+                default: "What this number measures"
+        default:
+            - value: "38 hrs"
+              label: "Reclaimed per team, every month"
+            - value: "6.2x"
+              label: "Faster end-of-week reporting"
+            - value: "31%"
+              label: "Fewer status meetings on the calendar"

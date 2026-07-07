@@ -18,12 +18,29 @@ return [
     | Studio Middleware
     |--------------------------------------------------------------------------
     |
-    | These middleware will be assigned to every Studio route, giving you
-    | the chance to add your own middleware to this list or change any of
-    | the existing middleware. Or, you can simply stick with this list.
+    | These middleware will be assigned to every Studio route. In production
+    | you should protect the editor — add 'auth' (or your own middleware)
+    | so only authorized users can open the Studio and its API:
+    |
+    |     'middleware' => ['web', 'auth'],
     |
     */
     'middleware' => ['web'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization Gate
+    |--------------------------------------------------------------------------
+    |
+    | Optionally require a Gate ability for every Studio route (applied as
+    | the `can:` middleware). Define the gate in a service provider:
+    |
+    |     Gate::define('viewStudio', fn ($user) => $user->isAdmin());
+    |
+    | and set 'gate' => 'viewStudio'. Leave null to disable.
+    |
+    */
+    'gate' => null,
 
     /*
     |--------------------------------------------------------------------------
@@ -52,13 +69,14 @@ return [
     | Default Layout
     |--------------------------------------------------------------------------
     |
-    | The default Blade component that generated pages will be wrapped in.
-    | This maps to a component tag, e.g. 'layout' becomes <x-layout>.
-    | For nested components, use dot notation: 'layouts.app' becomes
-    | <x-layouts.app>.
+    | The Blade component that exported pages are wrapped in. When null
+    | (the default), exports are fully standalone HTML documents that work
+    | in any application with zero setup. Set this to a component name to
+    | wrap exports instead — e.g. 'layout' becomes <x-layout>, and dot
+    | notation works too: 'layouts.app' becomes <x-layouts.app>.
     |
     */
-    'default_layout' => 'layout',
+    'default_layout' => null,
 
     /*
     |--------------------------------------------------------------------------

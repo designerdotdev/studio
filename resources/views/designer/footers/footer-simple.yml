@@ -1,0 +1,43 @@
+name: footer-simple
+title: Minimal footer
+description: Company name, a row of inline links, and copyright in one line
+category: footers
+tags:
+    - footer
+    - minimal
+    - simple
+
+fields:
+    company_name:
+        type: text
+        label: Company name
+        default: "Acme"
+        required: true
+
+    links:
+        type: repeater
+        label: Links
+        add_button_label: Add link
+        sub_fields:
+            text:
+                type: text
+                label: Link text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Privacy"
+              url: "#"
+            - text: "Terms"
+              url: "#"
+            - text: "Status"
+              url: "#"
+            - text: "Contact"
+              url: "#"
+
+    copyright:
+        type: text
+        label: Copyright
+        default: "© 2026 Acme, Inc. All rights reserved."

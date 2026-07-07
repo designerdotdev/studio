@@ -1,0 +1,50 @@
+<section class="relative w-full overflow-hidden bg-neutral-950 py-24 sm:py-32">
+    <div class="pointer-events-none absolute inset-0">
+        <div class="absolute left-1/2 top-[-180px] h-[420px] w-[720px] -translate-x-1/2 rounded-full opacity-25 blur-3xl" style="background: {{ $glow_color ?? '#4c7dfa' }}"></div>
+        <div class="absolute inset-0" style="background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px); background-size: 26px 26px;"></div>
+        <div class="absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-neutral-950 to-transparent"></div>
+    </div>
+
+    <div class="relative mx-auto w-full max-w-6xl px-6 text-center lg:px-8">
+        @if($badge_text)
+            <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-neutral-300">
+                <span class="h-1.5 w-1.5 animate-pulse rounded-full" style="background: {{ $glow_color ?? '#4c7dfa' }}"></span>
+                {{ $badge_text }}
+            </span>
+        @endif
+
+        <h1 class="mx-auto mt-6 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-white sm:text-6xl">
+            {{ $heading ?? 'Customer conversations, finally in' }}
+            <span class="bg-gradient-to-r from-white via-neutral-300 to-neutral-500 bg-clip-text text-transparent">{{ $heading_accent ?? 'one place' }}</span>
+        </h1>
+
+        <p class="mx-auto mt-6 max-w-xl text-balance text-lg leading-relaxed text-neutral-400">
+            {{ $text ?? 'Relay pulls email, chat, and social threads into a single shared inbox.' }}
+        </p>
+
+        <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            @if($button_text)
+                <a href="{{ $button_link ?? '#' }}" class="inline-flex w-full items-center justify-center rounded-xl bg-white px-7 py-3 text-sm font-semibold text-neutral-950 shadow-lg shadow-white/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-neutral-100 sm:w-auto">{{ $button_text }}</a>
+            @endif
+            @if($button_text_2)
+                <a href="{{ $button_link_2 ?? '#' }}" class="inline-flex w-full items-center justify-center rounded-xl border border-white/15 px-7 py-3 text-sm font-medium text-neutral-200 transition-colors hover:border-white/25 hover:bg-white/5 sm:w-auto">{{ $button_text_2 }}</a>
+            @endif
+        </div>
+
+        @if($footnote)
+            <p class="mt-5 text-xs text-neutral-500">{{ $footnote }}</p>
+        @endif
+
+        <div class="relative mx-auto mt-16 max-w-5xl">
+            <div class="absolute -inset-x-8 -top-8 h-40 opacity-20 blur-3xl" style="background: {{ $glow_color ?? '#4c7dfa' }}"></div>
+            <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 shadow-2xl shadow-black/60 ring-1 ring-white/5">
+                <div class="flex items-center gap-1.5 border-b border-white/5 bg-white/[0.03] px-4 py-2.5">
+                    <span class="h-2 w-2 rounded-full bg-white/15"></span>
+                    <span class="h-2 w-2 rounded-full bg-white/15"></span>
+                    <span class="h-2 w-2 rounded-full bg-white/15"></span>
+                </div>
+                <img src="{{ $image ?? 'https://picsum.photos/seed/relay-inbox/2000/1160' }}" alt="" class="block aspect-[50/29] w-full object-cover">
+            </div>
+        </div>
+    </div>
+</section>

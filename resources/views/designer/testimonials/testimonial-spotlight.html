@@ -1,0 +1,29 @@
+<section class="w-full bg-neutral-50 py-20 sm:py-28">
+    <div class="mx-auto w-full max-w-6xl px-6 lg:px-8">
+        <figure class="relative mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-neutral-200/70 bg-white px-6 py-14 text-center sm:px-16 sm:py-16">
+            <span class="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 select-none font-serif text-[11rem] leading-none text-neutral-100" aria-hidden="true">&ldquo;</span>
+
+            <div class="relative">
+                <div class="flex items-center justify-center gap-1" aria-label="Rated five out of five stars">
+                    <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z"/></svg>
+                    <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z"/></svg>
+                    <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z"/></svg>
+                    <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z"/></svg>
+                    <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z"/></svg>
+                </div>
+
+                <blockquote class="mx-auto mt-7 max-w-2xl text-2xl font-medium leading-snug tracking-tight text-neutral-950 sm:text-3xl">
+                    {{ $quote ?? 'We moved 212,000 shipments through the platform last quarter, and dispatch errors fell by half in the first week.' }}
+                </blockquote>
+
+                <figcaption class="mt-9 flex flex-col items-center gap-3">
+                    <img src="{{ $avatar ?? 'https://i.pravatar.cc/144?img=38' }}" alt="{{ $name ?? '' }}" class="h-12 w-12 rounded-full object-cover" loading="lazy">
+                    <div>
+                        <div class="text-sm font-semibold text-neutral-950">{{ $name ?? 'Marisol Vega' }}</div>
+                        <div class="mt-0.5 text-sm text-neutral-500">{{ $role ?? '' }}@if($company), {{ $company }}@endif</div>
+                    </div>
+                </figcaption>
+            </div>
+        </figure>
+    </div>
+</section>

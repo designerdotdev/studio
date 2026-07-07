@@ -1,0 +1,129 @@
+name: pricing-tiers
+title: Three pricing tiers
+description: Three plan cards with a highlighted popular tier
+category: pricing
+tags:
+    - pricing
+    - plans
+    - tiers
+    - cards
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small uppercase label above the heading. Clear to hide.
+        default: "Pricing"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Choose the plan that fits today"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        rows: 2
+        default: "Every plan starts with a free 14-day trial of Growth. Upgrade, downgrade, or cancel from the billing page whenever you like."
+
+    footnote:
+        type: text
+        label: Footnote
+        description: Small print under the plan grid. Clear to hide.
+        default: "All prices in USD, excluding tax. Annual billing takes roughly 18% off."
+
+    tiers:
+        type: repeater
+        label: Plans
+        add_button_label: Add plan
+        sub_fields:
+            name:
+                type: text
+                label: Plan name
+                default: "New plan"
+            price:
+                type: text
+                label: Price
+                default: "$29"
+            period:
+                type: text
+                label: Period
+                default: "/month"
+            description:
+                type: text
+                label: Description
+                default: "Who this plan is for."
+            cta_text:
+                type: text
+                label: Button text
+                default: "Get started"
+            cta_url:
+                type: url
+                label: Button link
+                default: "#"
+            highlighted:
+                type: select
+                label: Highlighted
+                options:
+                    "": "No"
+                    "yes": "Highlighted"
+                default: ""
+            feature_1:
+                type: text
+                label: Feature 1
+                description: Clear a feature to hide its row.
+                default: ""
+            feature_2:
+                type: text
+                label: Feature 2
+                default: ""
+            feature_3:
+                type: text
+                label: Feature 3
+                default: ""
+            feature_4:
+                type: text
+                label: Feature 4
+                default: ""
+            feature_5:
+                type: text
+                label: Feature 5
+                default: ""
+        default:
+            - name: "Starter"
+              price: "$19"
+              period: "/month"
+              description: "For a single project and a small crew."
+              cta_text: "Get started"
+              cta_url: "#"
+              highlighted: ""
+              feature_1: "Up to 3 team members"
+              feature_2: "Unlimited pages and drafts"
+              feature_3: "10 GB asset storage"
+              feature_4: "Email support within two business days"
+              feature_5: ""
+            - name: "Growth"
+              price: "$49"
+              period: "/month"
+              description: "For teams shipping to production every week."
+              cta_text: "Start 14-day trial"
+              cta_url: "#"
+              highlighted: "yes"
+              feature_1: "Everything in Starter"
+              feature_2: "Up to 12 team members"
+              feature_3: "Staging environments with preview links"
+              feature_4: "Role-based permissions"
+              feature_5: "Priority email and chat support"
+            - name: "Scale"
+              price: "$139"
+              period: "/month"
+              description: "For companies with compliance needs and many teams."
+              cta_text: "Talk to sales"
+              cta_url: "#"
+              highlighted: ""
+              feature_1: "Everything in Growth"
+              feature_2: "Unlimited team members"
+              feature_3: "SSO with SAML and SCIM"
+              feature_4: "Audit log with 13-month retention"
+              feature_5: "Dedicated success manager"

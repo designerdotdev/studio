@@ -1,0 +1,31 @@
+name: banner-announcement
+title: Announcement bar
+description: Thin dark bar with a message, an arrow link, and an optional dismiss button
+category: banners
+tags:
+    - banner
+    - announcement
+    - bar
+
+fields:
+    message:
+        type: text
+        label: Message
+        default: "Version 4.2 is out — offline mode, instant search, and 12 new integrations."
+        required: true
+
+    link_text:
+        type: text
+        label: Link text
+        description: Clear to hide the link.
+        default: "Read the changelog"
+
+    link_url:
+        type: url
+        label: Link URL
+        default: "#"
+
+    dismissible:
+        type: toggle
+        label: Show dismiss button
+        default: true

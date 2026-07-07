@@ -1,0 +1,76 @@
+name: testimonials-grid
+title: Testimonial wall
+description: Masonry wall of short and long customer quotes
+category: testimonials
+tags:
+    - testimonials
+    - quotes
+    - social-proof
+    - masonry
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small uppercase label above the heading. Clear to hide.
+        default: "Testimonials"
+
+    heading:
+        type: text
+        label: Heading
+        default: "What teams say after the switch"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        rows: 2
+        default: "Quotes from the operators, engineers, and founders who moved their teams over in the past year."
+
+    testimonials:
+        type: repeater
+        label: Testimonials
+        add_button_label: Add testimonial
+        sub_fields:
+            quote:
+                type: textarea
+                label: Quote
+                rows: 3
+                default: "A short line about what changed for the team."
+            name:
+                type: text
+                label: Name
+                default: "New person"
+            role:
+                type: text
+                label: Role and company
+                default: "Role, Company"
+            avatar:
+                type: image
+                label: Avatar
+                default: "https://i.pravatar.cc/144?img=5"
+        default:
+            - quote: "We migrated 14 services over one weekend and kept waiting for the catch. It never came."
+              name: "Priya Raghavan"
+              role: "Engineering lead, Fathom"
+              avatar: "https://i.pravatar.cc/144?img=47"
+            - quote: "I ran our old stack for six years and dreaded every deploy. Now the newest hire ships on Friday afternoons without anyone hovering. My blood pressure has genuinely improved."
+              name: "Marcus Webb"
+              role: "Founder, Hollowbrook Supply"
+              avatar: "https://i.pravatar.cc/144?img=12"
+            - quote: "The first tool our designers and engineers actually agree on."
+              name: "Ana Sofía Delgado"
+              role: "Product manager, Terracota"
+              avatar: "https://i.pravatar.cc/144?img=44"
+            - quote: "Support answered my ticket in nine minutes on a Sunday. A real engineer read our config and pointed at the exact line. That reply is what earned the company-wide rollout."
+              name: "Tomasz Kowalski"
+              role: "CTO, Lumen Analytics"
+              avatar: "https://i.pravatar.cc/144?img=59"
+            - quote: "Setup took one quiet afternoon, tea break included. Our whole fulfillment flow now fits on a single screen."
+              name: "Yuki Tanaka"
+              role: "Operations lead, Kanso Goods"
+              avatar: "https://i.pravatar.cc/144?img=65"
+            - quote: "Month-end reporting went from a two-day scramble to a saved view. I have my Mondays back."
+              name: "Leah Okafor"
+              role: "Head of data, Brightline Health"
+              avatar: "https://i.pravatar.cc/144?img=32"

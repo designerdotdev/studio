@@ -1,0 +1,37 @@
+name: testimonial-spotlight
+title: Spotlight quote
+description: One large five-star quote with avatar attribution
+category: testimonials
+tags:
+    - testimonials
+    - quote
+    - spotlight
+    - social-proof
+
+fields:
+    quote:
+        type: textarea
+        label: Quote
+        rows: 3
+        default: "We moved 212,000 shipments through the platform last quarter, and dispatch errors fell by half in the first week. My team finally trusts the numbers on the screen."
+        required: true
+
+    name:
+        type: text
+        label: Name
+        default: "Marisol Vega"
+
+    role:
+        type: text
+        label: Role
+        default: "Chief operating officer"
+
+    company:
+        type: text
+        label: Company
+        default: "Northwind Freight"
+
+    avatar:
+        type: image
+        label: Avatar
+        default: "https://i.pravatar.cc/144?img=38"

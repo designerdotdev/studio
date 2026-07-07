@@ -1,0 +1,70 @@
+name: pricing-simple
+title: Single price card
+description: One flat-rate card with a feature checklist and price panel
+category: pricing
+tags:
+    - pricing
+    - simple
+    - flat-rate
+    - card
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small uppercase label above the heading. Clear to hide.
+        default: "Pricing"
+
+    heading:
+        type: text
+        label: Heading
+        default: "One plan, everything in it"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Description
+        rows: 3
+        default: "No tiers to compare and no feature matrix to decode. Every workspace gets the full product, and you can cancel from the billing page in two clicks."
+
+    features:
+        type: repeater
+        label: Included features
+        add_button_label: Add feature
+        sub_fields:
+            text:
+                type: text
+                label: Feature
+                default: "Another included feature"
+        default:
+            - text: "Unlimited projects and collaborators"
+            - text: "Every integration, including SSO"
+            - text: "Full API access from day one"
+            - text: "Priority support with same-day replies"
+            - text: "Weekly office hours with our engineers"
+            - text: "Export everything, whenever you leave"
+
+    price:
+        type: text
+        label: Price
+        default: "$32"
+
+    period:
+        type: text
+        label: Period
+        default: "/month"
+
+    cta_text:
+        type: text
+        label: Button text
+        default: "Start your 30-day trial"
+
+    cta_url:
+        type: url
+        label: Button link
+        default: "#"
+
+    note:
+        type: text
+        label: Note under button
+        default: "No credit card required. Cancel anytime."

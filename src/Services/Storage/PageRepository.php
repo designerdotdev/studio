@@ -32,7 +32,11 @@ class PageRepository
 
     public function create(array $data): PageData
     {
-        $slug = $data['slug'] ?? Str::slug($data['title'] ?? 'untitled');
+        $slug = Str::slug(($data['slug'] ?? '') ?: ($data['title'] ?? 'untitled'));
+
+        if ($slug === '') {
+            $slug = 'untitled';
+        }
 
         // Ensure unique slug
         $originalSlug = $slug;
@@ -46,7 +50,8 @@ class PageRepository
             'slug' => $slug,
             'title' => $data['title'] ?? 'Untitled Page',
             'description' => $data['description'] ?? '',
-            'layout' => $data['layout'] ?? config('studio.default_layout', 'layouts.app'),
+            // null = follow studio.default_layout at export time
+            'layout' => $data['layout'] ?? null,
             'created_at' => now()->toIso8601String(),
             'updated_at' => now()->toIso8601String(),
             'meta' => $data['meta'] ?? [],
@@ -66,10 +71,19 @@ class PageRepository
             return null;
         }
 
-        // Handle slug change
-        $newSlug = $data['slug'] ?? $slug;
+        // Handle slug change (slugify, keep unique, move the file)
+        $newSlug = Str::slug($data['slug'] ?? $slug) ?: $slug;
+
         if ($newSlug !== $slug) {
+            $base = $newSlug;
+            $counter = 1;
+            while ($this->storage->exists("pages/{$newSlug}.json")) {
+                $newSlug = $base . '-' . $counter++;
+            }
+            $data['slug'] = $newSlug;
             $this->storage->delete("pages/{$slug}.json");
+        } else {
+            $data['slug'] = $slug;
         }
 
         $updated = array_merge($existing, $data, [
@@ -84,6 +98,93 @@ class PageRepository
     public function delete(string $slug): bool
     {
         return $this->storage->delete("pages/{$slug}.json");
+    }
+
+    /**
+     * Duplicate a page (components get fresh instance ids).
+     */
+    public function duplicate(string $slug): ?PageData
+    {
+        $existing = $this->storage->read("pages/{$slug}.json");
+
+        if (!$existing) {
+            return null;
+        }
+
+        $components = array_map(function ($comp) {
+            $comp['id'] = (string) Str::uuid();
+
+            return $comp;
+        }, $existing['components'] ?? []);
+
+        return $this->create([
+            'title' => ($existing['title'] ?? 'Untitled') . ' Copy',
+            'slug' => ($existing['slug'] ?? $slug) . '-copy',
+            'description' => $existing['description'] ?? '',
+            'layout' => $existing['layout'] ?? null,
+            'meta' => $existing['meta'] ?? [],
+            'components' => $components,
+        ]);
+    }
+
+    /**
+     * Duplicate a section instance in place (inserted directly below the original).
+     */
+    public function duplicateComponent(string $pageSlug, string $componentId): ?PageData
+    {
+        $page = $this->storage->read("pages/{$pageSlug}.json");
+
+        if (!$page) {
+            return null;
+        }
+
+        $components = collect($page['components'] ?? [])->sortBy('order')->values()->toArray();
+        $index = null;
+
+        foreach ($components as $i => $comp) {
+            if ($comp['id'] === $componentId) {
+                $index = $i;
+                break;
+            }
+        }
+
+        if ($index === null) {
+            return null;
+        }
+
+        $copy = $components[$index];
+        $copy['id'] = (string) Str::uuid();
+
+        array_splice($components, $index + 1, 0, [$copy]);
+
+        foreach ($components as $i => &$comp) {
+            $comp['order'] = $i;
+        }
+        unset($comp);
+
+        return $this->update($pageSlug, ['components' => $components]);
+    }
+
+    /**
+     * Toggle a section's visibility without removing it from the page.
+     */
+    public function setComponentHidden(string $pageSlug, string $componentId, bool $hidden): ?PageData
+    {
+        $page = $this->storage->read("pages/{$pageSlug}.json");
+
+        if (!$page) {
+            return null;
+        }
+
+        $components = collect($page['components'] ?? [])->map(function ($comp) use ($componentId, $hidden) {
+            if ($comp['id'] === $componentId) {
+                $comp['hidden'] = $hidden;
+            }
+
+            return $comp;
+        })->toArray();
+
+        return $this->update($pageSlug, ['components' => $components]);
     }
 
     public function addComponent(string $pageSlug, string $componentRef, array $variables = [], ?int $insertAtIndex = null): ?PageData
