@@ -259,15 +259,68 @@
     /* --- topbar ----------------------------------------------------- */
 
     .s-topbar {
-        @apply relative z-40 flex h-12 shrink-0 items-center gap-2 border-b border-line bg-panel px-3;
+        @apply relative z-40 flex h-14 shrink-0 items-center gap-1.5 border-b border-line bg-shell px-3;
+    }
+
+    /* Boxed square button (hamburger) */
+    .s-box-btn {
+        @apply flex h-9.5 w-9.5 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-raised text-soft transition-all duration-150;
+    }
+
+    .s-box-btn:hover {
+        @apply text-ink border-line-strong;
+    }
+
+    .s-box-btn:active {
+        transform: scale(0.96);
+    }
+
+    /* Browser-style nav buttons (back / forward / reload) */
+    .s-nav-btn {
+        @apply flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-colors duration-150;
+    }
+
+    .s-nav-btn:hover {
+        @apply text-ink bg-white/6;
+    }
+
+    .s-nav-btn:active {
+        transform: scale(0.94);
+    }
+
+    /* Centered URL bar */
+    .s-urlbar {
+        @apply flex h-9.5 items-center gap-2.5 rounded-xl border border-line bg-raised px-3.5 transition-colors duration-150;
+    }
+
+    a.s-urlbar:hover {
+        border-color: var(--color-line-strong);
+    }
+
+    .s-urlbar .s-urlbar-open {
+        opacity: 0;
+        transition: opacity 150ms ease;
+    }
+
+    .s-urlbar:hover .s-urlbar-open {
+        opacity: 1;
+    }
+
+    /* Bordered dropdown trigger (page switcher) */
+    .s-drop-btn {
+        @apply flex h-9.5 cursor-pointer items-center gap-2 rounded-xl border border-line bg-raised px-3 text-[13px] font-medium text-ink transition-all duration-150;
+    }
+
+    .s-drop-btn:hover {
+        border-color: var(--color-line-strong);
     }
 
     .s-seg {
-        @apply flex items-center gap-0.5 rounded-lg border border-line bg-shell p-0.5;
+        @apply flex h-9.5 items-center gap-0.5 rounded-xl border border-line bg-raised p-1;
     }
 
     .s-seg-btn {
-        @apply flex h-6.5 w-7.5 cursor-pointer items-center justify-center rounded-[7px] text-faint transition-all duration-150;
+        @apply flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg text-faint transition-all duration-150;
     }
 
     .s-seg-btn:hover {
@@ -275,8 +328,8 @@
     }
 
     .s-seg-btn.is-active {
-        @apply bg-raised text-ink;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        @apply bg-white/10 text-ink;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
     }
 
     /* --- canvas ----------------------------------------------------- */

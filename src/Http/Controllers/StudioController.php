@@ -30,7 +30,10 @@ class StudioController extends Controller
         // Always sync designs from resource files so edits are reflected
         $this->designSync->syncAll();
 
-        $pages = $this->pages->all()->sortBy('title')->values();
+        $homeSlugForSort = config('studio.page_routing.home_slug', 'home');
+        $pages = $this->pages->all()
+            ->sortBy(fn($p) => [$p->slug === $homeSlugForSort ? 0 : 1, $p->title])
+            ->values();
 
         // Show onboarding when no pages exist
         if ($pages->isEmpty()) {
@@ -39,12 +42,15 @@ class StudioController extends Controller
             ]);
         }
 
-        // Load the requested page or fall back to the first page
-        $slug = $request->query('page', $pages->first()?->slug);
+        // Load the requested page, preferring the home page as the default
+        $homeSlug = config('studio.page_routing.home_slug', 'home');
+        $defaultSlug = $pages->firstWhere('slug', $homeSlug)?->slug ?? $pages->first()?->slug;
+
+        $slug = $request->query('page', $defaultSlug);
         $page = $slug ? $this->pages->find($slug) : null;
 
         if (!$page && $pages->isNotEmpty()) {
-            $page = $pages->first();
+            $page = $this->pages->find($defaultSlug);
         }
 
         if (!$page) {
