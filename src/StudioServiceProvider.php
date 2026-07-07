@@ -3,6 +3,7 @@
 namespace Designer\Studio;
 
 use Designer\Studio\Console\Commands\DevReset;
+use Designer\Studio\Console\Commands\PublishAssets;
 use Designer\Studio\Console\Commands\SeedSampleData;
 use Designer\Studio\Console\Commands\SyncDesigns;
 use Designer\Studio\Console\Commands\Uninstall;
@@ -69,6 +70,7 @@ class StudioServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 DevReset::class,
+                PublishAssets::class,
                 SeedSampleData::class,
                 SyncDesigns::class,
                 Uninstall::class,
@@ -90,6 +92,11 @@ class StudioServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../resources/views/designer' => resource_path('views/designer'),
             ], 'studio-designs');
+
+            $this->publishes([
+                __DIR__ . '/../dist/studio.js' => public_path('vendor/studio/studio.js'),
+                __DIR__ . '/../dist/studio-css.css' => public_path('vendor/studio/studio-css.css'),
+            ], 'studio-assets');
         }
 
         // Auto-publish design files on first boot if not already present
@@ -166,27 +173,15 @@ class StudioServiceProvider extends ServiceProvider
     protected function registerAssetDirectives(): void
     {
         Blade::directive('studioStyles', function () {
-            return '<?php
-                $__studioVersion = app("studio.asset.version");
-                $__studioPrefix = config("studio.path", "studio");
-                echo \'<link rel="stylesheet" href="\' . url($__studioPrefix . "/assets/studio-css.css") . \'?v=\' . $__studioVersion . \'">\';
-            ?>';
+            return '<?php echo \'<link rel="stylesheet" href="\' . \Designer\Studio\Support\StudioAssets::url("studio-css.css") . \'">\'; ?>';
         });
 
         Blade::directive('studioScripts', function () {
-            return '<?php
-                $__studioVersion = app("studio.asset.version");
-                $__studioPrefix = config("studio.path", "studio");
-                echo \'<script src="\' . url($__studioPrefix . "/assets/studio.js") . \'?v=\' . $__studioVersion . \'" defer></script>\';
-            ?>';
+            return '<?php echo \'<script src="\' . \Designer\Studio\Support\StudioAssets::url("studio.js") . \'" defer></script>\'; ?>';
         });
 
         Blade::directive('studioIframeCore', function () {
-            return '<?php
-                $__studioVersion = app("studio.asset.version");
-                $__studioPrefix = config("studio.path", "studio");
-                echo \'<script src="\' . url($__studioPrefix . "/assets/studio.js") . \'?v=\' . $__studioVersion . \'" defer></script>\';
-            ?>';
+            return '<?php echo \'<script src="\' . \Designer\Studio\Support\StudioAssets::url("studio.js") . \'" defer></script>\'; ?>';
         });
     }
 

@@ -16,7 +16,7 @@
     --color-overlay: #1e1e24;
 
     /* Hairlines */
-    --color-line: rgba(255, 255, 255, 0.07);
+    --color-line: rgba(255, 255, 255, 0.11);
     --color-line-strong: rgba(255, 255, 255, 0.14);
 
     /* Text */
@@ -275,6 +275,47 @@
         transform: scale(0.96);
     }
 
+    /* Menu button: brand mark at rest, cross-fades to the hamburger on
+       hover (and stays a hamburger while the menu is open) */
+    .s-logo-btn {
+        position: relative;
+    }
+
+    .s-logo-btn > svg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        translate: -50% -50%;
+        transition: opacity 180ms ease, scale 180ms ease;
+    }
+
+    .s-logo-btn .s-logo-btn-logo {
+        opacity: 0.55;
+    }
+
+    .s-logo-btn .s-logo-btn-menu {
+        opacity: 0;
+        scale: 0.72;
+    }
+
+    /* Menu open (no hover needed): full-strength icon + border */
+    .s-logo-btn.is-open {
+        color: var(--color-ink);
+        border-color: var(--color-line-strong);
+    }
+
+    .s-logo-btn:hover .s-logo-btn-logo,
+    .s-logo-btn.is-open .s-logo-btn-logo {
+        opacity: 0;
+        scale: 0.72;
+    }
+
+    .s-logo-btn:hover .s-logo-btn-menu,
+    .s-logo-btn.is-open .s-logo-btn-menu {
+        opacity: 1;
+        scale: 1;
+    }
+
     /* Browser-style nav buttons (back / forward / reload) */
     .s-nav-btn {
         @apply flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-colors duration-150;
@@ -288,31 +329,38 @@
         transform: scale(0.94);
     }
 
-    /* Centered URL bar */
+    /* Full-width browser URL bar — clicking it opens the page switcher */
     .s-urlbar {
-        @apply flex h-9.5 items-center gap-2.5 rounded-xl border border-line bg-raised px-3.5 transition-colors duration-150;
+        @apply flex h-9.5 cursor-pointer select-none items-center gap-2.5 rounded-xl border border-line bg-raised pl-3.5 pr-2 transition-colors duration-150;
     }
 
-    a.s-urlbar:hover {
+    .s-urlbar:hover,
+    .s-urlbar.is-open {
         border-color: var(--color-line-strong);
     }
 
-    .s-urlbar .s-urlbar-open {
-        opacity: 0;
-        transition: opacity 150ms ease;
+    .s-urlbar:focus-visible {
+        outline: none;
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
     }
 
-    .s-urlbar:hover .s-urlbar-open {
+    /* Hover-reveal actions at the right edge of the URL bar */
+    .s-urlbar-action {
+        @apply flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md text-soft;
+        opacity: 0;
+        transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+    }
+
+    .s-urlbar:hover .s-urlbar-action,
+    .s-urlbar.is-open .s-urlbar-action,
+    .s-urlbar-action:focus-visible {
         opacity: 1;
     }
 
-    /* Bordered dropdown trigger (page switcher) */
-    .s-drop-btn {
-        @apply flex h-9.5 cursor-pointer items-center gap-2 rounded-xl border border-line bg-raised px-3 text-[13px] font-medium text-ink transition-all duration-150;
-    }
-
-    .s-drop-btn:hover {
-        border-color: var(--color-line-strong);
+    .s-urlbar-action:hover,
+    .s-urlbar-action.is-active {
+        @apply bg-white/10 text-ink;
     }
 
     .s-seg {

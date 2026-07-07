@@ -10,7 +10,7 @@ Designer Studio is a Laravel package (not a standalone app) that provides a visu
 
 ```bash
 npm run build          # Build frontend assets (Vite → dist/)
-npm run dev            # Start Vite dev server
+npm run dev            # Watch mode: rebuilds dist/ on every change (and re-publishes to the host's public/vendor/studio if published assets exist)
 ```
 
 There are no tests or linting configured in this package. Verify changes against the host app (`php artisan serve` from the repo root, then hit `/studio`).
@@ -54,8 +54,8 @@ There are no tests or linting configured in this package. Verify changes against
 
 ### Views
 
-- `components/layouts/app.blade.php` — editor shell (topbar/sidebar/main slots, dark chrome)
-- `home.blade.php` — editor page: browser-style topbar (hamburger menu, back/forward/reload, centered URL bar with integrated save-status dot, device toggle, bordered page dropdown, Publish popover), canvas iframe, Add-Section modal (live scaled preview iframes per component), create-page modal
+- `components/layouts/app.blade.php` — editor shell (topbar/sidebar/main slots, dark chrome); sidebar sits on the RIGHT and collapses via `$store.studio.sidebar` (persisted in localStorage `studio.sidebar`)
+- `home.blade.php` — editor page: browser-style topbar (hamburger menu, back/forward/reload, full-width URL bar that doubles as the page switcher — save-status dot, hover-reveal chevron opens the pages dropdown incl. "New page", hover-reveal external-link icon opens the live page —, device toggle, Publish popover, sidebar-collapse toggle), canvas iframe, Add-Section modal (live scaled preview iframes per component), create-page modal
 - `livewire/editor-panel.blade.php` + `livewire/fields/*.blade.php` — panel views; field partials: text, url, textarea, select, toggle, colorpicker, image (with upload), repeater (+ `sub-input` shared partial)
 - `iframe.blade.php` — canvas preview document: section wrappers with hover/selection overlay, name chips, floating toolbar, insert-between affordances; exposes `window.__studioPreview`
 - `preview.blade.php` — non-interactive render used by picker + onboarding thumbnails
@@ -86,6 +86,7 @@ Each section = `<name>.html` + `<name>.yml` (filename matches the `name` key). ~
 ```bash
 php artisan studio:sync           # Re-sync design files into the library
 php artisan studio:seed           # Seed the starter template
+php artisan studio:publish        # Publish compiled assets to public/vendor/studio (--remove reverts; also: vendor:publish --tag=studio-assets)
 php artisan studio:dev-reset      # Reset to fresh-install state (dev)
 php artisan studio:uninstall      # Remove studio data (--keep-generated, --keep-data)
 ```
@@ -94,4 +95,4 @@ php artisan studio:uninstall      # Remove studio data (--keep-generated, --keep
 
 - The app's copy of `resources/views/designer/` wins over the package copy (DesignSyncService). When package sections change during development, refresh the host app's copy or delete it so it re-publishes.
 - `Livewire.dispatch()` names and the postMessage protocol (`studio:*`) are shared contracts between `EditorPanel`, `home.blade.php`, `iframe.blade.php`, and `studio.js` — change them everywhere or nowhere.
-- After editing `resources/css|js`, run `npm run build`; assets are served from `dist/` via `AssetController` with a manifest-hash cache buster.
+- After editing `resources/css|js`, run `npm run build` (or keep `npm run dev` watching). Asset URLs come from `Support\StudioAssets::url()`: a published copy in `public/vendor/studio` wins (static file, filemtime cache buster); otherwise `AssetController` serves the package `dist/` with a manifest-hash buster. If the editor looks stale, check for a forgotten published copy (`php artisan studio:publish --remove`).

@@ -277,8 +277,17 @@ class StudioController extends Controller
      */
     public function upload(Request $request)
     {
+        if ($message = $this->phpUploadLimitError($request)) {
+            return response()->json(['success' => false, 'message' => $message], 422);
+        }
+
         $request->validate([
             'file' => 'required|file|image|mimes:jpeg,jpg,png,gif,webp,avif|max:5120',
+        ], [
+            'file.max' => 'This image is too large — the maximum upload size is 5 MB.',
+            'file.image' => 'That file is not an image.',
+            'file.mimes' => 'Only JPEG, PNG, GIF, WebP, and AVIF images can be uploaded.',
+            'file.required' => 'No image was received by the server.',
         ]);
 
         $file = $request->file('file');
@@ -296,6 +305,48 @@ class StudioController extends Controller
             'success' => true,
             'url' => url('studio-uploads/' . $filename),
         ]);
+    }
+
+    /**
+     * PHP silently discards uploads that exceed upload_max_filesize or
+     * post_max_size, so Laravel validation only sees a missing/broken file
+     * and produces a misleading error. Detect those cases and name the
+     * php.ini setting that needs raising.
+     */
+    private function phpUploadLimitError(Request $request): ?string
+    {
+        $file = $request->file('file');
+
+        if ($file && $file->getError() === UPLOAD_ERR_INI_SIZE) {
+            return sprintf(
+                "This image exceeds the server's PHP upload limit of %s. Raise `upload_max_filesize` in php.ini to allow larger uploads.",
+                ini_get('upload_max_filesize')
+            );
+        }
+
+        // post_max_size overflow: PHP drops the entire request body.
+        $postMax = $this->iniBytes(ini_get('post_max_size'));
+        if (!$file && $postMax > 0 && (int) $request->server('CONTENT_LENGTH') > $postMax) {
+            return sprintf(
+                "This image exceeds the server's PHP post limit of %s. Raise `post_max_size` (and `upload_max_filesize`) in php.ini to allow larger uploads.",
+                ini_get('post_max_size')
+            );
+        }
+
+        return null;
+    }
+
+    private function iniBytes(string $value): int
+    {
+        $value = trim($value);
+        $bytes = (int) $value;
+
+        return match (strtoupper(substr($value, -1))) {
+            'G' => $bytes * 1024 * 1024 * 1024,
+            'M' => $bytes * 1024 * 1024,
+            'K' => $bytes * 1024,
+            default => $bytes,
+        };
     }
 
     public function addComponentToPage(Request $request, string $slug)
