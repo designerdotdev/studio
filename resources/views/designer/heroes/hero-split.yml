@@ -63,3 +63,8 @@ fields:
         type: image
         label: Image
         default: "https://picsum.photos/seed/hero-split-product/1160/1000"
+
+    image_alt:
+        type: text
+        label: Image alt text
+        default: "White mug of coffee on a bright red background"

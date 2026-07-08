@@ -83,6 +83,13 @@ class PageRepository
                 $newSlug = $base . '-' . $counter++;
             }
             $data['slug'] = $newSlug;
+
+            // Remember retired slugs so published URLs can 301 to the new one
+            $data['previous_slugs'] = array_values(array_diff(
+                array_unique([...($existing['previous_slugs'] ?? []), $slug]),
+                [$newSlug]
+            ));
+
             $this->storage->delete("pages/{$slug}.json");
         } else {
             $data['slug'] = $slug;

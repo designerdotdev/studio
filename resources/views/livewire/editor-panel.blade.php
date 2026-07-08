@@ -378,40 +378,58 @@
 
                     <div class="s-divider"></div>
 
-                    {{-- ============ Search engine listing ============ --}}
-                    <p class="s-microlabel">Search engine listing</p>
-
-                    {{-- Live result preview --}}
-                    <div class="rounded-lg border border-line bg-shell px-3 py-2.5">
-                        <p class="truncate text-[11px] text-faint">{{ parse_url(url('/'), PHP_URL_HOST) }} › {{ $page['slug'] ?? '' }}</p>
-                        <p class="mt-0.5 truncate text-[14.5px] leading-snug text-[#9cc0ff]">{{ ($page['seo_title'] ?? '') !== '' ? $page['seo_title'] : ($page['title'] ?? 'Untitled') }}</p>
-                        <p class="mt-0.5 line-clamp-2 text-xs leading-relaxed {{ ($page['seo_description'] ?? '') !== '' ? 'text-soft' : 'text-faint italic' }}">
-                            {{ ($page['seo_description'] ?? '') !== '' ? $page['seo_description'] : 'Add a description to control how this page reads in search results.' }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <label for="page-seo-title" class="s-label">SEO title</label>
-                        <input id="page-seo-title" type="text" class="s-input" placeholder="{{ $page['title'] ?? '' }}" wire:model.blur="page.seo_title">
-                    </div>
-
-                    <div>
-                        <label for="page-seo-description" class="s-label">SEO description</label>
-                        <textarea id="page-seo-description" rows="3" class="s-input" placeholder="Describe this page for search results…" wire:model.blur="page.seo_description"></textarea>
-                    </div>
-
-                    {{-- ============ Social sharing (collapsible) ============ --}}
-                    <div x-data="{ open: false }" class="overflow-hidden rounded-lg border border-line" wire:key="group-social">
-                        <button type="button" @click="open = !open" class="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
-                            <span class="min-w-0">
-                                <span class="block text-[13px] font-medium text-ink">Social sharing</span>
-                                <span class="mt-0.5 block truncate text-[11px] text-faint">Facebook, LinkedIn, Slack, iMessage, X</span>
+                    {{-- ============ Search engine listing (group) ============ --}}
+                    <div x-data="{ open: true }" class="s-group" :class="open && 'is-open'" wire:key="group-seo">
+                        <button type="button" @click="open = !open" class="s-group-head">
+                            <span class="s-group-icon">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/></svg>
                             </span>
-                            <svg class="h-3.5 w-3.5 shrink-0 text-faint transition-transform duration-150" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                            <span class="min-w-0 flex-1">
+                                <span class="s-group-title">Search engine listing</span>
+                                <span class="s-group-sub">How this page reads on Google</span>
+                            </span>
+                            <svg class="s-group-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                        </button>
+
+                        <div x-show="open" x-collapse>
+                            <div class="s-group-body">
+                                {{-- Live result preview --}}
+                                <div class="rounded-lg border border-line bg-shell px-3 py-2.5">
+                                    <p class="truncate text-[11px] text-faint">{{ parse_url(url('/'), PHP_URL_HOST) }} › {{ $page['slug'] ?? '' }}</p>
+                                    <p class="mt-0.5 truncate text-[14.5px] leading-snug text-[#9cc0ff]">{{ ($page['seo_title'] ?? '') !== '' ? $page['seo_title'] : ($page['title'] ?? 'Untitled') }}</p>
+                                    <p class="mt-0.5 line-clamp-2 text-xs leading-relaxed {{ ($page['seo_description'] ?? '') !== '' ? 'text-soft' : 'text-faint italic' }}">
+                                        {{ ($page['seo_description'] ?? '') !== '' ? $page['seo_description'] : 'Add a description to control how this page reads in search results.' }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label for="page-seo-title" class="s-label">SEO title</label>
+                                    <input id="page-seo-title" type="text" class="s-input" placeholder="{{ $page['title'] ?? '' }}" wire:model.blur="page.seo_title">
+                                </div>
+
+                                <div>
+                                    <label for="page-seo-description" class="s-label">SEO description</label>
+                                    <textarea id="page-seo-description" rows="3" class="s-input" placeholder="Describe this page for search results…" wire:model.blur="page.seo_description"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ============ Social sharing (group) ============ --}}
+                    <div x-data="{ open: false }" class="s-group" :class="open && 'is-open'" wire:key="group-social">
+                        <button type="button" @click="open = !open" class="s-group-head">
+                            <span class="s-group-icon">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13 4.5a2.5 2.5 0 1 1 .702 1.737L6.97 9.604a2.518 2.518 0 0 1 0 .792l6.733 3.367a2.5 2.5 0 1 1-.671 1.341l-6.733-3.367a2.5 2.5 0 1 1 0-3.475l6.733-3.366A2.52 2.52 0 0 1 13 4.5Z"/></svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="s-group-title">Social sharing</span>
+                                <span class="s-group-sub">Facebook, LinkedIn, Slack, iMessage, X</span>
+                            </span>
+                            <svg class="s-group-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                         </button>
 
                         <div x-show="open" x-collapse x-cloak>
-                            <div class="space-y-4 border-t border-line p-3">
+                            <div class="s-group-body">
                                 <div x-data="{ uploading: false }">
                                     <label class="s-label">Social share image</label>
                                     @if(!empty($page['og_image']))
@@ -490,18 +508,21 @@
                         </div>
                     </div>
 
-                    {{-- ============ Advanced (collapsible) ============ --}}
-                    <div x-data="{ open: false }" class="overflow-hidden rounded-lg border border-line" wire:key="group-advanced">
-                        <button type="button" @click="open = !open" class="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
-                            <span class="min-w-0">
-                                <span class="block text-[13px] font-medium text-ink">Advanced</span>
-                                <span class="mt-0.5 block truncate text-[11px] text-faint">Indexing, canonical URL, structured data</span>
+                    {{-- ============ Advanced (group) ============ --}}
+                    <div x-data="{ open: false }" class="s-group" :class="open && 'is-open'" wire:key="group-advanced">
+                        <button type="button" @click="open = !open" class="s-group-head">
+                            <span class="s-group-icon">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM17.25 4.5a.75.75 0 0 0 0-1.5h-5.5a.75.75 0 0 0 0 1.5h5.5ZM5 3.75a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75ZM4.25 17a.75.75 0 0 0 0-1.5h-1.5a.75.75 0 0 0 0 1.5h1.5ZM17.25 17a.75.75 0 0 0 0-1.5h-5.5a.75.75 0 0 0 0 1.5h5.5ZM9 10a.75.75 0 0 1-.75.75h-5.5a.75.75 0 0 1 0-1.5h5.5A.75.75 0 0 1 9 10ZM17.25 10.75a.75.75 0 0 0 0-1.5h-1.5a.75.75 0 0 0 0 1.5h1.5ZM14 10a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM10 16.25a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z"/></svg>
                             </span>
-                            <svg class="h-3.5 w-3.5 shrink-0 text-faint transition-transform duration-150" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                            <span class="min-w-0 flex-1">
+                                <span class="s-group-title">Advanced</span>
+                                <span class="s-group-sub">Indexing, canonical URL, structured data</span>
+                            </span>
+                            <svg class="s-group-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                         </button>
 
                         <div x-show="open" x-collapse x-cloak>
-                            <div class="space-y-4 border-t border-line p-3">
+                            <div class="s-group-body">
                                 @foreach([
                                     'noindex' => ['Hide from search engines', 'Adds noindex so this page is left out of results.'],
                                     'nofollow' => ['Don\'t follow links', 'Asks crawlers not to follow links on this page.'],

@@ -22,7 +22,7 @@
             @foreach($posts as $item)
                 <a href="{{ $item['url'] ?? '#' }}" class="group block">
                     <div class="mb-5 aspect-[16/10] overflow-hidden rounded-2xl bg-neutral-100">
-                        <img src="{{ $item['image'] }}" alt="" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]">
+                        <img src="{{ $item['image'] }}" alt="{{ $item['alt'] ?? '' }}" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]">
                     </div>
                     <div class="flex items-center gap-3 text-xs text-neutral-400">
                         @if($item['category'])

@@ -145,13 +145,35 @@ Gate::define('viewStudio', fn ($user) => $user->is_admin);
 ```
 
 Image uploads (used by image fields) are stored in `public/studio-uploads/` and validated to
-raster image types, 5 MB max.
+raster image types, 5 MB max. Upload, publish, and export endpoints are rate-limited, and when
+the app runs in production without auth protection the editor shows a warning banner until you
+lock it down.
+
+**The trust model, plainly:** anyone with Studio access can edit everything the Studio manages.
+Section fields intentionally allow raw SVG/HTML (logos, icons, custom head tags), so Studio
+access is equivalent to publishing content — including markup — on your site. Give it only to
+people you'd let edit your templates, and treat the editor URL like an admin panel, not a page.
+
+## Hosting requirements
+
+Studio stores everything as JSON files under `storage/studio/`. That buys zero-setup installs
+and git-friendly content, and it implies three constraints:
+
+- **A persistent filesystem.** Serverless platforms with ephemeral disks (e.g. Laravel Vapor)
+  are not supported — content written after deploy would disappear.
+- **A single server**, or shared storage (NFS/EFS) if you scale horizontally — the draft and
+  live trees must be the same files for every instance.
+- **Backups = `storage/studio/`** (plus `public/studio-uploads/` for images). If you back those
+  up, you can restore the whole site.
+
+A Flysystem-backed storage driver (S3 and friends) is on the roadmap and removes all three.
 
 ## Artisan commands
 
 ```bash
 php artisan studio:sync         # Re-sync section designs into the library
 php artisan studio:seed         # Seed the starter template
+php artisan studio:publish      # Publish compiled editor assets to public/vendor/studio (--remove reverts)
 php artisan studio:dev-reset    # Wipe studio data back to a fresh install (dev only)
 php artisan studio:uninstall    # Remove studio data (--keep-generated, --keep-data)
 ```
@@ -162,6 +184,18 @@ Every page can be written to a plain Blade file (`Publish → Export Blade file`
 `POST /studio/api/generate/{slug}`). Exports land in `resources/views/designer/{slug}.blade.php`,
 wrapped in the layout component configured by `default_layout`. From there they're ordinary
 views — route them, edit them, or delete the package entirely; your pages keep working.
+
+## Roadmap
+
+Shipping next, roughly in order:
+
+- **Version history & rollback** — every publish becomes a restorable snapshot
+- **Scheduled publishing** — stage now, go live Friday at 9am
+- **Shareable preview links** — signed URLs so clients can review drafts without a login
+- **Theme system** — site-wide brand color, button shape, and typography tokens
+- **Global values** — link any field to a site-wide value (one CTA URL, everywhere)
+- **Teams** — roles, approvals, and multi-editor collaboration
+- **Flysystem storage driver** — S3-backed content for serverless and multi-server hosting
 
 ## Uninstalling
 

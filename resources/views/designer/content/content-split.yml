@@ -48,3 +48,8 @@ fields:
         type: image
         label: Image
         default: "https://picsum.photos/seed/content-split-studio/900/1125"
+
+    image_alt:
+        type: text
+        label: Image alt text
+        default: "Ferry and the Statue of Liberty seen across open water"

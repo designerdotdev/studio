@@ -51,6 +51,9 @@ class EditorPanel extends Component
     /** The most recently deleted section, restorable via the toast's Undo */
     public ?array $lastDeleted = null;
 
+    /** updated_at of the page/layout docs as loaded — for conflict detection */
+    public array $docVersions = [];
+
     /** Editable name of the selected global block (synced on selection) */
     public string $selectedBlockName = '';
 
@@ -154,7 +157,45 @@ class EditorPanel extends Component
             'page'
         );
 
+        $this->docVersions['page'] = $page->updated_at;
+
         $this->loadLayout($page->layout_ref);
+    }
+
+    /* ------------------------------------------------------------ */
+    /*  Concurrent-edit detection                                    */
+    /* ------------------------------------------------------------ */
+
+    /**
+     * True (and shows a reload toast) when the underlying document was
+     * modified since this panel loaded it — another tab or another
+     * person. Prevents silent last-write-wins clobbering.
+     */
+    protected function guardConflict(string $scope): bool
+    {
+        $loaded = $this->docVersions[$scope] ?? null;
+
+        $current = $scope === 'layout'
+            ? ($this->layoutSlug ? ($this->layoutRepo()->find($this->layoutSlug)['updated_at'] ?? null) : null)
+            : $this->pages()->find($this->pageSlug)?->updated_at;
+
+        if ($loaded === null || $current === null || $current === $loaded) {
+            return false;
+        }
+
+        $this->dispatch(
+            'studio:toast',
+            message: 'This ' . ($scope === 'layout' ? 'layout' : 'page') . ' was changed in another tab — reload to keep editing',
+            type: 'error',
+            action: ['label' => 'Reload', 'reload' => true],
+        );
+
+        return true;
+    }
+
+    protected function scopeFor(string $id): string
+    {
+        return $this->isLayoutSection($id) ? 'layout' : 'page';
     }
 
     protected function loadLayout(?string $layoutRef): void
@@ -175,6 +216,7 @@ class EditorPanel extends Component
 
         $this->layoutSlug = $layout['slug'];
         $this->layoutName = $layout['name'];
+        $this->docVersions['layout'] = $layout['updated_at'] ?? null;
 
         $instances = collect($layout['components'] ?? [])
             ->sortBy('order')
@@ -283,6 +325,10 @@ class EditorPanel extends Component
             return;
         }
 
+        if ($this->guardConflict($scope === 'layout' ? 'layout' : 'page')) {
+            return;
+        }
+
         $component = $this->components()->find($ref);
 
         if (!$component) {
@@ -340,6 +386,10 @@ class EditorPanel extends Component
 
     public function moveSection(string $id, int $delta): void
     {
+        if ($this->guardConflict($this->scopeFor($id))) {
+            return;
+        }
+
         if ($this->isLayoutSection($id)) {
             // Order within the layout doc includes the content slot, so a
             // header section moved down past the slot becomes a footer one.
@@ -387,6 +437,10 @@ class EditorPanel extends Component
 
     public function duplicateSection(string $id): void
     {
+        if ($this->guardConflict($this->scopeFor($id))) {
+            return;
+        }
+
         $result = $this->isLayoutSection($id)
             ? $this->layoutRepo()->duplicateComponent($this->layoutSlug, $id)
             : $this->pages()->duplicateComponent($this->pageSlug, $id);
@@ -402,6 +456,10 @@ class EditorPanel extends Component
 
     public function toggleHidden(string $id): void
     {
+        if ($this->guardConflict($this->scopeFor($id))) {
+            return;
+        }
+
         $current = false;
 
         foreach ([...$this->sections, ...$this->layoutSections] as $section) {
@@ -423,6 +481,10 @@ class EditorPanel extends Component
 
     public function removeSection(string $id): void
     {
+        if ($this->guardConflict($this->scopeFor($id))) {
+            return;
+        }
+
         // Capture the raw instance + position first so the toast can undo
         $this->lastDeleted = $this->captureInstance($id);
 
@@ -498,6 +560,10 @@ class EditorPanel extends Component
             return;
         }
 
+        if ($this->guardConflict($deleted['scope'])) {
+            return;
+        }
+
         // Restore only into the document it was deleted from
         $currentDoc = $deleted['scope'] === 'layout' ? $this->layoutSlug : $this->pageSlug;
 
@@ -558,21 +624,30 @@ class EditorPanel extends Component
             return;
         }
 
+        if ($this->guardConflict($this->scopeFor($sectionId))) {
+            return;
+        }
+
         if ($this->isLayoutSection($sectionId)) {
-            $this->layoutRepo()->updateComponentVariables(
+            $updated = $this->layoutRepo()->updateComponentVariables(
                 $this->layoutSlug,
                 $sectionId,
                 $this->variables[$sectionId]
             );
+            $this->docVersions['layout'] = $updated['updated_at'] ?? $this->docVersions['layout'] ?? null;
 
             return;
         }
 
-        $this->pages()->updateComponentVariables(
+        $updated = $this->pages()->updateComponentVariables(
             $this->pageSlug,
             $sectionId,
             $this->variables[$sectionId]
         );
+
+        if ($updated) {
+            $this->docVersions['page'] = $updated->updated_at;
+        }
     }
 
     /** Toggle fields persist + push their state to the preview in one round trip */
@@ -739,6 +814,10 @@ class EditorPanel extends Component
      */
     protected function addBlockPlacement(string $blockSlug, ?int $index, string $scope): void
     {
+        if ($this->guardConflict($scope === 'layout' ? 'layout' : 'page')) {
+            return;
+        }
+
         $block = $this->blockRepo()->find($blockSlug);
 
         if (!$block) {
@@ -803,6 +882,10 @@ class EditorPanel extends Component
             return;
         }
 
+        if ($this->guardConflict('page')) {
+            return;
+        }
+
         $page = $this->pages()->find($this->pageSlug);
 
         if (!$page) {
@@ -856,6 +939,10 @@ class EditorPanel extends Component
      */
     public function detachBlock(string $id): void
     {
+        if ($this->guardConflict($this->scopeFor($id))) {
+            return;
+        }
+
         $blockSlug = $this->blockFor($id);
         $block = $blockSlug ? $this->blockRepo()->find($blockSlug) : null;
 
@@ -951,6 +1038,10 @@ class EditorPanel extends Component
 
     public function assignLayout(?string $slug): void
     {
+        if ($this->guardConflict('page')) {
+            return;
+        }
+
         $slug = $slug ?: null;
 
         if ($slug && !$this->layoutRepo()->find($slug)) {
@@ -1040,6 +1131,10 @@ class EditorPanel extends Component
 
     protected function savePageSettings(): void
     {
+        if ($this->guardConflict('page')) {
+            return;
+        }
+
         $meta = [];
 
         foreach (self::META_KEYS as $key) {

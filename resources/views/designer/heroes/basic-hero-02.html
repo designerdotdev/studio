@@ -19,6 +19,6 @@
             </div>
         </div>
 
-        <img src="{{ $image ?? 'https://placehold.co/1200x900/f4f4f5/a1a1aa?text=Image' }}" alt="" class="block aspect-[4/3] w-full rounded-xl border border-neutral-200 object-cover">
+        <img src="{{ $image ?? 'https://placehold.co/1200x900/f4f4f5/a1a1aa?text=Image' }}" alt="{{ $image_alt ?? '' }}" class="block aspect-[4/3] w-full rounded-xl border border-neutral-200 object-cover">
     </div>
 </section>

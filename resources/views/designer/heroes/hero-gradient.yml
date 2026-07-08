@@ -62,6 +62,11 @@ fields:
         label: Product screenshot
         default: "https://picsum.photos/seed/relay-inbox/2000/1160"
 
+    image_alt:
+        type: text
+        label: Product screenshot alt text
+        default: "Red fishing boat on a dark fjord beneath snowy mountains"
+
     glow_color:
         type: colorpicker
         label: Glow color

@@ -237,6 +237,55 @@
         background-size: 15px;
     }
 
+    /* --- settings groups (Page tab) --------------------------------- */
+
+    .s-group {
+        @apply overflow-hidden rounded-xl border border-line bg-white/[0.02];
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .s-group:hover,
+    .s-group.is-open {
+        border-color: var(--color-line-strong);
+    }
+
+    .s-group.is-open {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .s-group-head {
+        @apply flex w-full cursor-pointer select-none items-center gap-2.5 px-3 py-2.5 text-left;
+    }
+
+    .s-group-icon {
+        @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-soft transition-colors duration-150;
+    }
+
+    .s-group.is-open .s-group-icon {
+        @apply text-ink;
+    }
+
+    .s-group-title {
+        @apply block truncate text-[13px] font-medium text-ink;
+    }
+
+    .s-group-sub {
+        @apply mt-px block truncate text-[11px] text-faint;
+    }
+
+    .s-group-chevron {
+        @apply h-3.5 w-3.5 shrink-0 text-faint;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .s-group.is-open .s-group-chevron {
+        transform: rotate(180deg);
+    }
+
+    .s-group-body {
+        @apply space-y-4 border-t border-line p-3;
+    }
+
     /* --- popovers / menus ------------------------------------------ */
 
     .s-pop {

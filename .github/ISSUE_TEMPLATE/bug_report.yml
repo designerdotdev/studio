@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in Designer Studio isn't working the way it should
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Designer Studio / Laravel / PHP versions
+      placeholder: "studio 1.0.0 · laravel 12.x · php 8.3"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open /studio on a page with a layout
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor (canvas / panel)
+        - Layouts or global blocks
+        - Draft mode / publishing
+        - Rendered pages / SEO
+        - Section authoring
+        - Blade export
+        - Installation / assets
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Console errors, screenshots, the section YAML involved…

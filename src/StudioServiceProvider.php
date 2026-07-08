@@ -222,6 +222,11 @@ class StudioServiceProvider extends ServiceProvider
                     ->name('studio.page.home');
             }
 
+            if (config('studio.page_routing.sitemap', true)) {
+                Route::get('/sitemap.xml', [\Designer\Studio\Http\Controllers\PageController::class, 'sitemap'])
+                    ->name('studio.sitemap');
+            }
+
             // Every other page: a single-segment catch-all, registered after
             // all app routes so it can never shadow them. Unknown slugs 404
             // in the controller.
