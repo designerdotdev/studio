@@ -62,6 +62,10 @@ fields:
                 type: image
                 label: Cover image
                 default: "https://picsum.photos/seed/blog-new-post/800/500"
+            alt:
+                type: text
+                label: Alt text
+                default: "Article cover image"
             url:
                 type: url
                 label: Article URL
@@ -72,16 +76,19 @@ fields:
               category: "Engineering"
               date: "Feb 12, 2026"
               image: "https://picsum.photos/seed/blog-build-times/800/500"
+              alt: "Red deer stag beside a tree stump at sunrise"
               url: "#"
             - title: "A field guide to design tokens"
               excerpt: "Naming, aliasing, and the three-tier structure we landed on after two false starts — plus the Figma-to-code sync our design team actually keeps up to date."
               category: "Design"
               date: "Apr 3, 2026"
               image: "https://picsum.photos/seed/blog-design-tokens/800/500"
+              alt: "Covered pier over the ocean in black and white"
               url: "#"
             - title: "Postmortem: the great cache stampede of March"
               excerpt: "A routine deploy invalidated 2.3 million cache keys at once and took the API down for 41 minutes. What happened, what we got wrong, and the guardrails we added."
               category: "Infrastructure"
               date: "Jun 21, 2026"
               image: "https://picsum.photos/seed/blog-cache-stampede/800/500"
+              alt: "Hazy sunset over forested mountain peaks"
               url: "#"

@@ -76,7 +76,43 @@ class StudioController extends Controller
             ])->values()->all(),
             'draftMode' => $draftMode,
             'publishStatus' => $draftMode ? $this->publisher()->status() : null,
+            'notices' => $this->editorNotices(),
         ]);
+    }
+
+    /**
+     * Operational warnings surfaced inside the editor: an unprotected
+     * Studio in production, or storage that can't be written to.
+     */
+    protected function editorNotices(): array
+    {
+        $notices = [];
+
+        $storagePath = config('studio.storage_path', storage_path('studio'));
+
+        if (is_dir($storagePath) && !is_writable($storagePath)) {
+            $notices[] = [
+                'id' => 'storage-unwritable',
+                'tone' => 'danger',
+                'dismissible' => false,
+                'text' => 'Studio can\'t write to ' . basename($storagePath) . ' — check directory permissions. Changes will not save.',
+            ];
+        }
+
+        $unprotected = app()->environment('production')
+            && config('studio.middleware', ['web']) === ['web']
+            && !config('studio.gate');
+
+        if ($unprotected) {
+            $notices[] = [
+                'id' => 'unprotected',
+                'tone' => 'warn',
+                'dismissible' => true,
+                'text' => 'The Studio is open to anyone who can reach this URL. Add auth middleware or a gate in config/studio.php before sharing this site.',
+            ];
+        }
+
+        return $notices;
     }
 
     /**
@@ -373,6 +409,7 @@ class StudioController extends Controller
             'renderedSections' => $renderedSections,
             'page' => $page,
             'noindex' => true,
+            'preview' => true,
         ]);
     }
 
@@ -383,7 +420,16 @@ class StudioController extends Controller
 
     public function publishSite()
     {
-        $published = $this->publisher()->publishAll();
+        try {
+            $published = $this->publisher()->publishAll();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Publishing failed — check that storage/studio is writable.',
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,
@@ -394,7 +440,16 @@ class StudioController extends Controller
 
     public function discardDraft()
     {
-        $discarded = $this->publisher()->discardAll();
+        try {
+            $discarded = $this->publisher()->discardAll();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Discard failed — check that storage/studio is writable.',
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,

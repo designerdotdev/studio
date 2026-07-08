@@ -47,6 +47,11 @@ fields:
         label: Image
         default: "https://placehold.co/2400x1000/f4f4f5/a1a1aa?text=Image"
 
+    image_alt:
+        type: text
+        label: Image alt text
+        default: "Placeholder image"
+
     stats:
         type: repeater
         label: Stats

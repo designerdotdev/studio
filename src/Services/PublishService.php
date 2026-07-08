@@ -155,7 +155,10 @@ class PublishService
             $sourceFiles = $this->fileNames($from);
 
             foreach ($sourceFiles as $name) {
-                File::copy($from . '/' . $name, $to . '/' . $name);
+                // Copy-then-rename so a half-written file can never be served
+                $temp = $to . '/.' . $name . '.tmp';
+                File::copy($from . '/' . $name, $temp);
+                File::move($temp, $to . '/' . $name);
             }
 
             // Remove anything on the target that's gone from the source

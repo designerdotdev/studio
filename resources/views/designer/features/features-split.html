@@ -17,7 +17,7 @@
                 <div class="flex flex-col gap-8 md:flex-row md:items-center md:gap-14 md:even:flex-row-reverse lg:gap-20">
                     <div class="md:w-1/2">
                         <div class="overflow-hidden rounded-3xl border border-neutral-200/70 bg-neutral-50">
-                            <img src="{{ $item['image'] ?? 'https://picsum.photos/seed/features-split-new/1200/900' }}" alt="" class="block aspect-[4/3] w-full object-cover">
+                            <img src="{{ $item['image'] ?? 'https://picsum.photos/seed/features-split-new/1200/900' }}" alt="{{ $item['alt'] ?? '' }}" class="block aspect-[4/3] w-full object-cover">
                         </div>
                     </div>
                     <div class="md:w-1/2">

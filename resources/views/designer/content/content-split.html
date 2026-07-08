@@ -27,7 +27,7 @@
 
         <div class="relative mx-auto w-full max-w-md">
             <div class="absolute inset-0 -rotate-2 rounded-3xl bg-neutral-100" aria-hidden="true"></div>
-            <img src="{{ $image ?? 'https://picsum.photos/seed/content-split-studio/900/1125' }}" alt="" class="relative aspect-[4/5] w-full rounded-3xl border border-neutral-200/70 object-cover" loading="lazy">
+            <img src="{{ $image ?? 'https://picsum.photos/seed/content-split-studio/900/1125' }}" alt="{{ $image_alt ?? '' }}" class="relative aspect-[4/5] w-full rounded-3xl border border-neutral-200/70 object-cover" loading="lazy">
         </div>
     </div>
 </section>

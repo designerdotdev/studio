@@ -121,6 +121,8 @@ return [
         'enabled' => true,
         'middleware' => ['web'],
         'home_slug' => 'home',
+        // Serve /sitemap.xml listing all published, indexable pages
+        'sitemap' => true,
     ],
 
     /*

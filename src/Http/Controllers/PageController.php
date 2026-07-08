@@ -32,6 +32,11 @@ class PageController extends Controller
         $page = $this->pages->find($slug);
 
         if (!$page) {
+            // Renamed page? 301 old slugs to their new home
+            if ($target = $this->redirectForPreviousSlug($slug)) {
+                return redirect($target, 301);
+            }
+
             abort(404);
         }
 
@@ -77,6 +82,52 @@ class PageController extends Controller
         }
 
         return $rendered;
+    }
+
+    /**
+     * URL a retired slug should 301 to, if any page remembers it.
+     */
+    protected function redirectForPreviousSlug(string $slug): ?string
+    {
+        $storage = app(\Designer\Studio\Services\Storage\StudioStorage::class);
+        $homeSlug = config('studio.page_routing.home_slug', 'home');
+
+        foreach ($storage->list('pages') as $pageSlug) {
+            $doc = $storage->read("pages/{$pageSlug}.json");
+
+            if (in_array($slug, $doc['previous_slugs'] ?? [], true)) {
+                return $pageSlug === $homeSlug ? url('/') : url('/' . $pageSlug);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * sitemap.xml for all published, indexable pages.
+     */
+    public function sitemap()
+    {
+        $this->ensureComponentsSynced();
+
+        $homeSlug = config('studio.page_routing.home_slug', 'home');
+
+        $urls = $this->pages->all()
+            ->reject(fn ($page) => !empty($page->meta['noindex']))
+            ->sortBy(fn ($page) => $page->slug === $homeSlug ? 0 : 1)
+            ->map(function ($page) use ($homeSlug) {
+                $loc = $page->slug === $homeSlug ? url('/') : url('/' . $page->slug);
+                $lastmod = substr($page->updated_at, 0, 10);
+
+                return "    <url>\n        <loc>" . e($loc) . "</loc>\n        <lastmod>{$lastmod}</lastmod>\n    </url>";
+            });
+
+        $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            . "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+            . $urls->implode("\n") . "\n"
+            . '</urlset>';
+
+        return response($xml, 200, ['Content-Type' => 'application/xml']);
     }
 
     protected function ensureComponentsSynced(): void

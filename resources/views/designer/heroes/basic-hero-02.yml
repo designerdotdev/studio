@@ -45,3 +45,8 @@ fields:
         type: image
         label: Image
         default: "https://placehold.co/1200x900/f4f4f5/a1a1aa?text=Image"
+
+    image_alt:
+        type: text
+        label: Image alt text
+        default: "Placeholder image"
