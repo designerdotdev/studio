@@ -1,0 +1,113 @@
+name: basic-pricing-01
+title: Basic Pricing 01
+description: Three plain bordered tier cards with feature checklists
+category: pricing
+tags:
+    - basic
+    - pricing
+    - tiers
+    - cards
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small label above the heading. Clear to hide.
+        default: "Pricing"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Simple, predictable pricing"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        description: Short line under the heading. Clear to hide.
+        default: "Three plans that grow with your team. Switch or cancel whenever you like."
+
+    tiers:
+        type: repeater
+        label: Plans
+        add_button_label: Add plan
+        description: Clear a feature to hide its row.
+        sub_fields:
+            name:
+                type: text
+                label: Plan name
+                default: "New plan"
+            price:
+                type: text
+                label: Price
+                default: "$29"
+            period:
+                type: text
+                label: Period
+                default: "/month"
+            description:
+                type: text
+                label: Description
+                default: "Who this plan is for."
+            cta_text:
+                type: text
+                label: Button text
+                default: "Get started"
+            cta_url:
+                type: url
+                label: Button link
+                default: "#"
+            feature_1:
+                type: text
+                label: Feature 1
+                default: ""
+            feature_2:
+                type: text
+                label: Feature 2
+                default: ""
+            feature_3:
+                type: text
+                label: Feature 3
+                default: ""
+            feature_4:
+                type: text
+                label: Feature 4
+                default: ""
+            feature_5:
+                type: text
+                label: Feature 5
+                default: ""
+        default:
+            - name: "Basic"
+              price: "$19"
+              period: "/month"
+              description: "For individuals and side projects."
+              cta_text: "Choose Basic"
+              cta_url: "#"
+              feature_1: "1 workspace"
+              feature_2: "Up to 3 pages"
+              feature_3: "2 GB storage"
+              feature_4: "Community support"
+              feature_5: ""
+            - name: "Standard"
+              price: "$49"
+              period: "/month"
+              description: "For small teams working together."
+              cta_text: "Choose Standard"
+              cta_url: "#"
+              feature_1: "5 workspaces"
+              feature_2: "Unlimited pages"
+              feature_3: "Custom domain"
+              feature_4: "Email support"
+              feature_5: ""
+            - name: "Premium"
+              price: "$99"
+              period: "/month"
+              description: "For growing companies with more moving parts."
+              cta_text: "Choose Premium"
+              cta_url: "#"
+              feature_1: "Unlimited workspaces"
+              feature_2: "Advanced permissions"
+              feature_3: "Priority support"
+              feature_4: "Uptime SLA"
+              feature_5: ""

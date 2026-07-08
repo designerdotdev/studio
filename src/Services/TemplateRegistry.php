@@ -7,6 +7,10 @@ namespace Designer\Studio\Services;
  * composed of library sections, with optional per-instance variable
  * overrides so every template reads like a designed site rather than
  * a pile of defaults.
+ *
+ * Templates with an optional `layout` key seed a shared layout (header
+ * sections in `before`, footer sections in `after`) applied to every
+ * page; templates without one (blank) seed plain pages.
  */
 class TemplateRegistry
 {
@@ -31,19 +35,26 @@ class TemplateRegistry
                 'name' => 'starter',
                 'title' => 'Starter',
                 'description' => 'The essential home page — hero, features, social proof, and a call to action.',
+                'layout' => [
+                    'name' => 'Main',
+                    'before' => $this->sections([
+                        ['header-nav'],
+                    ]),
+                    'after' => $this->sections([
+                        ['footer-simple'],
+                    ]),
+                ],
                 'pages' => [
                     [
                         'title' => 'Home',
                         'slug' => 'home',
                         'description' => 'Starter home page',
                         'components' => $this->sections([
-                            ['header-nav'],
                             ['hero-basic'],
                             ['logos-strip'],
                             ['features-grid'],
                             ['testimonials-grid'],
                             ['cta-section'],
-                            ['footer-simple'],
                         ]),
                     ],
                 ],
@@ -53,13 +64,24 @@ class TemplateRegistry
                 'name' => 'launch',
                 'title' => 'Launch',
                 'description' => 'A complete SaaS landing page with pricing, FAQ, and social proof.',
+                'layout' => [
+                    'name' => 'Main',
+                    'before' => $this->sections([
+                        ['header-cta'],
+                    ]),
+                    'after' => $this->sections([
+                        ['footer-columns', [
+                            'company_name' => 'Relay',
+                            'blurb' => 'The shared inbox for product-minded support teams.',
+                        ]],
+                    ]),
+                ],
                 'pages' => [
                     [
                         'title' => 'Home',
                         'slug' => 'home',
                         'description' => 'SaaS product landing page',
                         'components' => $this->sections([
-                            ['header-cta'],
                             ['hero-gradient'],
                             ['logos-strip', [
                                 'heading' => 'Trusted by support teams at',
@@ -93,10 +115,6 @@ class TemplateRegistry
                                 'button_text' => 'Start for free',
                                 'button_text_2' => 'Book a demo',
                             ]],
-                            ['footer-columns', [
-                                'company_name' => 'Relay',
-                                'blurb' => 'The shared inbox for product-minded support teams.',
-                            ]],
                         ]),
                     ],
                 ],
@@ -106,13 +124,24 @@ class TemplateRegistry
                 'name' => 'studio',
                 'title' => 'Studio',
                 'description' => 'An editorial portfolio for agencies and creative practices.',
+                'layout' => [
+                    'name' => 'Main',
+                    'before' => $this->sections([
+                        ['header-simple'],
+                    ]),
+                    'after' => $this->sections([
+                        ['footer-simple', [
+                            'company_name' => 'Foundry',
+                            'copyright' => '© 2026 Foundry ApS. All rights reserved.',
+                        ]],
+                    ]),
+                ],
                 'pages' => [
                     [
                         'title' => 'Home',
                         'slug' => 'home',
                         'description' => 'Agency portfolio',
                         'components' => $this->sections([
-                            ['header-simple'],
                             ['hero-editorial'],
                             ['gallery-masonry', [
                                 'eyebrow' => 'Selected work',
@@ -170,10 +199,6 @@ class TemplateRegistry
                                 'phone' => '+45 31 82 47 19',
                                 'address' => "Fabrikmestervej 4\n1437 Copenhagen K, Denmark",
                             ]],
-                            ['footer-simple', [
-                                'company_name' => 'Foundry',
-                                'copyright' => '© 2026 Foundry ApS. All rights reserved.',
-                            ]],
                         ]),
                     ],
                 ],
@@ -183,13 +208,21 @@ class TemplateRegistry
                 'name' => 'horizon',
                 'title' => 'Horizon',
                 'description' => 'A three-page company site — Home, About, and Contact.',
+                'layout' => [
+                    'name' => 'Main',
+                    'before' => $this->sections([
+                        ['header-nav', $this->harborHeader()],
+                    ]),
+                    'after' => $this->sections([
+                        ['footer-columns', $this->harborFooter()],
+                    ]),
+                ],
                 'pages' => [
                     [
                         'title' => 'Home',
                         'slug' => 'home',
                         'description' => 'Company home page',
                         'components' => $this->sections([
-                            ['header-nav', $this->harborHeader()],
                             ['hero-split', [
                                 'badge_text' => 'New — Route optimization',
                                 'heading' => 'Freight operations without the phone tag',
@@ -228,7 +261,6 @@ class TemplateRegistry
                                 'button_text' => 'Book a demo',
                                 'button_text_2' => 'Talk to sales',
                             ]],
-                            ['footer-columns', $this->harborFooter()],
                         ]),
                     ],
                     [
@@ -236,7 +268,6 @@ class TemplateRegistry
                         'slug' => 'about',
                         'description' => 'About the company',
                         'components' => $this->sections([
-                            ['header-nav', $this->harborHeader()],
                             ['content-prose', [
                                 'eyebrow' => 'About Harbor',
                                 'heading' => 'Built by people who ran the night desk',
@@ -259,7 +290,6 @@ class TemplateRegistry
                                 'button_text_2' => '',
                                 'footnote' => '',
                             ]],
-                            ['footer-columns', $this->harborFooter()],
                         ]),
                     ],
                     [
@@ -267,7 +297,6 @@ class TemplateRegistry
                         'slug' => 'contact',
                         'description' => 'Contact page',
                         'components' => $this->sections([
-                            ['header-nav', $this->harborHeader()],
                             ['contact-split', [
                                 'eyebrow' => 'Contact',
                                 'heading' => 'Talk to the Harbor team',
@@ -281,7 +310,6 @@ class TemplateRegistry
                                 'heading' => 'Before you write in',
                                 'subheading' => '',
                             ]],
-                            ['footer-columns', $this->harborFooter()],
                         ]),
                     ],
                 ],

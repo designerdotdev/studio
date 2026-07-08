@@ -1,0 +1,43 @@
+name: basic-content-01
+title: Basic Content 01
+description: Single centered prose column with an eyebrow, heading, and paragraphs
+category: content
+tags:
+    - basic
+    - content
+    - prose
+    - text
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small label above the heading. Clear to hide.
+        default: "About"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Why we built this"
+        required: true
+
+    paragraph_1:
+        type: textarea
+        label: Paragraph 1
+        rows: 4
+        default: "Most site builders make you choose between control and simplicity. Developers get flexibility but marketers wait on every copy change, while visual tools ship fast and then fall apart the moment a design needs real code."
+        required: true
+
+    paragraph_2:
+        type: textarea
+        label: Paragraph 2
+        rows: 4
+        description: Clear to hide.
+        default: "We wanted something in the middle. Designers and developers define the sections once, and everyone else edits content safely — no broken layouts, no deploy queue for a headline change."
+
+    paragraph_3:
+        type: textarea
+        label: Paragraph 3
+        rows: 4
+        description: Optional third paragraph. Clear to hide.
+        default: ""

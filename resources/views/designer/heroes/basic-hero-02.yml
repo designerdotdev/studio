@@ -1,0 +1,47 @@
+name: basic-hero-02
+title: Basic Hero 02
+description: Split hero with text on the left and an image on the right
+category: heroes
+tags:
+    - basic
+    - hero
+    - split
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "A better way to run your projects"
+        required: true
+
+    text:
+        type: textarea
+        label: Description
+        default: "Keep tasks, files, and conversations together in one place, so your team always knows what happens next."
+
+    button_text:
+        type: text
+        label: Primary button text
+        description: Clear to hide.
+        default: "Get started"
+
+    button_link:
+        type: url
+        label: Primary button link
+        default: "#"
+
+    button_text_2:
+        type: text
+        label: Secondary button text
+        description: Clear to hide.
+        default: "See how it works"
+
+    button_link_2:
+        type: url
+        label: Secondary button link
+        default: "#"
+
+    image:
+        type: image
+        label: Image
+        default: "https://placehold.co/1200x900/f4f4f5/a1a1aa?text=Image"

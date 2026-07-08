@@ -3,10 +3,13 @@
 **The visual editor for your Laravel site.** Developers define sections as plain Blade + YAML files — then anyone on the team (marketing, HR, founders) edits pages visually with a live preview. No database, no lock-in: everything is files, and every page can be exported as a plain Blade view.
 
 - 🎨 **Visual editor** — click any section on the live preview and edit its content in place
-- 🧱 **30+ pre-built sections** — heroes, features, pricing, testimonials, FAQs, footers, and more, organized by category with live thumbnails
+- 🧱 **50+ pre-built sections** — heroes, features, pricing, testimonials, FAQs, footers, and more — including a full set of minimal **Basic blocks** to start from scratch
+- 🖼 **Layouts** — share a header and footer across pages; edit them on any page and every page updates
+- 🌀 **Global blocks** — turn any section into a synced block, place it anywhere, edit it once
 - 📄 **Multi-page** — create, duplicate, and manage as many pages as you need, with SEO settings per page
-- ⚡ **Instant publishing** — pages become live routes the moment they're created (`/`, `/about`, `/pricing`, …)
-- 📦 **File-based** — pages are JSON in `storage/studio/`, sections are Blade + YAML in `resources/views/designer/`. Everything versions cleanly in git
+- ✍️ **Draft mode** — edits stay in a private draft you can preview at `/studio/preview`; one click publishes the whole site (set `draft_mode` to `false` for instant-live editing)
+- ⚡ **Auto-routing** — published pages are served at their slug automatically (`/`, `/about`, `/pricing`, …)
+- 📦 **File-based** — pages, layouts, and blocks are JSON in `storage/studio/`, sections are Blade + YAML in `resources/views/designer/`. Everything versions cleanly in git
 - 🛠 **Exportable** — one click writes any page to a plain `.blade.php` file you fully own
 - 🪶 **Light footprint** — Livewire 3 + Alpine.js; no database tables, no migrations
 
@@ -34,6 +37,8 @@ resources/views/designer/          ← section designs (Blade + YAML, published 
     heroes/hero-split.yml          ← its editable fields
 storage/studio/
     pages/home.json                ← page = ordered list of section instances + their content
+    layouts/main.json              ← shared header/footer sections wrapping pages
+    blocks/main-cta.json           ← global blocks (synced sections)
     components/library/*.json      ← synced library (regenerated from the design files)
 ```
 
@@ -49,6 +54,8 @@ storage/studio/
 - **Click a section** in the canvas to edit its fields; changes render instantly as you type.
 - **Sections panel** — drag to reorder; duplicate, hide, or delete from the row actions.
 - **Add section** — browse the library by category with live-rendered previews and search.
+- **Layout tab** — wrap pages in a shared header/footer (violet on the canvas); edit a layout section from any page and every page using it updates.
+- **Global blocks** — one click turns any section into a synced block (teal on the canvas) you can place on any page; detach a copy when one page needs a variation.
 - **Page tab** — rename the page, change its URL, set SEO title/description, duplicate or delete.
 - **Device toggle** — preview at desktop, tablet (768px), and mobile (390px) widths.
 - **Publish** — copy the live URL or export the page as a Blade file.

@@ -1,0 +1,49 @@
+name: basic-testimonials-01
+title: Basic Testimonials 01
+description: Three-column grid of plain quote cards with name and role
+category: testimonials
+tags:
+    - basic
+    - testimonials
+    - quotes
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "What teams are saying"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        description: Short line under the heading. Clear to hide.
+        default: "Notes from people who moved their day-to-day work over."
+
+    testimonials:
+        type: repeater
+        label: Testimonials
+        add_button_label: Add testimonial
+        sub_fields:
+            quote:
+                type: textarea
+                label: Quote
+                default: "A short quote about the product."
+            name:
+                type: text
+                label: Name
+                default: "A name"
+            role:
+                type: text
+                label: Role
+                default: "Role, Company"
+        default:
+            - quote: "We moved the whole support queue over in an afternoon. First-response time dropped from four hours to about forty minutes within the first month."
+              name: "Elena Vasquez"
+              role: "Head of Support, Brightline"
+            - quote: "The handoff between sales and onboarding used to live in three spreadsheets. Now every account has one thread and nobody gets asked the same question twice."
+              name: "Marcus Chen"
+              role: "Operations Lead, Fernwood"
+            - quote: "I run a team of six across three time zones. The morning summary alone is worth the subscription — I stopped starting my day with forty unread threads."
+              name: "Amara Osei"
+              role: "Founder, Loopworks"

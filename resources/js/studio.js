@@ -20,7 +20,7 @@ const TOAST_ICONS = {
     info: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>',
 };
 
-function toast(message, type = 'success', duration = 3200) {
+function toast(message, type = 'success', duration = 3200, action = null) {
     let container = document.getElementById('studio-toasts');
 
     if (!container) {
@@ -35,8 +35,6 @@ function toast(message, type = 'success', duration = 3200) {
     el.addEventListener('click', () => dismiss());
     container.appendChild(el);
 
-    requestAnimationFrame(() => el.classList.add('is-visible'));
-
     let dismissed = false;
     const dismiss = () => {
         if (dismissed) return;
@@ -44,6 +42,23 @@ function toast(message, type = 'success', duration = 3200) {
         el.classList.remove('is-visible');
         setTimeout(() => el.remove(), 220);
     };
+
+    // Optional action button (e.g. Undo) — actionable toasts linger longer
+    if (action?.label) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'studio-toast__action';
+        button.textContent = action.label;
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            action.onClick?.();
+            dismiss();
+        });
+        el.appendChild(button);
+        duration = Math.max(duration, 6000);
+    }
+
+    requestAnimationFrame(() => el.classList.add('is-visible'));
 
     setTimeout(dismiss, duration);
 }
@@ -92,7 +107,9 @@ const StudioEditor = {
                     break;
 
                 case 'studio:add-section':
-                    window.dispatchEvent(new CustomEvent('studio:open-library', { detail: { index: data.index ?? null } }));
+                    window.dispatchEvent(new CustomEvent('studio:open-library', {
+                        detail: { index: data.index ?? null, scope: data.scope || 'page' },
+                    }));
                     break;
 
                 case 'studio:section-action':
@@ -187,10 +204,9 @@ const StudioEditor = {
 
         if (key === 'Backspace' || key === 'Delete') {
             preventDefault();
-            if (window.confirm('Delete this section?')) {
-                window.Livewire?.dispatch('studio:section-action', { id: this.selectedId, action: 'delete' });
-                this.selectedId = null;
-            }
+            // Undoable via the toast — no confirm needed
+            window.Livewire?.dispatch('studio:section-action', { id: this.selectedId, action: 'delete' });
+            this.selectedId = null;
         }
     },
 
@@ -238,11 +254,13 @@ function isTyping(doc = document) {
 const StudioPreview = {
     variables: {},
     templates: {},
+    blocks: {},
     selectedId: null,
 
-    init({ variables, templates }) {
+    init({ variables, templates, blocks }) {
         this.variables = variables || {};
         this.templates = templates || {};
+        this.blocks = blocks || {};
 
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
@@ -360,32 +378,42 @@ const StudioPreview = {
     action(sectionId, action, event) {
         if (event) event.stopPropagation();
 
-        if (action === 'delete' && !window.confirm('Delete this section?')) {
-            return;
-        }
-
+        // Deletion needs no confirm — it's undoable from the toast
         this.post('studio:section-action', { sectionId, action });
     },
 
-    addAt(index, event) {
+    addAt(scope, index, event) {
         if (event) event.stopPropagation();
-        this.post('studio:add-section', { index });
+        this.post('studio:add-section', { scope, index });
     },
 
     /* --- live re-rendering ----------------------------------------- */
 
-    updateVariable(sectionId, key, value) {
-        if (!this.variables[sectionId] || Array.isArray(this.variables[sectionId])) {
-            this.variables[sectionId] = {};
-        }
+    // A global block placement mirrors every sibling placement of the
+    // same block on this page — they all render from the shared data.
+    siblingIds(sectionId) {
+        const block = this.blocks[sectionId];
+        if (!block) return [sectionId];
 
-        this.variables[sectionId][key] = value;
-        this.render(sectionId);
+        return Object.keys(this.blocks).filter((id) => this.blocks[id] === block);
+    },
+
+    updateVariable(sectionId, key, value) {
+        for (const id of this.siblingIds(sectionId)) {
+            if (!this.variables[id] || Array.isArray(this.variables[id])) {
+                this.variables[id] = {};
+            }
+
+            this.variables[id][key] = value;
+            this.render(id);
+        }
     },
 
     updateVariables(sectionId, variables) {
-        this.variables[sectionId] = { ...(this.variables[sectionId] || {}), ...variables };
-        this.render(sectionId);
+        for (const id of this.siblingIds(sectionId)) {
+            this.variables[id] = { ...(this.variables[id] || {}), ...variables };
+            this.render(id);
+        }
     },
 
     render(sectionId) {

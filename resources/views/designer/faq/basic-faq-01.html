@@ -1,0 +1,24 @@
+<section class="w-full bg-white py-20 sm:py-28">
+    <div class="mx-auto w-full max-w-3xl px-6 lg:px-8">
+        <div class="text-center">
+            <h2 class="text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">{{ $heading ?? 'Frequently asked questions' }}</h2>
+            @if($subheading)
+                <p class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-500">{{ $subheading }}</p>
+            @endif
+        </div>
+
+        <div class="mt-12 divide-y divide-neutral-200 rounded-xl border border-neutral-200">
+            @foreach($faqs as $item)
+                <div x-data="{ open: false }" class="px-5">
+                    <button type="button" @click="open = !open" :aria-expanded="open" class="flex w-full items-center justify-between gap-6 py-5 text-left">
+                        <span class="text-sm font-medium text-neutral-950">{{ $item['question'] }}</span>
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <div x-show="open" style="display: none" class="pb-5 pr-10">
+                        <p class="text-sm leading-6 text-neutral-500">{{ $item['answer'] }}</p>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</section>

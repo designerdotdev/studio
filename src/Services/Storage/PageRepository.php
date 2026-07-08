@@ -52,6 +52,8 @@ class PageRepository
             'description' => $data['description'] ?? '',
             // null = follow studio.default_layout at export time
             'layout' => $data['layout'] ?? null,
+            // Studio layout (shared header/footer sections), null = none
+            'layout_ref' => $data['layout_ref'] ?? null,
             'created_at' => now()->toIso8601String(),
             'updated_at' => now()->toIso8601String(),
             'meta' => $data['meta'] ?? [],
@@ -122,6 +124,7 @@ class PageRepository
             'slug' => ($existing['slug'] ?? $slug) . '-copy',
             'description' => $existing['description'] ?? '',
             'layout' => $existing['layout'] ?? null,
+            'layout_ref' => $existing['layout_ref'] ?? null,
             'meta' => $existing['meta'] ?? [],
             'components' => $components,
         ]);

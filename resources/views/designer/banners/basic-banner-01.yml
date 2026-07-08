@@ -1,0 +1,31 @@
+name: basic-banner-01
+title: Basic Banner 01
+description: Thin white announcement bar with a message, link, and optional dismiss button
+category: banners
+tags:
+    - basic
+    - banner
+    - announcement
+
+fields:
+    message:
+        type: text
+        label: Message
+        default: "Version 2.0 is here — faster, cleaner, and easier to use."
+        required: true
+
+    link_text:
+        type: text
+        label: Link text
+        description: Clear to hide the link.
+        default: "See what's new"
+
+    link_url:
+        type: url
+        label: Link URL
+        default: "#"
+
+    dismissible:
+        type: toggle
+        label: Show dismiss button
+        default: true

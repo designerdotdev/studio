@@ -36,7 +36,13 @@ class DevReset extends Command
         $this->line('  Re-creating storage directories...');
         $storage->ensureDirectoryExists();
         $storage->ensureDirectoryExists('pages');
+        $storage->ensureDirectoryExists('layouts');
+        $storage->ensureDirectoryExists('blocks');
         $storage->ensureDirectoryExists('components/library');
+
+        if (config('studio.draft_mode', true)) {
+            app(\Designer\Studio\Services\PublishService::class)->ensureDraftSeeded();
+        }
         $this->info('  Done.');
 
         // 4. Sync component designs from source YAML/HTML files

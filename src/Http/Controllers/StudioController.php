@@ -23,7 +23,12 @@ class StudioController extends Controller
         protected DesignSyncService $designSync,
         protected SampleDataSeeder $seeder,
         protected TemplateRegistry $templates
-    ) {}
+    ) {
+        // The editor (and everything it calls) works on the draft site
+        if (config('studio.draft_mode', true)) {
+            app(\Designer\Studio\Services\Storage\StudioStorage::class)->useDraft();
+        }
+    }
 
     public function index(Request $request)
     {
@@ -57,15 +62,30 @@ class StudioController extends Controller
             abort(404);
         }
 
+        $blocks = app(\Designer\Studio\Services\Storage\BlockRepository::class);
+        $draftMode = (bool) config('studio.draft_mode', true);
+
         return view('studio::home', [
             'page' => $page,
             'pages' => $pages,
             'library' => $this->components->grouped(),
+            'blocks' => $blocks->all()->map(fn ($block) => [
+                'slug' => $block['slug'],
+                'name' => $block['name'],
+                'usage' => $blocks->usage($block['slug'])['count'],
+            ])->values()->all(),
+            'draftMode' => $draftMode,
+            'publishStatus' => $draftMode ? $this->publisher()->status() : null,
         ]);
     }
 
     /**
      * The live-editing preview document loaded inside the canvas iframe.
+     *
+     * When the page uses a layout, the layout's header/footer sections are
+     * rendered around the page's own sections. Every section carries its
+     * scope ('page' or 'layout') plus insert/ordering metadata relative to
+     * the document it belongs to, so the overlay chrome edits the right one.
      */
     public function iframe(string $slug)
     {
@@ -75,31 +95,77 @@ class StudioController extends Controller
             abort(404);
         }
 
+        $layouts = app(\Designer\Studio\Services\Storage\LayoutRepository::class);
+        $blocks = app(\Designer\Studio\Services\Storage\BlockRepository::class);
+        $regions = $layouts->regions($page->layout_ref);
+        $layout = $page->layout_ref ? $layouts->find($page->layout_ref) : null;
+
         $sections = [];
         $componentVariables = [];
+        $blockByInstance = [];
+        $pageComponents = collect($page->components)->sortBy('order')->values()->all();
+        // Layout doc length includes the content slot entry
+        $layoutCount = $layout ? count($layout['components'] ?? []) : 0;
 
-        foreach (collect($page->components)->sortBy('order')->values() as $instance) {
-            $component = $this->components->find($instance['component_ref']);
+        $push = function (array $instances, string $scope, int $indexOffset, int $docCount) use (&$sections, &$componentVariables, &$blockByInstance, $blocks) {
+            // Hydrate WITHOUT dropping missing blocks so doc indexes stay
+            // aligned with the raw components array (insertion positions).
+            foreach (array_values($instances) as $i => $instance) {
+                $docIndex = $i + $indexOffset;
 
-            if (!$component) {
-                continue;
+                if (!empty($instance['block_ref'])) {
+                    $hydrated = $blocks->hydrate([$instance]);
+
+                    if (empty($hydrated)) {
+                        continue;
+                    }
+
+                    $instance = $hydrated[0];
+                    $blockByInstance[$instance['id']] = $instance['block_ref'];
+                }
+
+                $component = $this->components->find($instance['component_ref']);
+
+                if (!$component) {
+                    continue;
+                }
+
+                $sections[] = [
+                    'id' => $instance['id'],
+                    'ref' => $component->name,
+                    'title' => $component->title,
+                    'html' => $component->html,
+                    'hidden' => (bool) ($instance['hidden'] ?? false),
+                    'scope' => $scope,
+                    'block' => $instance['block_ref'] ?? null,
+                    // Position inside its own document (layout indexes count
+                    // the content slot, so footer sections continue past it)
+                    'docIndex' => $docIndex,
+                    'docFirst' => $docIndex === 0,
+                    'docLast' => $docIndex === $docCount - 1,
+                ];
+
+                $componentVariables[$instance['id']] = $component->resolveVariables($instance['variables'] ?? []);
             }
+        };
 
-            $sections[] = [
-                'id' => $instance['id'],
-                'ref' => $component->name,
-                'title' => $component->title,
-                'html' => $component->html,
-                'hidden' => (bool) ($instance['hidden'] ?? false),
-            ];
-
-            $componentVariables[$instance['id']] = $component->resolveVariables($instance['variables'] ?? []);
-        }
+        // Layout header → page content → layout footer. A header section is
+        // never docLast (the slot follows it) and a footer section is never
+        // docFirst — so move-down/up across the slot moves between regions.
+        $push($regions['before'], 'layout', 0, $layoutCount);
+        $push($pageComponents, 'page', 0, count($pageComponents));
+        $push($regions['after'], 'layout', count($regions['before']) + 1, $layoutCount);
 
         return view('studio::iframe', [
             'page' => $page,
             'sections' => $sections,
             'componentVariables' => $componentVariables,
+            'blockByInstance' => $blockByInstance,
+            'layout' => $layout,
+            'layoutBeforeCount' => count($regions['before']),
+            'layoutAfterCount' => count($regions['after']),
+            'layoutComponentCount' => $layoutCount,
+            'pageSectionCount' => count($pageComponents),
         ]);
     }
 
@@ -127,6 +193,29 @@ class StudioController extends Controller
     }
 
     /**
+     * Standalone rendered preview of a global block (picker thumbnails).
+     */
+    public function blockPreview(string $slug)
+    {
+        $block = app(\Designer\Studio\Services\Storage\BlockRepository::class)->find($slug);
+        $component = $block ? $this->components->find($block['component_ref']) : null;
+
+        if (!$component) {
+            abort(404);
+        }
+
+        $html = $this->renderSection(
+            $component->html,
+            $component->resolveVariables($block['variables'] ?? []),
+            $component->name
+        );
+
+        return response()
+            ->view('studio::preview', ['title' => $block['name'], 'sections' => [$html]])
+            ->header('Cache-Control', 'private, max-age=10');
+    }
+
+    /**
      * Standalone rendered preview of an onboarding template's first page.
      */
     public function templatePreview(string $name)
@@ -140,7 +229,14 @@ class StudioController extends Controller
         $sections = [];
         $pageDef = $template['pages'][0] ?? null;
 
-        foreach ($pageDef['components'] ?? [] as $instance) {
+        // Template previews show the composite: layout header + page + footer
+        $instances = [
+            ...($template['layout']['before'] ?? []),
+            ...($pageDef['components'] ?? []),
+            ...($template['layout']['after'] ?? []),
+        ];
+
+        foreach ($instances as $instance) {
             $component = $this->components->find($instance['component_ref']);
 
             if (!$component) {
@@ -179,7 +275,8 @@ class StudioController extends Controller
 
     public function generate()
     {
-        $generated = $this->generator->generateAll();
+        // Exports always reflect the published site, not the draft
+        $generated = $this->storage()->inLive(fn () => $this->generator->generateAll());
 
         return response()->json([
             'success' => true,
@@ -191,7 +288,7 @@ class StudioController extends Controller
     public function generatePage(string $slug)
     {
         try {
-            $path = $this->generator->generatePage($slug);
+            $path = $this->storage()->inLive(fn () => $this->generator->generatePage($slug));
 
             return response()->json([
                 'success' => true,
@@ -199,11 +296,110 @@ class StudioController extends Controller
                 'relative_path' => str_replace(base_path() . '/', '', $path),
             ]);
         } catch (\Exception $e) {
+            $message = $e->getMessage();
+
+            if (str_contains($message, 'Page not found') && config('studio.draft_mode', true)) {
+                $message = 'This page has not been published yet — publish the site first, then export.';
+            }
+
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $message,
             ], 500);
         }
+    }
+
+    /* ------------------------------------------------------------ */
+    /*  Draft mode — preview + publish                               */
+    /* ------------------------------------------------------------ */
+
+    protected function storage(): \Designer\Studio\Services\Storage\StudioStorage
+    {
+        return app(\Designer\Studio\Services\Storage\StudioStorage::class);
+    }
+
+    protected function publisher(): \Designer\Studio\Services\PublishService
+    {
+        return app(\Designer\Studio\Services\PublishService::class);
+    }
+
+    /**
+     * Render a draft page exactly like the live site would — the whole
+     * draft site is browsable under /studio/preview.
+     */
+    public function previewPage(?string $slug = null)
+    {
+        $slug = $slug ?: config('studio.page_routing.home_slug', 'home');
+
+        $page = $this->pages->find($slug);
+
+        if (!$page) {
+            abort(404);
+        }
+
+        $regions = app(\Designer\Studio\Services\Storage\LayoutRepository::class)->regions($page->layout_ref);
+        $pageComponents = collect($page->components)->sortBy('order')->values()->all();
+
+        $instances = app(\Designer\Studio\Services\Storage\BlockRepository::class)->hydrate([
+            ...$regions['before'],
+            ...$pageComponents,
+            ...$regions['after'],
+        ]);
+
+        $renderedSections = [];
+
+        foreach ($instances as $instance) {
+            if (!empty($instance['hidden'])) {
+                continue;
+            }
+
+            $component = $this->components->find($instance['component_ref']);
+
+            if (!$component) {
+                continue;
+            }
+
+            try {
+                $renderedSections[] = Blade::render(
+                    $component->html,
+                    $component->resolveVariables($instance['variables'] ?? [])
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return view('studio::page', [
+            'renderedSections' => $renderedSections,
+            'page' => $page,
+            'noindex' => true,
+        ]);
+    }
+
+    public function publishStatus()
+    {
+        return response()->json($this->publisher()->status());
+    }
+
+    public function publishSite()
+    {
+        $published = $this->publisher()->publishAll();
+
+        return response()->json([
+            'success' => true,
+            'published' => $published['items'],
+            'count' => count($published['items']),
+        ]);
+    }
+
+    public function discardDraft()
+    {
+        $discarded = $this->publisher()->discardAll();
+
+        return response()->json([
+            'success' => true,
+            'discarded' => count($discarded['items']),
+        ]);
     }
 
     public function createPage(Request $request)

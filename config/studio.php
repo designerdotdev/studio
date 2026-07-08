@@ -29,6 +29,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Draft Mode
+    |--------------------------------------------------------------------------
+    |
+    | When enabled (the default), edits made in the Studio are saved to a
+    | draft of the whole site and are NOT live until you hit Publish. The
+    | draft is viewable at /studio/preview (and /studio/preview/{slug}),
+    | behind the same middleware as the editor. Publishing mirrors the
+    | draft onto the live site in one step; discarding restores the draft
+    | from live. Disable to make every edit live immediately.
+    |
+    */
+    'draft_mode' => true,
+
+    /*
+    |--------------------------------------------------------------------------
     | Authorization Gate
     |--------------------------------------------------------------------------
     |
