@@ -100,8 +100,9 @@ class BladeGenerator
 
     protected function buildStandaloneBlade(PageData $page): string
     {
-        $seoTitle = e($page->meta['seo_title'] ?? $page->title);
-        $seoDescription = e($page->meta['seo_description'] ?? $page->description ?? '');
+        $meta = $page->meta;
+        $seoTitle = e($meta['seo_title'] ?? $page->title);
+        $seoDescription = e($meta['seo_description'] ?? $page->description ?? '');
 
         $head = [
             '<!DOCTYPE html>',
@@ -114,6 +115,10 @@ class BladeGenerator
 
         if ($seoDescription !== '') {
             $head[] = "    <meta name=\"description\" content=\"{$seoDescription}\">";
+        }
+
+        foreach ($this->headTags($page) as $tag) {
+            $head[] = '    ' . $tag;
         }
 
         if (config('studio.iframe.tailwind_cdn', true)) {
@@ -142,7 +147,24 @@ class BladeGenerator
     }
 
     /**
-     * Render every visible section of a page as indented Blade blocks.
+     * The page's section instances with its layout's header/footer
+     * sections merged around them.
+     */
+    protected function mergedInstances(PageData $page): array
+    {
+        $regions = app(\Designer\Studio\Services\Storage\LayoutRepository::class)
+            ->regions($page->layout_ref);
+
+        return app(\Designer\Studio\Services\Storage\BlockRepository::class)->hydrate([
+            ...$regions['before'],
+            ...collect($page->components)->sortBy('order')->values()->all(),
+            ...$regions['after'],
+        ]);
+    }
+
+    /**
+     * Render every visible section of a page (including its layout's
+     * sections) as indented Blade blocks.
      *
      * @return array<int, string>
      */
@@ -150,7 +172,7 @@ class BladeGenerator
     {
         $blocks = [];
 
-        $sortedComponents = collect($page->components)->sortBy('order')->values();
+        $sortedComponents = $this->mergedInstances($page);
 
         foreach ($sortedComponents as $instance) {
             if (!empty($instance['hidden'])) {
@@ -179,6 +201,94 @@ class BladeGenerator
         }
 
         return $blocks;
+    }
+
+    /**
+     * The SEO/social/branding head tags for exports — mirrors what
+     * resources/views/page.blade.php renders for live pages.
+     *
+     * @return string[]
+     */
+    protected function headTags(PageData $page): array
+    {
+        $meta = $page->meta;
+        $seoTitle = e($meta['seo_title'] ?? $page->title);
+        $seoDescription = e($meta['seo_description'] ?? $page->description ?? '');
+        $canonical = e($meta['canonical_url'] ?? '');
+        $ogImage = e($meta['og_image'] ?? '');
+
+        $tags = [];
+
+        $tags[] = $canonical !== ''
+            ? "<link rel=\"canonical\" href=\"{$canonical}\">"
+            : '<link rel="canonical" href="{{ url()->current() }}">';
+
+        if (!empty($meta['seo_keywords'])) {
+            $tags[] = '<meta name="keywords" content="' . e($meta['seo_keywords']) . '">';
+        }
+
+        if (!empty($meta['noindex']) || !empty($meta['nofollow'])) {
+            $robots = (!empty($meta['noindex']) ? 'noindex' : 'index')
+                . ', '
+                . (!empty($meta['nofollow']) ? 'nofollow' : 'follow');
+            $tags[] = "<meta name=\"robots\" content=\"{$robots}\">";
+        }
+
+        $tags[] = "<meta property=\"og:title\" content=\"{$seoTitle}\">";
+
+        if ($seoDescription !== '') {
+            $tags[] = "<meta property=\"og:description\" content=\"{$seoDescription}\">";
+        }
+
+        $tags[] = '<meta property="og:type" content="' . e($meta['og_type'] ?? 'website') . '">';
+        $tags[] = $canonical !== ''
+            ? "<meta property=\"og:url\" content=\"{$canonical}\">"
+            : '<meta property="og:url" content="{{ url()->current() }}">';
+        $tags[] = !empty($meta['og_site_name'])
+            ? '<meta property="og:site_name" content="' . e($meta['og_site_name']) . '">'
+            : '<meta property="og:site_name" content="{{ config(\'app.name\') }}">';
+        $tags[] = !empty($meta['og_locale'])
+            ? '<meta property="og:locale" content="' . e($meta['og_locale']) . '">'
+            : '<meta property="og:locale" content="{{ str_replace(\'-\', \'_\', app()->getLocale()) }}">';
+
+        if ($ogImage !== '') {
+            $tags[] = "<meta property=\"og:image\" content=\"{$ogImage}\">";
+
+            if (!empty($meta['og_image_alt'])) {
+                $tags[] = '<meta property="og:image:alt" content="' . e($meta['og_image_alt']) . '">';
+            }
+        }
+
+        $twitterCard = $meta['twitter_card'] ?? ($ogImage !== '' ? 'summary_large_image' : 'summary');
+        $tags[] = '<meta name="twitter:card" content="' . e($twitterCard) . '">';
+
+        if (!empty($meta['twitter_site'])) {
+            $tags[] = '<meta name="twitter:site" content="' . e($meta['twitter_site']) . '">';
+        }
+
+        if (!empty($meta['twitter_creator'])) {
+            $tags[] = '<meta name="twitter:creator" content="' . e($meta['twitter_creator']) . '">';
+        }
+
+        if (!empty($meta['favicon'])) {
+            $tags[] = '<link rel="icon" href="' . e($meta['favicon']) . '">';
+        }
+
+        if (!empty($meta['theme_color'])) {
+            $tags[] = '<meta name="theme-color" content="' . e($meta['theme_color']) . '">';
+        }
+
+        if (!empty($meta['json_ld']) && ($decoded = json_decode($meta['json_ld'])) !== null) {
+            $tags[] = '<script type="application/ld+json">'
+                . json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+                . '</script>';
+        }
+
+        if (!empty($meta['head_html'])) {
+            $tags[] = $meta['head_html'];
+        }
+
+        return $tags;
     }
 
     protected function withGeneratedHeader(PageData $page, string $content): string

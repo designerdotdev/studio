@@ -1,0 +1,64 @@
+name: basic-team-01
+title: Basic Team 01
+description: Simple grid of members with placeholder avatar, name, and role
+category: team
+tags:
+    - basic
+    - team
+    - people
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "The team"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        description: Short line under the heading. Clear to hide.
+        default: "Fourteen people across four time zones, building the tool we always wanted at our last jobs."
+
+    members:
+        type: repeater
+        label: Members
+        add_button_label: Add member
+        sub_fields:
+            image:
+                type: image
+                label: Photo
+                default: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=%E2%80%A2"
+            name:
+                type: text
+                label: Name
+                default: "A name"
+            role:
+                type: text
+                label: Role
+                default: "Role"
+        default:
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=ML"
+              name: "Maya Lindqvist"
+              role: "Co-founder & CEO"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=DO"
+              name: "Daniel Okafor"
+              role: "Co-founder & CTO"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=PR"
+              name: "Priya Raman"
+              role: "Head of Design"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=TW"
+              name: "Tom Whitaker"
+              role: "Staff Engineer"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=SR"
+              name: "Sofia Reyes"
+              role: "Product Manager"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=JB"
+              name: "Jonas Berg"
+              role: "Engineer"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=HC"
+              name: "Hannah Cole"
+              role: "Customer Success"
+            - image: "https://placehold.co/144x144/f4f4f5/a1a1aa?text=LT"
+              name: "Leo Tanaka"
+              role: "Marketing Lead"

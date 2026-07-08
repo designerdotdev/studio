@@ -1,0 +1,92 @@
+name: basic-footer-02
+title: Basic Footer 02
+description: Four link columns with a bottom bar for brand, copyright, and social icons
+category: footers
+tags:
+    - basic
+    - footer
+    - columns
+
+fields:
+    logo_svg:
+        type: textarea
+        label: Logo SVG
+        rows: 3
+        description: Paste inline SVG markup. Clear it to show the company name only.
+        default: '<svg class="h-6 w-6 text-neutral-950" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect width="32" height="32" rx="8"></rect></svg>'
+
+    company_name:
+        type: text
+        label: Company name
+        default: "Acme"
+        required: true
+
+    columns:
+        type: repeater
+        label: Link columns
+        nestable: true
+        max_depth: 2
+        add_button_label: Add column
+        description: Top-level items are column headings. Nest links beneath them.
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Product"
+              url: "#"
+              children:
+                  - text: "Features"
+                    url: "#"
+                  - text: "Pricing"
+                    url: "#"
+                  - text: "Integrations"
+                    url: "#"
+                  - text: "Changelog"
+                    url: "#"
+            - text: "Company"
+              url: "#"
+              children:
+                  - text: "About"
+                    url: "#"
+                  - text: "Blog"
+                    url: "#"
+                  - text: "Careers"
+                    url: "#"
+                  - text: "Press"
+                    url: "#"
+            - text: "Resources"
+              url: "#"
+              children:
+                  - text: "Docs"
+                    url: "#"
+                  - text: "Help center"
+                    url: "#"
+                  - text: "Community"
+                    url: "#"
+                  - text: "Status"
+                    url: "#"
+            - text: "Legal"
+              url: "#"
+              children:
+                  - text: "Privacy"
+                    url: "#"
+                  - text: "Terms"
+                    url: "#"
+                  - text: "Security"
+                    url: "#"
+
+    copyright:
+        type: text
+        label: Copyright
+        default: "© 2026 Acme, Inc. All rights reserved."
+
+    show_social:
+        type: toggle
+        label: Show social icons
+        default: true

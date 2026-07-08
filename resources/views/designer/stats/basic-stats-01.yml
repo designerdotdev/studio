@@ -1,0 +1,39 @@
+name: basic-stats-01
+title: Basic Stats 01
+description: Four headline numbers in a row with dividers between them
+category: stats
+tags:
+    - basic
+    - stats
+    - numbers
+    - row
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        description: Optional heading above the numbers. Clear to hide.
+        default: ""
+
+    stats:
+        type: repeater
+        label: Stats
+        add_button_label: Add stat
+        sub_fields:
+            value:
+                type: text
+                label: Value
+                default: "42%"
+            label:
+                type: text
+                label: Label
+                default: "What this number measures"
+        default:
+            - value: "12,400+"
+              label: "Active teams"
+            - value: "48"
+              label: "Countries served"
+            - value: "99.98%"
+              label: "Uptime last quarter"
+            - value: "4.7/5"
+              label: "Average review score"

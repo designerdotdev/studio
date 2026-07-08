@@ -61,9 +61,8 @@
         {{-- Step 1 — Welcome --}}
         <div x-show="step === 1" class="flex min-h-full flex-col items-center justify-center px-6 py-16 text-center">
             <div class="onboard-up flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] ring-1 ring-white/10" style="animation-delay: 60ms">
-                <svg class="h-9 w-9" viewBox="0 0 32 32" fill="none">
-                    <path d="M10 9.5h7.25a6.5 6.5 0 0 1 0 13H10v-13Z" stroke="#fff" stroke-width="2.5"/>
-                    <circle cx="23.5" cy="23.5" r="2.5" fill="#4c7dfa"/>
+                <svg class="h-8 w-auto text-neutral-100" viewBox="0 0 72 75" fill="none">
+                    <path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/>
                 </svg>
             </div>
 
@@ -164,19 +163,34 @@
                 @endforeach
             </div>
 
-            <div class="mt-8 flex items-center justify-end gap-3 border-t border-line pt-6">
-                <p class="mr-auto text-xs text-faint">Tip: double-click a template to jump straight in.</p>
-                <button
-                    @click="apply()"
-                    :disabled="!selected || applying"
-                    class="s-btn-primary !h-10 !px-6"
-                >
-                    <span x-show="!applying">Use this template</span>
-                    <span x-show="applying" x-cloak class="flex items-center gap-2">
-                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
-                        Setting up your site…
-                    </span>
-                </button>
+        </div>
+
+        {{-- Step 2 — pinned action bar (always visible while browsing templates) --}}
+        <div
+            x-show="step === 2"
+            x-cloak
+            class="sticky bottom-0 z-20 border-t border-line bg-shell/85 shadow-[0_-16px_40px_-16px_rgba(0,0,0,0.65)] backdrop-blur-xl"
+        >
+            <div class="mx-auto flex w-full max-w-6xl items-center gap-4 px-6 py-3.5">
+                <p class="hidden text-xs text-faint sm:block">Tip: double-click a template to jump straight in.</p>
+
+                <div class="ml-auto flex items-center gap-3">
+                    <p class="text-[13px] text-soft">
+                        <span class="text-faint">Selected:</span>
+                        <span class="font-medium text-ink" x-text="({ @foreach($templates as $key => $template)@js($key): @js($template['title']),@endforeach })[selected] ?? '—'"></span>
+                    </p>
+                    <button
+                        @click="apply()"
+                        :disabled="!selected || applying"
+                        class="s-btn-primary !h-10 !px-6"
+                    >
+                        <span x-show="!applying">Use this template</span>
+                        <span x-show="applying" x-cloak class="flex items-center gap-2">
+                            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                            Setting up your site…
+                        </span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

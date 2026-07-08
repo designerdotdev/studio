@@ -28,6 +28,12 @@ Route::group([
     // Rendered previews (section picker thumbnails + onboarding templates)
     Route::get('/preview/component/{name}', [StudioController::class, 'componentPreview'])->name('preview.component');
     Route::get('/preview/template/{name}', [StudioController::class, 'templatePreview'])->name('preview.template');
+    Route::get('/preview/block/{slug}', [StudioController::class, 'blockPreview'])->name('preview.block');
+
+    // Draft site preview (page slugs never contain '/', so these can't
+    // shadow the two-segment preview routes above)
+    Route::get('/preview', [StudioController::class, 'previewPage'])->name('preview.home');
+    Route::get('/preview/{slug}', [StudioController::class, 'previewPage'])->name('preview.page');
 
     // API endpoints
     Route::prefix('api')->group(function () {
@@ -50,5 +56,10 @@ Route::group([
         // Blade generation
         Route::post('/generate', [StudioController::class, 'generate'])->name('api.generate');
         Route::post('/generate/{slug}', [StudioController::class, 'generatePage'])->name('api.generate.page');
+
+        // Draft publishing
+        Route::get('/publish/status', [StudioController::class, 'publishStatus'])->name('api.publish.status');
+        Route::post('/publish', [StudioController::class, 'publishSite'])->name('api.publish');
+        Route::post('/publish/discard', [StudioController::class, 'discardDraft'])->name('api.publish.discard');
     });
 });

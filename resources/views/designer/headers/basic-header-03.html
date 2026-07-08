@@ -1,0 +1,39 @@
+<header class="relative z-40 w-full border-b border-neutral-200 bg-white" x-data="{ mobileOpen: false }">
+    <div class="mx-auto grid h-16 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-6 lg:px-8">
+        <div class="justify-self-start">
+            <nav class="hidden items-center gap-1 md:flex">
+                @foreach($nav_links_left as $item)
+                    <a href="{{ $item['url'] ?? '#' }}" class="rounded-lg px-3 py-2 text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-950">{{ $item['text'] }}</a>
+                @endforeach
+            </nav>
+        </div>
+
+        <a href="/" class="flex items-center gap-2.5 justify-self-center">
+            {!! $logo_svg !!}
+            <span class="text-base font-semibold tracking-tight text-neutral-950">{{ $brand_name ?? 'Atelier' }}</span>
+        </a>
+
+        <div class="flex items-center justify-self-end">
+            <nav class="hidden items-center gap-1 md:flex">
+                @foreach($nav_links_right as $item)
+                    <a href="{{ $item['url'] ?? '#' }}" class="rounded-lg px-3 py-2 text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-950">{{ $item['text'] }}</a>
+                @endforeach
+            </nav>
+            <button type="button" class="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 md:hidden" @click="mobileOpen = !mobileOpen" aria-label="Toggle menu">
+                <svg x-show="!mobileOpen" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+                <svg x-show="mobileOpen" style="display: none" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div x-show="mobileOpen" style="display: none" class="border-t border-neutral-200 bg-white px-6 py-4 md:hidden">
+        <nav class="flex flex-col gap-0.5">
+            @foreach($nav_links_left as $item)
+                <a href="{{ $item['url'] ?? '#' }}" class="rounded-lg px-3 py-2.5 text-[15px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50">{{ $item['text'] }}</a>
+            @endforeach
+            @foreach($nav_links_right as $item)
+                <a href="{{ $item['url'] ?? '#' }}" class="rounded-lg px-3 py-2.5 text-[15px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50">{{ $item['text'] }}</a>
+            @endforeach
+        </nav>
+    </div>
+</header>

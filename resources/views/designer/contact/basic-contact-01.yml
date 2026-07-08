@@ -1,0 +1,59 @@
+name: basic-contact-01
+title: Basic Contact 01
+description: Contact details beside a simple static form layout
+category: contact
+tags:
+    - basic
+    - contact
+    - form
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "Get in touch"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        description: Short line under the heading. Clear to hide.
+        default: "Questions about plans, a demo, or migrating an existing workspace — we usually reply within one business day."
+
+    email:
+        type: text
+        label: Email
+        description: Clear to hide the email row.
+        default: "hello@acme.com"
+
+    phone:
+        type: text
+        label: Phone
+        description: Clear to hide the phone row.
+        default: "+1 (415) 555-0132"
+
+    address:
+        type: text
+        label: Address
+        description: Clear to hide the address row.
+        default: "410 Mission Street, Suite 300, San Francisco, CA"
+
+    name_label:
+        type: text
+        label: Name field label
+        default: "Name"
+
+    email_label:
+        type: text
+        label: Email field label
+        default: "Email"
+
+    message_label:
+        type: text
+        label: Message field label
+        default: "Message"
+
+    button_text:
+        type: text
+        label: Button text
+        default: "Send message"

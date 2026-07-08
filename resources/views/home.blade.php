@@ -26,7 +26,16 @@
             });
 
             window.addEventListener('studio:toast', (event) => {
-                window.Studio?.toast(event.detail.message, event.detail.type || 'success');
+                const { message, type, action } = event.detail;
+
+                window.Studio?.toast(
+                    message,
+                    type || 'success',
+                    undefined,
+                    action?.dispatch
+                        ? { label: action.label, onClick: () => window.Livewire?.dispatch(action.dispatch) }
+                        : null,
+                );
             });
         </script>
 
@@ -92,6 +101,10 @@
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                     New page…
                 </button>
+                <button @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
+                    New layout…
+                </button>
                 <button @click="duplicatePage()" class="s-menu-item">
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
                     Duplicate this page
@@ -112,6 +125,21 @@
             </div>
         </div>
 
+        {{-- Sidebar reveal — slides out from under the menu button when collapsed --}}
+        <div x-data class="s-reveal" :class="!$store.studio.sidebar && 'is-out'" :inert="$store.studio.sidebar">
+            <button
+                @click="$store.studio.toggleSidebar()"
+                class="s-box-btn s-panel-expand"
+                title="Show sidebar"
+                aria-label="Show sidebar"
+            >
+                <svg class="h-4 w-4" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M4.5498 2.30001C3.68785 2.30001 2.8612 2.64242 2.25171 3.25191C1.64221 3.8614 1.2998 4.68805 1.2998 5.55001C1.2998 6.41196 1.3 10.45 1.3 10.45C1.3 10.8768 1.38406 11.2994 1.54739 11.6937C1.71072 12.088 1.95011 12.4463 2.2519 12.7481C2.8614 13.3576 3.68805 13.7 4.55 13.7L11.4498 13.7C11.8766 13.7 12.2992 13.6159 12.6935 13.4526C13.0878 13.2893 13.4461 13.0499 13.7479 12.7481C14.0497 12.4463 14.2891 12.088 14.4524 11.6937C14.6157 11.2994 14.6998 10.8768 14.6998 10.45C14.6998 8.30212 14.6998 7.69789 14.6998 5.55C14.6998 5.12321 14.6157 4.70059 14.4524 4.30628C14.2891 3.91197 14.0497 3.5537 13.7479 3.25191C13.4461 2.95012 13.0878 2.71072 12.6935 2.54739C12.2992 2.38407 11.8766 2.3 11.4498 2.3L4.5498 2.30001ZM2.4998 5.50001C2.4998 4.96957 2.71052 4.46087 3.08559 4.08579C3.46066 3.71072 3.96937 3.50001 4.4998 3.50001H11.4998C12.0302 3.50001 12.5389 3.71072 12.914 4.08579C13.2891 4.46087 13.4998 4.96957 13.4998 5.50001V10.5C13.4998 11.0304 13.2891 11.5391 12.914 11.9142C12.5389 12.2893 12.0302 12.5 11.4998 12.5H4.4998C3.96937 12.5 3.46066 12.2893 3.08559 11.9142C2.71052 11.5391 2.4998 11.0304 2.4998 10.5V5.50001Z"></path>
+                    <rect class="s-panel-icon-bar" x="3.9" y="5" width="4.5" height="6" rx="0.75"></rect>
+                </svg>
+            </button>
+        </div>
+
         {{-- Browser navigation --}}
         <div x-data class="flex shrink-0 items-center">
             <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
@@ -125,10 +153,11 @@
             </button>
         </div>
 
-        {{-- URL bar — full width, doubles as the page switcher --}}
+        {{-- URL bar — centered, capped width, doubles as the page switcher --}}
         @php $displayHost = parse_url(url('/'), PHP_URL_HOST); @endphp
+        <div class="flex min-w-0 flex-1 justify-center px-1">
         <div
-            class="relative mx-1 min-w-0 flex-1"
+            class="relative w-full min-w-0 max-w-xl"
             x-data="{
                 state: 'idle',
                 pagesOpen: false,
@@ -136,6 +165,13 @@
                 homeSlug: @js($homeSlug),
                 get path() { return this.slug === this.homeSlug ? '' : this.slug },
                 get liveUrl() { return @js(rtrim(url('/'), '/')) + '/' + this.path },
+                get openUrl() {
+                    @if($draftMode)
+                    return @js(route('studio.preview.home')) + (this.path ? '/' + this.path : '');
+                    @else
+                    return this.liveUrl;
+                    @endif
+                },
             }"
             @studio:status.window="state = $event.detail.state"
             @studio:page-meta-updated.window="
@@ -180,14 +216,14 @@
                     <span class="s-urlbar-action" :class="pagesOpen && 'is-active'">
                         <svg class="h-3.5 w-3.5 transition-transform duration-150" :class="pagesOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                     </span>
-                    @if($liveUrl)
+                    @if($liveUrl || $draftMode)
                         <a
-                            :href="liveUrl"
-                            href="{{ $liveUrl }}"
+                            :href="openUrl"
+                            href="{{ $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl }}"
                             target="_blank"
                             class="s-urlbar-action"
-                            title="Open the live page in a new tab"
-                            aria-label="Open the live page in a new tab"
+                            title="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
+                            aria-label="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
                             @click.stop
                         >
                             <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
@@ -235,6 +271,7 @@
                 </button>
             </div>
         </div>
+        </div>
 
         {{-- Device switcher --}}
         <div x-data>
@@ -271,6 +308,9 @@
             open: false,
             exporting: false,
             copied: false,
+            draftMode: @js($draftMode),
+            status: @js($publishStatus),
+            busy: false,
 
             copyUrl() {
                 navigator.clipboard.writeText(@js($liveUrl)).then(() => {
@@ -279,15 +319,79 @@
                 });
             },
 
+            async refreshStatus() {
+                if (!this.draftMode) return;
+                try {
+                    const response = await fetch(@js(route('studio.api.publish.status')), { headers: { 'Accept': 'application/json' } });
+                    this.status = await response.json();
+                } catch (e) { /* keep last known status */ }
+            },
+
+            async publish() {
+                if (this.busy) return;
+                this.busy = true;
+                try {
+                    const response = await fetch(@js(route('studio.api.publish')), {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
+                        },
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        window.Studio.toast(data.count === 1 ? '1 change published' : data.count + ' changes published');
+                        await this.refreshStatus();
+                    } else {
+                        window.Studio.toast('Could not publish the site', 'error');
+                    }
+                } catch (e) {
+                    window.Studio.toast('Could not publish the site', 'error');
+                }
+                this.busy = false;
+            },
+
+            async discard() {
+                const count = this.status?.items?.length ?? 0;
+                if (!window.confirm('Discard all unpublished changes? ' + count + (count === 1 ? ' item' : ' items') + ' will be reverted to the live site. This cannot be undone.')) return;
+                this.busy = true;
+                try {
+                    const response = await fetch(@js(route('studio.api.publish.discard')), {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
+                        },
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.reload();
+                        return;
+                    }
+                } catch (e) { /* fall through */ }
+                window.Studio.toast('Could not discard the draft', 'error');
+                this.busy = false;
+            },
+
             async exportBlade() {
                 this.exporting = true;
                 const ok = await window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
                 if (ok) this.open = false;
                 this.exporting = false;
             }
-        }" @click.outside="open = false" @keydown.escape.window="open = false">
-            <button @click="open = !open" class="s-btn-primary">
+        }"
+        @click.outside="open = false"
+        @keydown.escape.window="open = false"
+        @studio:status.window="if ($event.detail.state === 'saved' && status) status.dirty = true"
+        >
+            <button @click="open = !open; if (open) refreshStatus()" class="s-btn-primary relative">
                 Publish
+                <span
+                    x-show="draftMode && status?.dirty"
+                    x-cloak
+                    x-transition.opacity
+                    class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-shell"
+                ></span>
             </button>
 
             <div
@@ -301,7 +405,58 @@
                 x-transition:leave-end="opacity-0 -translate-y-1"
                 class="s-pop absolute right-0 top-full mt-1.5 w-80 origin-top-right p-3"
             >
-                @if($routingEnabled)
+                @if($draftMode)
+                    {{-- Unpublished changes --}}
+                    <div x-show="status?.dirty" x-cloak>
+                        <p class="s-microlabel px-0.5">Unpublished changes</p>
+
+                        <div class="mt-2 max-h-44 space-y-1 overflow-y-auto pr-0.5">
+                            <template x-for="item in (status?.items ?? [])" :key="item.type + '/' + item.slug">
+                                <div class="flex items-center gap-2 rounded-md px-0.5 py-0.5 text-xs">
+                                    <span class="s-chip w-14 shrink-0 !justify-center capitalize" x-text="item.type"></span>
+                                    <span class="min-w-0 flex-1 truncate text-soft" x-text="item.label"></span>
+                                    <span
+                                        class="shrink-0 text-[10.5px]"
+                                        :class="{ 'text-ok': item.state === 'added', 'text-warn': item.state === 'updated', 'text-danger': item.state === 'removed' }"
+                                        x-text="item.state === 'removed' ? 'will be removed' : item.state"
+                                    ></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="mt-3 flex items-center gap-1.5">
+                            <button @click="discard()" :disabled="busy" class="s-btn-ghost flex-1 !justify-center !text-danger hover:!bg-danger/10">
+                                Discard
+                            </button>
+                            <button @click="publish()" :disabled="busy" class="s-btn-accent flex-1">
+                                <span x-show="!busy">Publish site</span>
+                                <span x-show="busy" x-cloak>Publishing…</span>
+                            </button>
+                        </div>
+
+                        <a
+                            href="{{ route('studio.preview.page', ['slug' => $page->slug]) }}"
+                            target="_blank"
+                            class="s-btn-outline mt-1.5 w-full"
+                        >
+                            Preview the draft site
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        </a>
+
+                        <div class="s-divider my-3"></div>
+                    </div>
+
+                    {{-- Everything published --}}
+                    <div x-show="!status || !status.dirty" x-cloak class="mb-3 flex items-start gap-2.5">
+                        <span class="mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
+                            <span class="s-status-dot bg-ok"></span>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="font-medium text-ink">Everything is live</p>
+                            <p class="mt-0.5 text-xs leading-relaxed text-soft">The live site matches your draft. New edits stay in the draft until you publish them.</p>
+                        </div>
+                    </div>
+                @elseif($routingEnabled)
                     <div class="mb-3 flex items-start gap-2.5">
                         <span class="mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
                             <span class="s-status-dot bg-ok"></span>
@@ -311,7 +466,9 @@
                             <p class="mt-0.5 text-xs leading-relaxed text-soft">Changes you make in the Studio are published to your site immediately.</p>
                         </div>
                     </div>
+                @endif
 
+                @if($routingEnabled)
                     <div class="flex items-center gap-1.5 rounded-lg border border-line bg-shell py-1.5 pl-2.5 pr-1.5">
                         <span class="min-w-0 flex-1 truncate font-mono text-xs text-soft">{{ $liveUrl }}</span>
                         <button @click="copyUrl()" class="s-icon-btn !h-6 !w-6" title="Copy URL">
@@ -334,22 +491,6 @@
             </div>
         </div>
 
-        {{-- Sidebar toggle --}}
-        <button
-            x-data
-            @click="$store.studio.toggleSidebar()"
-            class="s-box-btn"
-            :class="$store.studio.sidebar || '!text-faint'"
-            :title="$store.studio.sidebar ? 'Hide sidebar' : 'Show sidebar'"
-            :aria-expanded="$store.studio.sidebar"
-            aria-label="Toggle sidebar"
-        >
-            <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                <rect x="3.75" y="4.75" width="16.5" height="14.5" rx="2.5"/>
-                <path d="M15.25 4.75v14.5"/>
-                <path x-show="$store.studio.sidebar" d="M15.25 4.75h2.5a2.5 2.5 0 0 1 2.5 2.5v9.5a2.5 2.5 0 0 1-2.5 2.5h-2.5z" fill="currentColor" stroke="none" opacity="0.35"/>
-            </svg>
-        </button>
     </x-slot:topbar>
 
     {{-- ============================================================ --}}
@@ -386,12 +527,14 @@
             x-data="{
                 open: false,
                 insertIndex: null,
+                insertScope: 'page',
                 addingRef: null,
                 search: '',
                 category: 'all',
 
-                openLibrary(index = null) {
+                openLibrary(index = null, scope = 'page') {
                     this.insertIndex = index;
+                    this.insertScope = scope;
                     this.search = '';
                     this.category = 'all';
                     this.open = true;
@@ -410,7 +553,7 @@
                 add(ref) {
                     if (this.addingRef) return;
                     this.addingRef = ref;
-                    Livewire.dispatch('studio:add-section', { ref: ref, index: this.insertIndex });
+                    Livewire.dispatch('studio:add-section', { ref: ref, index: this.insertIndex, scope: this.insertScope });
                 },
 
                 matches(el) {
@@ -430,7 +573,7 @@
                     frame.style.height = `${Math.ceil(viewport.offsetHeight / scale)}px`;
                 }
             }"
-            @studio:open-library.window="openLibrary($event.detail?.index ?? null)"
+            @studio:open-library.window="openLibrary($event.detail?.index ?? null, $event.detail?.scope || 'page')"
             @studio:section-added.window="close()"
             @keydown.escape.window="close()"
             x-show="open"
@@ -454,7 +597,8 @@
             >
                 {{-- Modal header --}}
                 <div class="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
-                    <h2 class="text-[15px] font-semibold text-ink">Add a section</h2>
+                    <h2 class="text-[15px] font-semibold text-ink" x-text="insertScope === 'layout' ? 'Add a section to the layout' : 'Add a section'">Add a section</h2>
+                    <span class="s-chip" x-show="insertScope === 'layout'" x-cloak style="border-color: color-mix(in srgb, var(--color-layout) 40%, transparent); color: var(--color-layout);">Shared across pages</span>
                     <span class="s-chip">{{ $totalComponents }} designs</span>
 
                     <div class="relative ml-auto w-64">
@@ -478,6 +622,16 @@
                 <div class="flex min-h-0 flex-1">
                     {{-- Category rail --}}
                     <div class="w-44 shrink-0 space-y-0.5 overflow-y-auto border-r border-line p-2">
+                        @if(count($blocks))
+                            <button
+                                @click="category = '__blocks'"
+                                class="s-menu-item justify-between !text-block"
+                                :class="category === '__blocks' && 'bg-block/10'"
+                            >
+                                Global blocks
+                                <span class="text-[10.5px] text-block/70">{{ count($blocks) }}</span>
+                            </button>
+                        @endif
                         <button
                             @click="category = 'all'"
                             class="s-menu-item justify-between"
@@ -502,6 +656,42 @@
                     {{-- Cards --}}
                     <div class="min-h-0 flex-1 overflow-y-auto p-4">
                         <div class="grid grid-cols-2 gap-4">
+                            {{-- Global blocks — synced everywhere they're placed --}}
+                            @foreach($blocks as $block)
+                                <button
+                                    type="button"
+                                    class="s-preview-card !border-block/25 hover:!border-block/60"
+                                    data-category="__blocks"
+                                    data-search="{{ strtolower($block['name'] . ' global block') }}"
+                                    x-show="matches($el)"
+                                    @click="add(@js('block:' . $block['slug']))"
+                                    :class="addingRef === @js('block:' . $block['slug']) && 'pointer-events-none opacity-70'"
+                                >
+                                    <span class="s-preview-viewport">
+                                        <iframe
+                                            src="{{ route('studio.preview.block', ['slug' => $block['slug']]) }}"
+                                            loading="lazy"
+                                            tabindex="-1"
+                                            title="{{ $block['name'] }} preview"
+                                        ></iframe>
+                                    </span>
+                                    <span class="flex items-center gap-2 p-3">
+                                        <span class="min-w-0 flex-1">
+                                            <span class="flex items-center gap-1.5">
+                                                <span class="truncate text-[13px] font-medium text-ink">{{ $block['name'] }}</span>
+                                                <span class="s-chip !border-block/40 !text-block">Global</span>
+                                            </span>
+                                            <span class="mt-0.5 block truncate text-xs text-faint">
+                                                Synced — used {{ $block['usage'] }} {{ \Illuminate\Support\Str::plural('time', $block['usage']) }}
+                                            </span>
+                                        </span>
+                                        <span x-show="addingRef === @js('block:' . $block['slug'])" x-cloak>
+                                            <svg class="h-4 w-4 animate-spin text-block" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                                        </span>
+                                    </span>
+                                </button>
+                            @endforeach
+
                             @foreach($library as $categoryName => $components)
                                 @foreach($components as $component)
                                     <button

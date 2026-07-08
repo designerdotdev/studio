@@ -29,8 +29,11 @@ class StudioServiceProvider extends ServiceProvider
         // Register services as singletons
         $this->app->singleton(StudioStorage::class);
         $this->app->singleton(PageRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\LayoutRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\BlockRepository::class);
         $this->app->singleton(ComponentRepository::class);
         $this->app->singleton(BladeGenerator::class);
+        $this->app->singleton(\Designer\Studio\Services\PublishService::class);
         $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
 
         // Register asset version for cache busting
@@ -48,11 +51,16 @@ class StudioServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
 
-        // Register page routes in booted callback so they override app routes
-        // (package boot() runs before app routes are loaded, so registering
-        // here in boot() would be overwritten by the app's GET / route)
+        // Register the page catch-all in a booted callback so it lands AFTER
+        // every app route (package boot() runs before app routes load — the
+        // app's own routes must always win over Studio pages). When routes
+        // are cached the cached copy already contains these static routes,
+        // so re-registering is skipped — pages are resolved from storage at
+        // request time, making the whole thing route:cache-safe.
         $this->app->booted(function () {
-            $this->registerPageRoutes();
+            if (!$this->app->routesAreCached()) {
+                $this->registerPageRoutes();
+            }
         });
 
         // NOTE: No migrations - we use JSON file storage!
@@ -108,7 +116,13 @@ class StudioServiceProvider extends ServiceProvider
                 $storage = $this->app->make(StudioStorage::class);
                 $storage->ensureDirectoryExists();
                 $storage->ensureDirectoryExists('pages');
+                $storage->ensureDirectoryExists('layouts');
+                $storage->ensureDirectoryExists('blocks');
                 $storage->ensureDirectoryExists('components/library');
+
+                if (config('studio.draft_mode', true)) {
+                    $this->app->make(\Designer\Studio\Services\PublishService::class)->ensureDraftSeeded();
+                }
             }
         });
     }
@@ -185,36 +199,46 @@ class StudioServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Two STATIC routes serve every published page — which pages exist is
+     * decided at request time by looking in storage, never at registration
+     * time. Route definitions that don't depend on content survive
+     * `route:cache` and pick up newly published pages instantly.
+     */
     protected function registerPageRoutes(): void
     {
         if (!config('studio.page_routing.enabled', true)) {
             return;
         }
 
-        $storagePath = config('studio.storage_path', storage_path('studio'));
-        $pagesPath = $storagePath . '/pages';
-
-        if (!is_dir($pagesPath)) {
-            return;
-        }
-
-        $files = glob($pagesPath . '/*.json');
-
-        if (empty($files)) {
-            return;
-        }
-
         $middleware = config('studio.page_routing.middleware', ['web']);
         $homeSlug = config('studio.page_routing.home_slug', 'home');
 
-        Route::middleware($middleware)->group(function () use ($files, $homeSlug) {
-            foreach ($files as $file) {
-                $slug = basename($file, '.json');
-                $uri = ($slug === $homeSlug) ? '/' : $slug;
-
-                Route::get($uri, [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
-                    ->defaults('slug', $slug);
+        Route::middleware($middleware)->group(function () use ($homeSlug) {
+            // The home page — only when the app hasn't claimed '/' itself
+            if (!$this->appDefinesRootRoute()) {
+                Route::get('/', [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
+                    ->defaults('slug', $homeSlug)
+                    ->name('studio.page.home');
             }
+
+            // Every other page: a single-segment catch-all, registered after
+            // all app routes so it can never shadow them. Unknown slugs 404
+            // in the controller.
+            Route::get('/{slug}', [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
+                ->where('slug', '[a-z0-9-]+')
+                ->name('studio.page.show');
         });
+    }
+
+    protected function appDefinesRootRoute(): bool
+    {
+        foreach (Route::getRoutes()->get('GET') as $route) {
+            if ($route->uri() === '/') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

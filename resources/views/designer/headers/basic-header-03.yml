@@ -1,0 +1,64 @@
+name: basic-header-03
+title: Basic Header 03
+description: Minimal header with a centered logo and nav links split on both sides
+category: headers
+tags:
+    - basic
+    - header
+    - navigation
+
+fields:
+    brand_name:
+        type: text
+        label: Brand name
+        default: "Atelier"
+        required: true
+
+    logo_svg:
+        type: textarea
+        label: Logo SVG
+        rows: 3
+        description: Paste inline SVG markup. Clear it to show the brand name only.
+        default: '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#171717"/></svg>'
+
+    nav_links_left:
+        type: repeater
+        label: Left navigation links
+        add_button_label: Add link
+        sub_fields:
+            text:
+                type: text
+                label: Link text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Shop"
+              url: "#"
+            - text: "Collections"
+              url: "#"
+            - text: "About"
+              url: "#"
+
+    nav_links_right:
+        type: repeater
+        label: Right navigation links
+        add_button_label: Add link
+        sub_fields:
+            text:
+                type: text
+                label: Link text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Journal"
+              url: "#"
+            - text: "Support"
+              url: "#"
+            - text: "Contact"
+              url: "#"

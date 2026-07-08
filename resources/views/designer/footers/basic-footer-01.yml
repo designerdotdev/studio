@@ -1,0 +1,52 @@
+name: basic-footer-01
+title: Basic Footer 01
+description: Single-row footer with logo, inline nav links, and copyright
+category: footers
+tags:
+    - basic
+    - footer
+    - simple
+
+fields:
+    logo_svg:
+        type: textarea
+        label: Logo SVG
+        rows: 3
+        description: Paste inline SVG markup. Clear it to show the company name only.
+        default: '<svg class="h-6 w-6 text-neutral-950" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect width="32" height="32" rx="8"></rect></svg>'
+
+    company_name:
+        type: text
+        label: Company name
+        default: "Acme"
+        required: true
+
+    links:
+        type: repeater
+        label: Nav links
+        add_button_label: Add link
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Features"
+              url: "#"
+            - text: "Pricing"
+              url: "#"
+            - text: "About"
+              url: "#"
+            - text: "Blog"
+              url: "#"
+            - text: "Contact"
+              url: "#"
+
+    copyright:
+        type: text
+        label: Copyright
+        default: "© 2026 Acme, Inc. All rights reserved."

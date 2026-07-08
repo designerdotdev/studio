@@ -1,0 +1,66 @@
+name: basic-features-02
+title: Basic Features 02
+description: Text and checklist on the left, image on the right
+category: features
+tags:
+    - basic
+    - features
+    - split
+    - image
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        description: Small label above the heading. Clear to hide.
+        default: "Why it works"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Keep every project in one place"
+        required: true
+
+    description:
+        type: textarea
+        label: Description
+        default: "Stop stitching together docs, spreadsheets, and chat threads. Plans, files, and decisions stay attached to the work itself."
+
+    features:
+        type: repeater
+        label: Feature list
+        add_button_label: Add item
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "A short benefit"
+        default:
+            - text: "Shared timelines that update as work moves"
+            - text: "Comments and approvals on the page itself"
+            - text: "Version history for every change"
+
+    show_button:
+        type: toggle
+        label: Show button
+        default: true
+
+    button_text:
+        type: text
+        label: Button text
+        default: "Learn more"
+
+    button_url:
+        type: url
+        label: Button link
+        default: "#"
+
+    image:
+        type: image
+        label: Image
+        default: "https://placehold.co/1200x900/f4f4f5/a1a1aa?text=Image"
+
+    image_alt:
+        type: text
+        label: Image alt text
+        default: "Product screenshot"
