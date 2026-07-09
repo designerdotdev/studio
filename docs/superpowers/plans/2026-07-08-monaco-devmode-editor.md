@@ -539,14 +539,26 @@ Replace `ensureEditors()`:
 with:
 
 ```js
-                async ensureEditors() {
-                    if (this.editors) return;
-                    this.editors = {
-                        html: await window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
-                        yaml: await window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
-                    };
+                ensureEditors() {
+                    // Assigned synchronously so overlapping openEditor() calls
+                    // share one in-flight boot instead of double-creating
+                    // Monaco instances on the same hosts.
+                    if (!this._editorsPromise) {
+                        this._editorsPromise = (async () => {
+                            this.editors = {
+                                html: await window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
+                                yaml: await window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
+                            };
+                        })().catch((error) => {
+                            this._editorsPromise = null; // allow retry after a failed load
+                            throw error;
+                        });
+                    }
+                    return this._editorsPromise;
                 },
 ```
+
+> **Amended 2026-07-08 (review finding):** the original `async ensureEditors() { if (this.editors) return; … }` guard raced — `this.editors` isn't assigned until both awaits resolve, so two `studio:open-code-editor` dispatches before the first Monaco load finished would each create editors on the same host nodes. The promise-guard version above closes the window.
 
 And in `openEditor(detail)`, replace:
 
