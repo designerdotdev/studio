@@ -34,6 +34,8 @@ class StudioAssets
 
         $prefix = config('studio.path', 'studio');
 
-        return url($prefix . '/assets/' . $file) . '?v=' . app('studio.asset.version');
+        $dist = dirname(__DIR__, 2) . '/dist/' . $file;
+
+        return url($prefix . '/assets/' . $file) . '?v=' . (is_file($dist) ? filemtime($dist) : 'dev');
     }
 }

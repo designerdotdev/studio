@@ -985,7 +985,7 @@
                 },
 
                 async save() {
-                    if (this.saving || !this.ref || !this.editors) return;
+                    if (this.saving || this.loading || !this.ref || !this.editors) return;
                     this.saving = true;
                     this.error = '';
                     try {

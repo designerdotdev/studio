@@ -50,7 +50,7 @@ There are no tests or linting configured in this package. Verify changes against
 **Controllers** (`src/Http/Controllers/`):
 - `StudioController` — editor page, iframe doc, component/template previews, page CRUD API, image upload (`public/studio-uploads/`), Blade generation
 - `PageController` — public auto-routed pages (skips hidden sections, resolves variables with type-aware defaults)
-- `AssetController` — serves `dist/studio.js` + `dist/studio-css.css`
+- `AssetController` — serves the compiled `dist/` assets (allowlist mirrors `StudioAssets::FILES`)
 
 **DTOs**: `PageData`, `ComponentData` — `ComponentData::resolveVariables($overrides, usePreviewDefaults:)` is the single source of truth for merging stored values over field defaults (repeaters always resolve to arrays).
 
@@ -105,5 +105,5 @@ php artisan studio:uninstall      # Remove studio data (--keep-generated, --keep
 
 - The app's copy of `resources/views/designer/` wins over the package copy (DesignSyncService). When package sections change during development, refresh the host app's copy or delete it so it re-publishes.
 - `Livewire.dispatch()` names and the postMessage protocol (`studio:*`) are shared contracts between `EditorPanel`, `home.blade.php`, `iframe.blade.php`, and `studio.js` — change them everywhere or nowhere.
-- After editing `resources/css|js`, run `npm run build` (or keep `npm run dev` watching). Asset URLs come from `Support\StudioAssets::url()`: a published copy in `public/vendor/studio` wins (static file, filemtime cache buster); otherwise `AssetController` serves the package `dist/` with a manifest-hash buster. If the editor looks stale, check for a forgotten published copy (`php artisan studio:publish --remove`).
+- After editing `resources/css|js`, run `npm run build` (or keep `npm run dev` watching). Asset URLs come from `Support\StudioAssets::url()`: a published copy in `public/vendor/studio` wins (static file, filemtime cache buster); otherwise `AssetController` serves the package `dist/` with a per-file mtime buster. If the editor looks stale, check for a forgotten published copy (`php artisan studio:publish --remove`).
 - The compiled asset list lives in several places that must stay in sync when files are added: `StudioAssets::FILES` (drives `studio:publish` + the provider's `studio-assets` publish tag), `AssetController::$allowedFiles` (adds MIME types), Vite's `ASSET_FILES` (`vite.config.js`), and `MONACO_FILES` in `esbuild.monaco.mjs`.

@@ -37,15 +37,6 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(\Designer\Studio\Services\PublishService::class);
         $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
         $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
-
-        // Register asset version for cache busting
-        $this->app->singleton('studio.asset.version', function () {
-            $manifestPath = __DIR__ . '/../dist/.vite/manifest.json';
-            if (file_exists($manifestPath)) {
-                return md5_file($manifestPath);
-            }
-            return 'dev';
-        });
     }
 
     public function boot(): void
