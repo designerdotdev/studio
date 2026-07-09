@@ -22,7 +22,7 @@
                         this.sidebar = !this.sidebar;
                         localStorage.setItem('studio.sidebar', this.sidebar ? '1' : '0');
                     },
-                    devMode: localStorage.getItem('studio.devmode') === '1',
+                    devMode: localStorage.getItem('studio.devmode') !== '0',
                     toggleDevMode() {
                         this.devMode = !this.devMode;
                         localStorage.setItem('studio.devmode', this.devMode ? '1' : '0');

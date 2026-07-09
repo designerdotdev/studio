@@ -142,6 +142,9 @@ const StudioEditor = {
             if (type) this.send(type, payload);
         });
 
+        // Clicking anywhere in the editor chrome closes the canvas context menu
+        document.addEventListener('mousedown', () => this.send('studio:menu-close'), true);
+
         // Structural changes persisted → reload the preview document
         window.addEventListener('studio:refresh-preview', () => this.refreshPreview());
 
@@ -295,10 +298,11 @@ const StudioPreview = {
         this.templates = templates || {};
         this.blocks = blocks || {};
 
-        // Dev-mode chrome (Edit-code buttons) follows the editor's toggle
+        // Dev-mode chrome (Edit-code buttons) follows the editor's toggle —
+        // on by default, sticky once the user turns it off
         document.documentElement.classList.toggle(
             'studio-devmode',
-            localStorage.getItem('studio.devmode') === '1'
+            localStorage.getItem('studio.devmode') !== '0'
         );
 
         this.setupContextMenu();
@@ -332,6 +336,10 @@ const StudioPreview = {
 
                 case 'studio:devmode':
                     document.documentElement.classList.toggle('studio-devmode', !!data.on);
+                    break;
+
+                case 'studio:menu-close':
+                    this.closeMenu();
                     break;
             }
         });
@@ -465,6 +473,17 @@ const StudioPreview = {
     },
 
     setupContextMenu() {
+        // Close on ANY click that isn't inside the menu. Capture phase, so
+        // section handlers that stopPropagation() can't keep it open.
+        document.addEventListener('click', (event) => {
+            if (this.menu && !this.menu.contains(event.target)) {
+                this.closeMenu();
+            }
+        }, true);
+
+        // Clicking the editor chrome moves focus out of the iframe
+        window.addEventListener('blur', () => this.closeMenu());
+
         document.addEventListener('contextmenu', (event) => {
             // Right-clicking the menu itself keeps it open
             if (event.target.closest && event.target.closest('.studio-menu')) {
