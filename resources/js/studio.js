@@ -122,6 +122,12 @@ const StudioEditor = {
                     window.Livewire?.dispatch('studio:section-action', { id: data.sectionId, action: data.action });
                     break;
 
+                case 'studio:open-code':
+                    window.dispatchEvent(new CustomEvent('studio:open-code-editor', {
+                        detail: { ref: data.ref, title: data.title },
+                    }));
+                    break;
+
                 case 'studio:key':
                     this.handleShortcut(data);
                     break;
@@ -193,6 +199,13 @@ const StudioEditor = {
             return;
         }
 
+        // Cmd/Ctrl+K — open the section library
+        if (meta && (key === 'k' || key === 'K')) {
+            preventDefault();
+            window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} }));
+            return;
+        }
+
         if (typing) return;
 
         if (key === 'Escape') {
@@ -209,6 +222,16 @@ const StudioEditor = {
         if (meta && (key === 'd' || key === 'D')) {
             preventDefault();
             window.Livewire?.dispatch('studio:section-action', { id: this.selectedId, action: 'duplicate' });
+            return;
+        }
+
+        // Cmd/Ctrl+↑/↓ — reorder the selected section
+        if (meta && (key === 'ArrowUp' || key === 'ArrowDown')) {
+            preventDefault();
+            window.Livewire?.dispatch('studio:section-action', {
+                id: this.selectedId,
+                action: key === 'ArrowUp' ? 'move-up' : 'move-down',
+            });
             return;
         }
 
@@ -272,6 +295,14 @@ const StudioPreview = {
         this.templates = templates || {};
         this.blocks = blocks || {};
 
+        // Dev-mode chrome (Edit-code buttons) follows the editor's toggle
+        document.documentElement.classList.toggle(
+            'studio-devmode',
+            localStorage.getItem('studio.devmode') === '1'
+        );
+
+        this.setupContextMenu();
+
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
             if (!event.data || typeof event.data.type !== 'string') return;
@@ -298,6 +329,10 @@ const StudioPreview = {
                 case 'studio:deselect':
                     this.clearSelection();
                     break;
+
+                case 'studio:devmode':
+                    document.documentElement.classList.toggle('studio-devmode', !!data.on);
+                    break;
             }
         });
 
@@ -309,18 +344,26 @@ const StudioPreview = {
 
         document.addEventListener('submit', (event) => event.preventDefault(), true);
 
-        // Click on empty canvas space deselects
+        // Click on empty canvas space deselects (and closes the context menu)
         document.addEventListener('click', () => {
+            this.closeMenu();
             this.clearSelection();
             this.post('studio:deselected');
         });
 
         // Forward keyboard shortcuts to the editor
         document.addEventListener('keydown', (event) => {
+            // While the context menu is open, Escape only closes it
+            if (event.key === 'Escape' && this.menu) {
+                event.preventDefault();
+                this.closeMenu();
+                return;
+            }
+
             const relevant = event.key === 'Escape'
                 || event.key === 'Backspace'
                 || event.key === 'Delete'
-                || ((event.metaKey || event.ctrlKey) && ['d', 'D', 's', 'S'].includes(event.key));
+                || ((event.metaKey || event.ctrlKey) && ['d', 'D', 's', 'S', 'k', 'K', 'ArrowUp', 'ArrowDown'].includes(event.key));
 
             if (!relevant) return;
 
@@ -395,6 +438,168 @@ const StudioPreview = {
     addAt(scope, index, event) {
         if (event) event.stopPropagation();
         this.post('studio:add-section', { scope, index });
+    },
+
+    openCode(ref, title, event) {
+        if (event) event.stopPropagation();
+        this.post('studio:open-code', { ref, title });
+    },
+
+    /* --- context menu ---------------------------------------------- */
+
+    menu: null,
+    menuCloseTimer: null,
+
+    MENU_ICONS: {
+        up: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25Z" clip-rule="evenodd"/></svg>',
+        down: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.53 13.53a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 1.06-1.06L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25Z" clip-rule="evenodd"/></svg>',
+        plusAbove: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 6.75a.75.75 0 0 0-1.5 0v2.5h-2.5a.75.75 0 0 0 0 1.5h2.5v2.5a.75.75 0 0 0 1.5 0v-2.5h2.5a.75.75 0 0 0 0-1.5h-2.5v-2.5Z"/><path d="M3.75 2a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H3.75Z"/></svg>',
+        plusBelow: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.25a.75.75 0 0 0-1.5 0v2.5h-2.5a.75.75 0 0 0 0 1.5h2.5v2.5a.75.75 0 0 0 1.5 0v-2.5h2.5a.75.75 0 0 0 0-1.5h-2.5v-2.5Z"/><path d="M3.75 16.5a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H3.75Z"/></svg>',
+        duplicate: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>',
+        global: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.196 12.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 12.87Z"/><path d="M3.196 8.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 8.87Z"/><path d="M10.38 1.103a.75.75 0 0 0-.76 0l-7.25 4.25a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .76 0l7.25-4.25a.75.75 0 0 0 0-1.294l-7.25-4.25Z"/></svg>',
+        code: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>',
+        show: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>',
+        hide: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>',
+        trash: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>',
+        library: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>',
+    },
+
+    setupContextMenu() {
+        document.addEventListener('contextmenu', (event) => {
+            // Right-clicking the menu itself keeps it open
+            if (event.target.closest && event.target.closest('.studio-menu')) {
+                event.preventDefault();
+                return;
+            }
+
+            event.preventDefault();
+            this.closeMenu(true);
+
+            const wrapper = event.target.closest ? event.target.closest('[data-section]') : null;
+
+            if (wrapper) {
+                this.select(wrapper.dataset.section);
+                this.openMenu(event.clientX, event.clientY, this.sectionMenuItems(wrapper));
+            } else {
+                this.openMenu(event.clientX, event.clientY, [
+                    { header: 'Page' },
+                    { label: 'Add section…', icon: 'library', kbd: '⌘K', onClick: () => this.addAt('page', null) },
+                ]);
+            }
+        });
+
+        window.addEventListener('scroll', () => this.closeMenu(), { passive: true });
+        window.addEventListener('resize', () => this.closeMenu());
+    },
+
+    sectionMenuItems(wrapper) {
+        const d = wrapper.dataset;
+        const id = d.section;
+        const scope = d.scope || 'page';
+        const docIndex = parseInt(d.docIndex || '0', 10);
+        const isBlock = d.block === '1';
+        const isLayout = scope === 'layout';
+        const hidden = d.hidden === '1';
+        const devMode = document.documentElement.classList.contains('studio-devmode');
+        const scopeTag = isBlock ? 'Global block' : (isLayout ? 'Layout' : 'Section');
+
+        const items = [
+            { header: `${d.title} — ${scopeTag}` },
+            { label: 'Move up', icon: 'up', kbd: '⌘↑', disabled: d.docFirst === '1', onClick: () => this.action(id, 'move-up') },
+            { label: 'Move down', icon: 'down', kbd: '⌘↓', disabled: d.docLast === '1', onClick: () => this.action(id, 'move-down') },
+            'sep',
+            { label: isLayout ? 'Add to layout above' : 'Add section above', icon: 'plusAbove', onClick: () => this.addAt(scope, docIndex) },
+            { label: isLayout ? 'Add to layout below' : 'Add section below', icon: 'plusBelow', onClick: () => this.addAt(scope, docIndex + 1) },
+            'sep',
+            { label: 'Duplicate', icon: 'duplicate', kbd: '⌘D', onClick: () => this.action(id, 'duplicate') },
+        ];
+
+        if (!isBlock && !isLayout) {
+            items.push({ label: 'Make global', icon: 'global', onClick: () => this.action(id, 'make-global') });
+        }
+
+        if (devMode) {
+            items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.ref, d.title) });
+        }
+
+        items.push(
+            { label: hidden ? 'Show section' : 'Hide section', icon: hidden ? 'show' : 'hide', onClick: () => this.action(id, 'toggle-hidden') },
+            'sep',
+            { label: 'Delete', icon: 'trash', kbd: '⌫', danger: true, onClick: () => this.action(id, 'delete') },
+        );
+
+        return items;
+    },
+
+    openMenu(x, y, items) {
+        clearTimeout(this.menuCloseTimer);
+
+        const menu = document.createElement('div');
+        menu.className = 'studio-menu';
+
+        for (const item of items) {
+            if (item === 'sep') {
+                const sep = document.createElement('div');
+                sep.className = 'studio-menu-sep';
+                menu.appendChild(sep);
+                continue;
+            }
+
+            if (item.header) {
+                const header = document.createElement('div');
+                header.className = 'studio-menu-header';
+                header.textContent = item.header;
+                menu.appendChild(header);
+                continue;
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'studio-menu-item' + (item.danger ? ' studio-menu-danger' : '');
+            button.disabled = !!item.disabled;
+            button.innerHTML = (this.MENU_ICONS[item.icon] || '')
+                + `<span>${item.label}</span>`
+                + (item.kbd ? `<span class="studio-menu-kbd">${item.kbd}</span>` : '');
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.closeMenu();
+                item.onClick?.();
+            });
+            menu.appendChild(button);
+        }
+
+        document.body.appendChild(menu);
+        this.menu = menu;
+
+        // Clamp inside the viewport, flipping the grow direction (and the
+        // elastic transform origin) when the pointer is near an edge
+        const rect = menu.getBoundingClientRect();
+        const pad = 8;
+        const flipX = x + rect.width + pad > window.innerWidth;
+        const flipY = y + rect.height + pad > window.innerHeight;
+        const left = flipX ? Math.max(pad, x - rect.width) : x;
+        const top = flipY ? Math.max(pad, y - rect.height) : y;
+
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+        menu.style.transformOrigin = `${flipX ? 'right' : 'left'} ${flipY ? 'bottom' : 'top'}`;
+
+        requestAnimationFrame(() => menu.classList.add('is-open'));
+    },
+
+    closeMenu(instant = false) {
+        if (!this.menu) return;
+
+        const menu = this.menu;
+        this.menu = null;
+
+        if (instant) {
+            menu.remove();
+            return;
+        }
+
+        menu.classList.add('is-closing');
+        this.menuCloseTimer = setTimeout(() => menu.remove(), 130);
     },
 
     /* --- live re-rendering ----------------------------------------- */

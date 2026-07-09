@@ -68,6 +68,11 @@ used for nav dropdowns and footer link columns. Children live in `$item['childre
 for the starting content when a user adds the section. Usually the field `default`s are enough —
 make them excellent, because they *are* the demo content.
 
+`fixed: true` (optional, top-level) marks a section whose root element is `position: fixed`
+(sticky headers). It renders pinned on the live site, but the editor canvas shows it **in place**
+with a "Fixed" tag on its name chip so the page stays easy to work on. Only use it when the
+section's root really is fixed.
+
 **Canonical categories** (display order): `banners`, `headers`, `heroes`, `logos`, `features`,
 `stats`, `content`, `gallery`, `testimonials`, `pricing`, `faq`, `team`, `blog`, `contact`,
 `newsletter`, `cta`, `footers`.

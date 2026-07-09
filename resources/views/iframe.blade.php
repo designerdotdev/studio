@@ -354,6 +354,145 @@
                 box-shadow: 0 8px 24px -6px rgba(76, 125, 250, 0.55);
             }
 
+            /* Fixed-position sections (sticky headers) — rendered in place in
+               the editor so the page stays easy to work on; the chip tag says
+               why it behaves differently on the live site */
+            .studio-section.is-fixed [data-section-content] > * {
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                right: auto !important;
+                bottom: auto !important;
+            }
+
+            .studio-chip-fixed {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+            }
+
+            /* Dev-mode-only chrome (toggled from the editor via localStorage) */
+            .studio-devmode-only {
+                display: none !important;
+            }
+
+            html.studio-devmode .studio-devmode-only {
+                display: flex !important;
+            }
+
+            /* ---- Context menu — dark, Linear-grade, elastic ---- */
+            .studio-menu {
+                position: fixed;
+                z-index: 2147483008;
+                min-width: 216px;
+                padding: 5px;
+                border-radius: 12px;
+                background: rgba(23, 23, 28, 0.96);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow:
+                    0 0 0 1px rgba(0, 0, 0, 0.45),
+                    0 16px 48px -12px rgba(0, 0, 0, 0.65),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(16px) saturate(1.4);
+                -webkit-backdrop-filter: blur(16px) saturate(1.4);
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                opacity: 0;
+                transform: scale(0.9);
+                transition:
+                    opacity 140ms ease,
+                    transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            .studio-menu.is-open {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            .studio-menu.is-closing {
+                opacity: 0;
+                transform: scale(0.96);
+                transition: opacity 110ms ease, transform 110ms ease;
+                pointer-events: none;
+            }
+
+            .studio-menu-header {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 9px 6px;
+                font-size: 10.5px;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: rgba(255, 255, 255, 0.38);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .studio-menu-item {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                width: 100%;
+                padding: 6px 9px;
+                border: 0;
+                border-radius: 8px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.82);
+                font-family: inherit;
+                font-size: 12.5px;
+                font-weight: 500;
+                letter-spacing: -0.005em;
+                text-align: left;
+                cursor: pointer;
+                transition: background 90ms ease, color 90ms ease;
+                white-space: nowrap;
+            }
+
+            .studio-menu-item:hover {
+                background: rgba(255, 255, 255, 0.09);
+                color: #fff;
+            }
+
+            .studio-menu-item:disabled {
+                opacity: 0.32;
+                pointer-events: none;
+            }
+
+            .studio-menu-item svg {
+                width: 14px;
+                height: 14px;
+                flex-shrink: 0;
+                opacity: 0.72;
+            }
+
+            .studio-menu-item:hover svg {
+                opacity: 1;
+            }
+
+            .studio-menu-item .studio-menu-kbd {
+                margin-left: auto;
+                padding-left: 18px;
+                font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+                font-size: 10.5px;
+                font-weight: 500;
+                color: rgba(255, 255, 255, 0.32);
+            }
+
+            .studio-menu-item.studio-menu-danger:hover {
+                background: rgba(243, 114, 114, 0.14);
+                color: #f89b9b;
+            }
+
+            .studio-menu-sep {
+                height: 1px;
+                margin: 4px 7px;
+                background: rgba(255, 255, 255, 0.08);
+            }
+
             /* Hidden sections — dimmed with stripes in the editor only */
             .studio-section.is-hidden [data-section-content] {
                 opacity: 0.35;
@@ -530,7 +669,14 @@
             <div
                 data-section="{{ $section['id'] }}"
                 data-scope="{{ $section['scope'] }}"
-                class="studio-section {{ $section['hidden'] ? 'is-hidden' : '' }} {{ $isLayout ? 'is-layout' : '' }} {{ $isBlock ? 'is-block' : '' }}"
+                data-ref="{{ $section['ref'] }}"
+                data-title="{{ $section['title'] }}"
+                data-doc-index="{{ $section['docIndex'] }}"
+                data-doc-first="{{ $section['docFirst'] ? '1' : '0' }}"
+                data-doc-last="{{ $section['docLast'] ? '1' : '0' }}"
+                data-hidden="{{ $section['hidden'] ? '1' : '0' }}"
+                data-block="{{ $isBlock ? '1' : '0' }}"
+                class="studio-section {{ $section['hidden'] ? 'is-hidden' : '' }} {{ $isLayout ? 'is-layout' : '' }} {{ $isBlock ? 'is-block' : '' }} {{ $section['fixed'] ? 'is-fixed' : '' }}"
                 onclick="Studio.preview.select('{{ $section['id'] }}', event)"
             >
                 @php
@@ -574,6 +720,12 @@
                     @elseif($isLayout)
                         <span class="studio-chip-scope">Layout</span>
                     @endif
+                    @if($section['fixed'])
+                        <span class="studio-chip-scope studio-chip-fixed" title="Position: fixed on the live site — shown in place here so the page stays easy to work on">
+                            <svg viewBox="0 0 20 20" fill="currentColor" style="width:9px;height:9px"><path d="M10 2a1 1 0 0 1 1 1v5.586l2.293 2.293A1 1 0 0 1 12.586 13H10.75v4.25a.75.75 0 0 1-1.5 0V13H7.414a1 1 0 0 1-.707-1.707L9 9.586V3a1 1 0 0 1 1-1Z"/></svg>
+                            Fixed
+                        </span>
+                    @endif
                 </span>
 
                 @if($section['hidden'])
@@ -600,6 +752,11 @@
                     <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'duplicate', event)" title="Duplicate (⌘D)">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
                     </button>
+                    @if(\Designer\Studio\Support\DevMode::enabled())
+                        <button type="button" class="studio-devmode-only" onclick="Studio.preview.openCode('{{ $section['ref'] }}', '{{ $section['title'] }}', event)" title="Edit source code — .html + .yml (dev mode)">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                        </button>
+                    @endif
                     <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'toggle-hidden', event)" title="{{ $section['hidden'] ? 'Show' : 'Hide' }}">
                         @if($section['hidden'])
                             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>

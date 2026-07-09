@@ -18,6 +18,7 @@ class ComponentData
         public readonly array $fields,
         public readonly array $preview_variables,
         public readonly string $source,
+        public readonly bool $fixed = false,
     ) {}
 
     public static function fromArray(array $data): self
@@ -36,6 +37,7 @@ class ComponentData
             fields: $data['fields'] ?? [],
             preview_variables: $data['preview_variables'] ?? [],
             source: $data['source'] ?? 'local',
+            fixed: (bool) ($data['fixed'] ?? false),
         );
     }
 
@@ -100,6 +102,7 @@ class ComponentData
             'fields' => $this->fields,
             'preview_variables' => $this->preview_variables,
             'source' => $this->source,
+            'fixed' => $this->fixed,
         ];
     }
 }

@@ -1,5 +1,12 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap">
-<header class="relative z-40 w-full border-b border-[#ebe4d9]/60 bg-[#faf8f5]" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif" x-data="{ mobileOpen: false }">
+<header
+    class="fixed top-0 z-50 w-full transition-all duration-500"
+    style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif"
+    x-data="{ mobileOpen: false, scrolled: false }"
+    x-init="scrolled = window.scrollY > 10"
+    @scroll.window="scrolled = window.scrollY > 10"
+    :class="scrolled ? 'border-b border-[#ebe4d9]/60 bg-[#faf8f5]/40 backdrop-blur-xl' : 'border-b border-transparent'"
+>
     <div class="mx-auto w-full max-w-2xl px-6">
         <div class="flex h-16 items-center justify-between">
             <a href="/" class="flex w-auto items-center gap-1">

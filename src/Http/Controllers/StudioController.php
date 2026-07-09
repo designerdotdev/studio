@@ -203,6 +203,7 @@ class StudioController extends Controller
                     'ref' => $component->name,
                     'title' => $component->title,
                     'html' => $component->html,
+                    'fixed' => $component->fixed,
                     'hidden' => (bool) ($instance['hidden'] ?? false),
                     'scope' => $scope,
                     'block' => $instance['block_ref'] ?? null,
