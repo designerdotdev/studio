@@ -2,11 +2,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
+    "build": "vite build && node esbuild.monaco.mjs",
+    "build:monaco": "node esbuild.monaco.mjs",
+    "dev": "node esbuild.monaco.mjs && vite build --watch"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "esbuild": "^0.25.0",
+    "monaco-editor": "^0.55.1",
     "tailwindcss": "^4.0.0",
     "vite": "^6.0.0"
   },
