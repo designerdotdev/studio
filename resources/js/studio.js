@@ -1,12 +1,6 @@
 import blade from './blade.js';
 import Sortable from 'sortablejs';
 import collapse from '@alpinejs/collapse';
-import { basicSetup, EditorView } from 'codemirror';
-import { keymap } from '@codemirror/view';
-import { indentWithTab } from '@codemirror/commands';
-import { html as htmlLang } from '@codemirror/lang-html';
-import { yaml as yamlLang } from '@codemirror/lang-yaml';
-import { oneDark } from '@codemirror/theme-one-dark';
 
 // Client-side Blade renderer (used by the preview iframe)
 window.blade = blade;
@@ -679,27 +673,51 @@ window.Studio = {
     codeModalOpen: false,
 
     /**
-     * CodeMirror 6 instance for the dev-mode source editor.
-     * Returns { view, getValue, setValue }.
+     * Lazy-loading Monaco factory for the dev-mode source editor.
+     * Injects the slim Monaco bundle + CSS on first use — studio.js
+     * itself carries no editor code. Resolves { editor, getValue, setValue }.
+     * Asset URLs come from window.__studioMonacoAssets, rendered by the
+     * dev-mode block in home.blade.php.
      */
-    codeEditor(parent, { language = 'html', doc = '' } = {}) {
-        const view = new EditorView({
-            parent,
-            doc,
-            extensions: [
-                basicSetup,
-                keymap.of([indentWithTab]),
-                language === 'yaml' ? yamlLang() : htmlLang(),
-                oneDark,
-                EditorView.lineWrapping,
-            ],
+    async codeEditor(parent, { language = 'html', doc = '' } = {}) {
+        const assets = window.__studioMonacoAssets;
+
+        if (!assets) {
+            throw new Error('The code editor is only available in dev mode.');
+        }
+
+        if (!window._studioMonacoPromise) {
+            window._studioMonacoPromise = new Promise((resolve, reject) => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = assets.css;
+                document.head.appendChild(link);
+
+                const script = document.createElement('script');
+                script.src = assets.script;
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Could not load the code editor.'));
+                document.head.appendChild(script);
+            }).catch((error) => {
+                // Allow the next open to retry a failed load
+                window._studioMonacoPromise = null;
+                throw error;
+            });
+        }
+
+        await window._studioMonacoPromise;
+
+        const editor = window.StudioMonaco.create(parent, {
+            language,
+            value: doc,
+            workers: assets.workers,
         });
 
         return {
-            view,
-            getValue: () => view.state.doc.toString(),
+            editor,
+            getValue: () => editor.getValue(),
             setValue(value) {
-                view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+                editor.setValue(value);
             },
         };
     },

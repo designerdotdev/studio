@@ -723,22 +723,13 @@
         }
     }
 
-    /* Dev-mode source editor (CodeMirror host) */
-    .s-code-pane .cm-editor {
-        height: 100%;
-        font-size: 12.5px;
+    /* Monaco paints its own theme; the pane bg covers the lazy-load gap */
+    .s-code-pane {
         background: var(--color-shell);
+    }
+
+    .s-code-pane .monaco-editor {
         outline: none;
-    }
-
-    .s-code-pane .cm-gutters {
-        background: var(--color-shell);
-        border-right: 1px solid var(--color-line);
-    }
-
-    .s-code-pane .cm-scroller {
-        font-family: var(--font-mono);
-        line-height: 1.6;
     }
 
     /* Empty-state dashed tile */

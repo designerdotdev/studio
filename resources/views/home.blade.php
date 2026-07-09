@@ -913,6 +913,16 @@
     {{-- Dev mode — section source editor                              --}}
     {{-- ============================================================ --}}
     @if(\Designer\Studio\Support\DevMode::enabled())
+    <script>
+        window.__studioMonacoAssets = {
+            script: @js(\Designer\Studio\Support\StudioAssets::url('studio-monaco.js')),
+            css: @js(\Designer\Studio\Support\StudioAssets::url('studio-monaco.css')),
+            workers: {
+                editor: @js(\Designer\Studio\Support\StudioAssets::url('monaco-editor-worker.js')),
+                html: @js(\Designer\Studio\Support\StudioAssets::url('monaco-html-worker.js')),
+            },
+        };
+    </script>
     <div
             x-data="{
                 open: false,
@@ -926,11 +936,11 @@
                 editors: null,
                 base: @js(url(trim(config('studio.path', 'studio'), '/') . '/api/dev/components')),
 
-                ensureEditors() {
+                async ensureEditors() {
                     if (this.editors) return;
                     this.editors = {
-                        html: window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
-                        yaml: window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
+                        html: await window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
+                        yaml: await window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
                     };
                 },
 
@@ -948,7 +958,7 @@
                         const data = await response.json().catch(() => ({}));
                         if (!response.ok || !data.success) throw new Error(data.message || 'Could not load the source files.');
                         await this.$nextTick();
-                        this.ensureEditors();
+                        await this.ensureEditors();
                         this.editors.html.setValue(data.html);
                         this.editors.yaml.setValue(data.yaml);
                         this.paths = data.paths;
