@@ -12,6 +12,7 @@ use Designer\Studio\Services\BladeGenerator;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\StudioStorage;
+use Designer\Studio\Support\StudioAssets;
 use Designer\Studio\View\Components\Layouts\App;
 use Designer\Studio\View\Components\Layouts\Iframe;
 use Illuminate\Filesystem\Filesystem;
@@ -102,10 +103,11 @@ class StudioServiceProvider extends ServiceProvider
                 __DIR__ . '/../resources/views/designer' => resource_path('views/designer'),
             ], 'studio-designs');
 
-            $this->publishes([
-                __DIR__ . '/../dist/studio.js' => public_path('vendor/studio/studio.js'),
-                __DIR__ . '/../dist/studio-css.css' => public_path('vendor/studio/studio-css.css'),
-            ], 'studio-assets');
+            $publishableAssets = [];
+            foreach (StudioAssets::FILES as $file) {
+                $publishableAssets[__DIR__ . '/../dist/' . $file] = public_path(StudioAssets::PUBLISH_PATH . '/' . $file);
+            }
+            $this->publishes($publishableAssets, 'studio-assets');
         }
 
         // Auto-publish design files on first boot if not already present

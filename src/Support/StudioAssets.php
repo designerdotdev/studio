@@ -12,7 +12,15 @@ namespace Designer\Studio\Support;
  */
 class StudioAssets
 {
-    public const FILES = ['studio.js', 'studio-css.css'];
+    public const FILES = [
+        'studio.js',
+        'studio-css.css',
+        'studio-monaco.js',
+        'studio-monaco.css',
+        'monaco-editor-worker.js',
+        'monaco-html-worker.js',
+        'codicon.ttf',
+    ];
 
     public const PUBLISH_PATH = 'vendor/studio';
 

@@ -10,6 +10,11 @@ class AssetController
     protected array $allowedFiles = [
         'studio.js' => 'application/javascript',
         'studio-css.css' => 'text/css',
+        'studio-monaco.js' => 'application/javascript',
+        'studio-monaco.css' => 'text/css',
+        'monaco-editor-worker.js' => 'application/javascript',
+        'monaco-html-worker.js' => 'application/javascript',
+        'codicon.ttf' => 'font/ttf',
     ];
 
     public function __invoke(Request $request, string $file): Response
