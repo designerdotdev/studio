@@ -64,6 +64,8 @@ class DesignSyncService
 
         $data = Yaml::parseFile($basePath . '.yml');
         $data['html'] = file_get_contents($basePath . '.html');
+        // Always present so removing the key from the yml clears the flag
+        $data['fixed'] = (bool) ($data['fixed'] ?? false);
 
         return $data;
     }
@@ -150,6 +152,7 @@ class DesignSyncService
     protected function isDirty(\Designer\Studio\DataTransferObjects\ComponentData $existing, array $data): bool
     {
         return $existing->html !== ($data['html'] ?? '')
+            || $existing->fixed !== (bool) ($data['fixed'] ?? false)
             || $existing->title !== ($data['title'] ?? 'Untitled Component')
             || $existing->description !== ($data['description'] ?? '')
             || $existing->category !== ($data['category'] ?? 'general')

@@ -1,7 +1,8 @@
 name: atlas-header
 title: Atlas header
-description: Warm minimal navbar with centered rolling links and pill actions
+description: Fixed frosted navbar with centered rolling links and pill actions
 category: headers
+fixed: true
 tags:
     - header
     - navigation

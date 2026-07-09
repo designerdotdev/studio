@@ -367,33 +367,6 @@
         scale: 1;
     }
 
-    /* Sidebar-reveal button — hidden under the menu button, slides out and
-       pushes the nav arrows right when the sidebar is collapsed */
-    .s-reveal {
-        position: relative;
-        z-index: -1;
-        width: 0;
-        margin-left: -0.375rem; /* cancel the topbar gap while hidden */
-        overflow: hidden;
-        transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1), margin-left 260ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .s-reveal > button {
-        transform: translateX(-36px);
-        opacity: 0;
-        transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease 40ms;
-    }
-
-    .s-reveal.is-out {
-        width: 32px;
-        margin-left: 0;
-    }
-
-    .s-reveal.is-out > button {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
     /* Sidebar panel icon — the inner bar previews the action on hover:
        collapse buttons thin it out, expand buttons widen it */
     .s-panel-icon-bar {
