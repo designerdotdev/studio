@@ -47,7 +47,10 @@ export default defineConfig({
     ],
     build: {
         outDir: 'dist',
-        emptyOutDir: true,
+        // esbuild.monaco.mjs also writes into dist/; all outputs have fixed
+        // names, so never wipe the directory (watch mode would delete the
+        // Monaco assets at startup otherwise).
+        emptyOutDir: false,
         manifest: true,
         rollupOptions: {
             input: {
