@@ -934,14 +934,25 @@
                 error: '',
                 paths: { html: '', yaml: '' },
                 editors: null,
+                _editorsPromise: null,
                 base: @js(url(trim(config('studio.path', 'studio'), '/') . '/api/dev/components')),
 
-                async ensureEditors() {
-                    if (this.editors) return;
-                    this.editors = {
-                        html: await window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
-                        yaml: await window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
-                    };
+                ensureEditors() {
+                    // Assigned synchronously so overlapping openEditor() calls
+                    // share one in-flight boot instead of double-creating
+                    // Monaco instances on the same hosts.
+                    if (!this._editorsPromise) {
+                        this._editorsPromise = (async () => {
+                            this.editors = {
+                                html: await window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
+                                yaml: await window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
+                            };
+                        })().catch((error) => {
+                            this._editorsPromise = null; // allow retry after a failed load
+                            throw error;
+                        });
+                    }
+                    return this._editorsPromise;
                 },
 
                 async openEditor(detail) {
