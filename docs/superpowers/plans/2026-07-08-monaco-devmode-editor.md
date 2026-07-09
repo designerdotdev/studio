@@ -279,10 +279,12 @@ Expected: `studio-monaco.js` (~2–3MB), `studio-monaco.css` (~100–150KB), `mo
 Slimness check — the bundle must be meaningfully smaller than the all-languages DevDojo build (4.3MB):
 
 ```bash
-node -e "const s=require('fs').statSync('dist/studio-monaco.js').size; console.log(s < 3_500_000 ? 'OK slim ('+s+' bytes)' : 'TOO BIG ('+s+' bytes) — check that only the html/yaml contributions are imported')"
+node -e "const s=require('fs').statSync('dist/studio-monaco.js').size; console.log(s < 4_000_000 ? 'OK slim ('+s+' bytes)' : 'TOO BIG ('+s+' bytes) — check that only the html/yaml contributions are imported')"
 ```
 
 Expected: `OK slim (… bytes)`. (Functional verification — highlighting, completions — happens in Task 4 against the host app.)
+
+> **Amended 2026-07-08 (user-approved):** gate relaxed from 3.5MB to 4MB. Measured: 3,754,907 bytes. Monaco 0.55's editor core (`edcore.main.js`) is ~3.65MB by itself — the original 3.5MB estimate wrongly assumed language services dominated the main bundle. The slim build still avoids ever shipping the TS/CSS/JSON workers (~8.4MB) and is lazy-loaded, dev-mode-only.
 
 Run: `npm run build`
 Expected: Vite builds `studio.js`/`studio-css.css`, then esbuild rebuilds Monaco files; `ls dist/` still shows all seven files (proves `emptyOutDir: false` works).
