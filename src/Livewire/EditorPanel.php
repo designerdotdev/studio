@@ -296,6 +296,16 @@ class EditorPanel extends Component
         $this->dispatch('studio:selection-changed', id: null);
     }
 
+    /**
+     * Dev mode saved a section's source files — re-resolve everything so
+     * the inspector reflects the new fields/defaults.
+     */
+    #[On('studio:code-saved')]
+    public function refreshAfterCodeSave(): void
+    {
+        $this->loadPage();
+    }
+
     /** Select from the layers list — also focus the section in the canvas */
     public function selectFromList(string $id): void
     {

@@ -1,0 +1,104 @@
+name: atlas-footer
+title: Atlas footer
+description: Brand blurb over nestable link columns with quiet social icons
+category: footers
+tags:
+    - footer
+    - links
+    - atlas
+    - columns
+
+fields:
+    company_name:
+        type: text
+        label: Company name
+        default: "Atlas"
+        required: true
+
+    blurb:
+        type: textarea
+        label: Blurb
+        default: "The foundation for your next idea. Everything you need to plan, build, and launch your next project."
+
+    columns:
+        type: repeater
+        label: Link columns
+        nestable: true
+        max_depth: 2
+        add_button_label: Add column
+        description: Top-level items are column headings. Nest links beneath them.
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "Link"
+            url:
+                type: url
+                label: URL
+                default: "#"
+        default:
+            - text: "Product"
+              url: "#"
+              children:
+                  - text: "Features"
+                    url: "#"
+                  - text: "Integrations"
+                    url: "#"
+                  - text: "Pricing"
+                    url: "#"
+                  - text: "Changelog"
+                    url: "#"
+            - text: "Company"
+              url: "#"
+              children:
+                  - text: "About"
+                    url: "#"
+                  - text: "Blog"
+                    url: "#"
+                  - text: "Careers"
+                    url: "#"
+                  - text: "Contact"
+                    url: "#"
+            - text: "Resources"
+              url: "#"
+              children:
+                  - text: "Documentation"
+                    url: "#"
+                  - text: "Help Center"
+                    url: "#"
+                  - text: "Community"
+                    url: "#"
+                  - text: "Templates"
+                    url: "#"
+            - text: "Legal"
+              url: "#"
+              children:
+                  - text: "Privacy"
+                    url: "#"
+                  - text: "Terms"
+                    url: "#"
+                  - text: "Cookie Policy"
+                    url: "#"
+
+    copyright:
+        type: text
+        label: Copyright
+        default: "© 2026 Atlas. All rights reserved."
+
+    twitter_url:
+        type: url
+        label: X / Twitter URL
+        description: Clear to hide the icon.
+        default: "#"
+
+    github_url:
+        type: url
+        label: GitHub URL
+        description: Clear to hide the icon.
+        default: "#"
+
+    linkedin_url:
+        type: url
+        label: LinkedIn URL
+        description: Clear to hide the icon.
+        default: "#"

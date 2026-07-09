@@ -1,0 +1,61 @@
+name: atlas-faq
+title: Atlas FAQ
+description: Side-label FAQ with dashed dividers and plus-toggle answers
+category: faq
+tags:
+    - faq
+    - accordion
+    - atlas
+    - questions
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "FAQs"
+        required: true
+
+    subheading:
+        type: text
+        label: Subheading
+        default: "Your questions answered"
+
+    support_text:
+        type: text
+        label: Support text
+        default: "Need more help?"
+
+    support_link_text:
+        type: text
+        label: Support link text
+        default: "Contact us"
+
+    support_link_url:
+        type: url
+        label: Support link URL
+        default: "#"
+
+    faqs:
+        type: repeater
+        label: Questions
+        add_button_label: Add question
+        sub_fields:
+            question:
+                type: text
+                label: Question
+                default: "Question?"
+            answer:
+                type: textarea
+                label: Answer
+                default: "Answer."
+        default:
+            - question: "How does the free trial work?"
+              answer: "Start with a 14-day free trial with full access to all features. No credit card required. Upgrade to a paid plan at any time."
+            - question: "Can I change my plan later?"
+              answer: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately with prorated billing."
+            - question: "What payment methods do you accept?"
+              answer: "We accept all major credit cards, PayPal, and bank transfers for annual plans. Enterprise customers can pay via invoice."
+            - question: "Is there a setup fee?"
+              answer: "No setup fees or hidden costs. You only pay for your subscription plan."
+            - question: "Do you offer refunds?"
+              answer: "We offer a 30-day money-back guarantee. Contact us within 30 days for a full refund."

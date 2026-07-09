@@ -35,6 +35,7 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(BladeGenerator::class);
         $this->app->singleton(\Designer\Studio\Services\PublishService::class);
         $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
+        $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
 
         // Register asset version for cache busting
         $this->app->singleton('studio.asset.version', function () {
@@ -214,9 +215,13 @@ class StudioServiceProvider extends ServiceProvider
         $middleware = config('studio.page_routing.middleware', ['web']);
         $homeSlug = config('studio.page_routing.home_slug', 'home');
 
-        Route::middleware($middleware)->group(function () use ($homeSlug) {
-            // The home page — only when the app hasn't claimed '/' itself
-            if (!$this->appDefinesRootRoute()) {
+        $pruner = $this->app->make(\Designer\Studio\Support\WelcomeRoutePruner::class);
+
+        Route::middleware($middleware)->group(function () use ($homeSlug, $pruner) {
+            // The home page — only when the app hasn't claimed '/' itself.
+            // (The stock welcome route is auto-removed by WelcomeRoutePruner
+            // when the site is seeded, published, or the editor loads.)
+            if (!$pruner->appDefinesRootRoute()) {
                 Route::get('/', [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
                     ->defaults('slug', $homeSlug)
                     ->name('studio.page.home');
@@ -234,16 +239,5 @@ class StudioServiceProvider extends ServiceProvider
                 ->where('slug', '[a-z0-9-]+')
                 ->name('studio.page.show');
         });
-    }
-
-    protected function appDefinesRootRoute(): bool
-    {
-        foreach (Route::getRoutes()->get('GET') as $route) {
-            if ($route->uri() === '/') {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

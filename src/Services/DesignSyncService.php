@@ -43,6 +43,21 @@ class DesignSyncService
         return $designs;
     }
 
+    /**
+     * Relative design path (e.g. "heroes/basic-hero-04") for a component
+     * name. Filenames match the yml `name` key per the authoring contract.
+     */
+    public function findDesignPath(string $name): ?string
+    {
+        foreach ($this->discoverDesigns() as $relative) {
+            if (basename($relative) === $name) {
+                return $relative;
+            }
+        }
+
+        return null;
+    }
+
     public function loadDesign(string $relativePath): array
     {
         $basePath = $this->getDesignsPath() . '/' . $relativePath;
@@ -53,8 +68,13 @@ class DesignSyncService
         return $data;
     }
 
+    /** Image files that may sit beside section designs */
+    protected const ASSET_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif', 'avif'];
+
     public function syncAll(): array
     {
+        $this->publishAssets();
+
         $designs = $this->discoverDesigns();
         $created = 0;
         $updated = 0;
@@ -86,6 +106,45 @@ class DesignSyncService
             'created' => $created,
             'updated' => $updated,
         ];
+    }
+
+    /**
+     * Publish image files that live beside section designs into
+     * public/studio-uploads/designer/ so field defaults can reference
+     * them as /studio-uploads/designer/<filename> in every render path.
+     */
+    public function publishAssets(): void
+    {
+        $basePath = $this->getDesignsPath();
+
+        if (!is_dir($basePath)) {
+            return;
+        }
+
+        $target = public_path('studio-uploads/designer');
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($basePath, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!in_array(strtolower($file->getExtension()), self::ASSET_EXTENSIONS, true)) {
+                continue;
+            }
+
+            $destination = $target . '/' . $file->getFilename();
+
+            // Copy once; re-copy only when the source file changed size
+            if (file_exists($destination) && filesize($destination) === $file->getSize()) {
+                continue;
+            }
+
+            if (!is_dir($target)) {
+                @mkdir($target, 0755, true);
+            }
+
+            @copy($file->getPathname(), $destination);
+        }
     }
 
     protected function isDirty(\Designer\Studio\DataTransferObjects\ComponentData $existing, array $data): bool

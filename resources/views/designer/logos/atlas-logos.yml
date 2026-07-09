@@ -1,0 +1,36 @@
+name: atlas-logos
+title: Atlas logo marquee
+description: Scrolling wordmark marquee with soft edge fades
+category: logos
+tags:
+    - logos
+    - marquee
+    - atlas
+    - social-proof
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "Trusted by forward-thinking teams"
+
+    logos:
+        type: repeater
+        label: Company names
+        add_button_label: Add company
+        sub_fields:
+            name:
+                type: text
+                label: Name
+                default: "Company"
+        default:
+            - name: "Vercel"
+            - name: "Spotify"
+            - name: "Linear"
+            - name: "Supabase"
+            - name: "Notion"
+            - name: "Figma"
+            - name: "Stripe"
+            - name: "Slack"
+            - name: "GitHub"
+            - name: "Railway"

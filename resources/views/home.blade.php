@@ -1,7 +1,7 @@
 @php
     $homeSlug = config('studio.page_routing.home_slug', 'home');
     $routingEnabled = config('studio.page_routing.enabled', true);
-    $liveUrl = $routingEnabled ? url($page->slug === $homeSlug ? '/' : '/' . $page->slug) : null;
+    $liveUrl = $routingEnabled ? \Designer\Studio\Support\SiteUrls::pageUrl($page->slug) : null;
     $totalComponents = $library->flatten(1)->count();
 @endphp
 
@@ -21,6 +21,11 @@
                     toggleSidebar() {
                         this.sidebar = !this.sidebar;
                         localStorage.setItem('studio.sidebar', this.sidebar ? '1' : '0');
+                    },
+                    devMode: localStorage.getItem('studio.devmode') === '1',
+                    toggleDevMode() {
+                        this.devMode = !this.devMode;
+                        localStorage.setItem('studio.devmode', this.devMode ? '1' : '0');
                     },
                 });
             });
@@ -76,8 +81,8 @@
             @keydown.escape.window="open = false"
         >
             <button @click="open = !open" class="s-box-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
-                <svg class="s-logo-btn-logo h-[17px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
-                <svg class="s-logo-btn-menu h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+                <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
+                <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
 
             <div
@@ -117,6 +122,15 @@
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
                     Export Blade file
                 </button>
+                @if(\Designer\Studio\Support\DevMode::enabled())
+                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" title="Edit section .html and .yml source files from the editor">
+                        <span class="flex items-center gap-2.5">
+                            <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+                            Dev mode
+                        </span>
+                        <span class="s-chip" :class="$store.studio.devMode && '!border-accent/50 !text-accent'" x-text="$store.studio.devMode ? 'On' : 'Off'"></span>
+                    </button>
+                @endif
                 @if($liveUrl)
                     <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
                         <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
@@ -144,13 +158,13 @@
         {{-- Browser navigation --}}
         <div x-data class="flex shrink-0 items-center">
             <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
-                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
             </button>
             <button class="s-nav-btn" title="Forward" aria-label="Forward" @click="history.forward()">
-                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
             </button>
             <button class="s-nav-btn" title="Reload preview" aria-label="Reload preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
-                <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
             </button>
         </div>
 
@@ -342,6 +356,9 @@
                     const data = await response.json();
                     if (data.success) {
                         window.Studio.toast(data.count === 1 ? '1 change published' : data.count + ' changes published');
+                        if (data.home_claimed) {
+                            window.Studio.toast('Removed Laravel\'s default welcome page — your homepage now serves at /', 'info', 6000);
+                        }
                         await this.refreshStatus();
                     } else {
                         window.Studio.toast('Could not publish the site', 'error');
@@ -886,4 +903,151 @@
                 </div>
             </div>
     </div>
+
+    {{-- ============================================================ --}}
+    {{-- Dev mode — section source editor                              --}}
+    {{-- ============================================================ --}}
+    @if(\Designer\Studio\Support\DevMode::enabled())
+    <div
+            x-data="{
+                open: false,
+                ref: null,
+                title: '',
+                tab: 'html',
+                loading: false,
+                saving: false,
+                error: '',
+                paths: { html: '', yaml: '' },
+                editors: null,
+                base: @js(url(trim(config('studio.path', 'studio'), '/') . '/api/dev/components')),
+
+                ensureEditors() {
+                    if (this.editors) return;
+                    this.editors = {
+                        html: window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
+                        yaml: window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
+                    };
+                },
+
+                async openEditor(detail) {
+                    this.ref = detail.ref;
+                    this.title = detail.title || detail.ref;
+                    this.tab = 'html';
+                    this.error = '';
+                    this.open = true;
+                    this.loading = true;
+                    window.Studio.codeModalOpen = true;
+
+                    try {
+                        const response = await fetch(`${this.base}/${this.ref}`, { headers: { 'Accept': 'application/json' } });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not load the source files.');
+                        await this.$nextTick();
+                        this.ensureEditors();
+                        this.editors.html.setValue(data.html);
+                        this.editors.yaml.setValue(data.yaml);
+                        this.paths = data.paths;
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+                    this.loading = false;
+                },
+
+                close() {
+                    this.open = false;
+                    window.Studio.codeModalOpen = false;
+                },
+
+                async save() {
+                    if (this.saving || !this.ref || !this.editors) return;
+                    this.saving = true;
+                    this.error = '';
+                    try {
+                        const response = await fetch(`${this.base}/${this.ref}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                html: this.editors.html.getValue(),
+                                yaml: this.editors.yaml.getValue(),
+                            }),
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not save the source files.');
+                        window.Studio.toast('Section source saved — every section using it is updated');
+                        window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
+                        window.Livewire?.dispatch('studio:code-saved');
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+                    this.saving = false;
+                }
+            }"
+            @studio:open-code-editor.window="openEditor($event.detail)"
+            @keydown.escape.window="close()"
+            @keydown.window="if (open && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S')) { $event.preventDefault(); save(); }"
+            x-show="open"
+            x-cloak
+            class="fixed inset-0 z-[90] flex items-center justify-center p-4 lg:p-8"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit section source code"
+        >
+            <div class="s-modal-backdrop" x-show="open" x-transition.opacity.duration.200ms @click="close()"></div>
+
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-[0.97] translate-y-2"
+                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0 scale-[0.98]"
+                class="s-modal flex h-[720px] max-h-[90vh] w-[1080px] max-w-full flex-col overflow-hidden"
+            >
+                {{-- Header --}}
+                <div class="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
+                    <div class="min-w-0">
+                        <h2 class="truncate text-[15px] font-semibold text-ink" x-text="title"></h2>
+                        <p class="truncate font-mono text-[11px] text-faint" x-text="tab === 'html' ? paths.html : paths.yaml"></p>
+                    </div>
+
+                    <div class="s-seg ml-auto">
+                        <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'html' && 'is-active'" @click="tab = 'html'">HTML</button>
+                        <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'yaml' && 'is-active'" @click="tab = 'yaml'">YAML</button>
+                    </div>
+
+                    <button @click="close()" class="s-icon-btn" title="Close (Esc)">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+                    </button>
+                </div>
+
+                {{-- Editors --}}
+                <div class="relative min-h-0 flex-1">
+                    <div x-show="loading" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-panel/70">
+                        <svg class="h-5 w-5 animate-spin text-soft" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                    </div>
+                    <div x-ref="htmlHost" x-show="tab === 'html'" class="s-code-pane h-full"></div>
+                    <div x-ref="yamlHost" x-show="tab === 'yaml'" class="s-code-pane h-full"></div>
+                </div>
+
+                {{-- Footer --}}
+                <div class="flex shrink-0 items-center gap-3 border-t border-line px-4 py-2.5">
+                    <p class="min-w-0 flex-1 truncate text-[11.5px] text-faint">
+                        <span x-show="!error">Sections must stay inside the supported Blade subset — see <span class="font-mono">docs/authoring-sections.md</span>. Saving updates every page using this section.</span>
+                        <span x-show="error" x-cloak class="text-danger" x-text="error"></span>
+                    </p>
+                    <button @click="close()" class="s-btn-ghost">Cancel</button>
+                    <button @click="save()" :disabled="saving || loading" class="s-btn-accent">
+                        <span x-show="!saving">Save</span>
+                        <span x-show="saving" x-cloak>Saving…</span>
+                        <span class="s-kbd !border-white/25 !bg-transparent !text-white/80">⌘S</span>
+                    </button>
+                </div>
+            </div>
+    </div>
+    @endif
 </x-studio::layouts.app>

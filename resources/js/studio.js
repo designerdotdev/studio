@@ -1,6 +1,12 @@
 import blade from './blade.js';
 import Sortable from 'sortablejs';
 import collapse from '@alpinejs/collapse';
+import { basicSetup, EditorView } from 'codemirror';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
+import { html as htmlLang } from '@codemirror/lang-html';
+import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { oneDark } from '@codemirror/theme-one-dark';
 
 // Client-side Blade renderer (used by the preview iframe)
 window.blade = blade;
@@ -176,6 +182,10 @@ const StudioEditor = {
     },
 
     handleShortcut({ key, meta, typing, preventDefault = () => {} }) {
+        // The dev-mode code modal owns the keyboard while open (its own
+        // window-level handlers run after this document-level one)
+        if (window.Studio?.codeModalOpen) return;
+
         // Cmd/Ctrl+S — everything autosaves; reassure instead of a browser dialog
         if (meta && (key === 's' || key === 'S')) {
             preventDefault();
@@ -440,6 +450,35 @@ window.Studio = {
 
     editor: StudioEditor,
     preview: StudioPreview,
+
+    // Set by the dev-mode code modal so global shortcuts stand down
+    codeModalOpen: false,
+
+    /**
+     * CodeMirror 6 instance for the dev-mode source editor.
+     * Returns { view, getValue, setValue }.
+     */
+    codeEditor(parent, { language = 'html', doc = '' } = {}) {
+        const view = new EditorView({
+            parent,
+            doc,
+            extensions: [
+                basicSetup,
+                keymap.of([indentWithTab]),
+                language === 'yaml' ? yamlLang() : htmlLang(),
+                oneDark,
+                EditorView.lineWrapping,
+            ],
+        });
+
+        return {
+            view,
+            getValue: () => view.state.doc.toString(),
+            setValue(value) {
+                view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+            },
+        };
+    },
 
     /**
      * Drag-to-reorder that plays nice with Livewire's DOM morphing:

@@ -73,6 +73,10 @@ class SampleDataSeeder
             app(\Designer\Studio\Services\PublishService::class)->syncAfterSeed();
         }
 
+        // The site just went live — remove the stock Laravel welcome route
+        // (if present) so the homepage serves at '/' right away.
+        app(\Designer\Studio\Support\WelcomeRoutePruner::class)->claimHome();
+
         return $createdPages;
     }
 

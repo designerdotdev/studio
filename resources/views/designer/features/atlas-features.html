@@ -1,0 +1,98 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap">
+<style>
+    .atlas-serif { font-family: 'DM Serif Display', Georgia, serif; }
+</style>
+<section class="border-t border-[#ebe4d9]/60 bg-[#faf8f5] py-24" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif" id="features">
+    <div class="mx-auto w-full max-w-2xl px-6">
+        <h2 class="atlas-serif text-3xl tracking-tight text-[#121110] sm:text-4xl">{{ $heading ?? 'Built for high performance' }}</h2>
+        @if($subheading)
+            <p class="mt-3 max-w-md text-[15px] text-[#9a8a70]">{{ $subheading }}</p>
+        @endif
+
+        <div class="mt-12 grid gap-3 sm:grid-cols-2">
+            {{-- Card 1 — integrations (tall) --}}
+            <div class="row-span-2 rounded-2xl border border-[#ebe4d9]/60 bg-white/60 p-6 transition-all hover:border-[#d9cebf] hover:shadow-sm">
+                <h3 class="text-[14px] font-semibold text-[#121110]">{{ $feature_1_title ?? 'Seamless Integrations' }}</h3>
+                <p class="mt-1.5 text-[13px] leading-relaxed text-[#9a8a70]">{{ $feature_1_text ?? 'Connect your favorite tools and services with just a few clicks.' }}</p>
+                <div class="mt-8 space-y-3" aria-hidden="true">
+                    <div class="relative flex h-8 items-center gap-8 px-4">
+                        <div class="absolute inset-0 my-auto h-px bg-[#ebe4d9]"></div>
+                        <div class="relative rounded-full border border-[#ebe4d9] bg-white px-2.5 py-1 shadow-sm"><span class="text-[10px] font-medium">API</span></div>
+                        <div class="relative rounded-full border border-[#ebe4d9] bg-white px-2.5 py-1 shadow-sm"><span class="text-[10px] font-medium">SDK</span></div>
+                    </div>
+                    <div class="relative flex h-8 items-center justify-between gap-8 px-8">
+                        <div class="absolute inset-0 my-auto h-px bg-[#ebe4d9]"></div>
+                        <div class="relative rounded-full border border-[#ebe4d9] bg-white px-2.5 py-1 shadow-sm"><span class="text-[10px] font-medium">Auth</span></div>
+                        <div class="relative rounded-full border border-[#ebe4d9] bg-white px-2.5 py-1 shadow-sm"><span class="text-[10px] font-medium">Sync</span></div>
+                    </div>
+                    <div class="relative flex h-8 items-center gap-12 px-6">
+                        <div class="absolute inset-0 my-auto h-px bg-[#ebe4d9]"></div>
+                        <div class="relative rounded-full border border-[#ebe4d9] bg-white px-2.5 py-1 shadow-sm"><span class="text-[10px] font-medium">DB</span></div>
+                        <div class="relative rounded-full border border-[#ebe4d9] bg-white px-2.5 py-1 shadow-sm"><span class="text-[10px] font-medium">CDN</span></div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Card 2 — real-time sync --}}
+            <div class="rounded-2xl border border-[#ebe4d9]/60 bg-white/60 p-6 transition-all hover:border-[#d9cebf] hover:shadow-sm">
+                <h3 class="text-[14px] font-semibold text-[#121110]">{{ $feature_2_title ?? 'Real-time Sync' }}</h3>
+                <p class="mt-1.5 text-[13px] leading-relaxed text-[#9a8a70]">{{ $feature_2_text ?? 'Keep data synchronized across all platforms automatically.' }}</p>
+                <div class="relative mt-6 h-20 overflow-hidden" aria-hidden="true">
+                    <div class="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-[#ebe4d9]/50"></div>
+                    <div class="absolute -inset-x-4 top-2 aspect-square rounded-full border border-[#ebe4d9]/40"></div>
+                    <div class="absolute -inset-x-2 top-6 aspect-square rounded-full border border-emerald-400/30"></div>
+                    <div class="absolute inset-x-0 top-10 aspect-square rounded-full border border-[#ebe4d9]/60"></div>
+                </div>
+            </div>
+
+            {{-- Card 3 — developer first --}}
+            <div class="rounded-2xl border border-[#ebe4d9]/60 bg-white/60 p-6 transition-all hover:border-[#d9cebf] hover:shadow-sm">
+                <h3 class="text-[14px] font-semibold text-[#121110]">{{ $feature_3_title ?? 'Developer First' }}</h3>
+                <p class="mt-1.5 text-[13px] leading-relaxed text-[#9a8a70]">{{ $feature_3_text ?? 'Comprehensive APIs and SDKs built with developers in mind.' }}</p>
+                <div class="mt-6 flex h-16 items-end justify-between pb-2" aria-hidden="true">
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#121110]/60"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#121110]/60"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#121110]/60"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#121110]/60"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                    <div class="h-full w-px rounded-full bg-[#121110]/60"></div>
+                    <div class="h-full w-px rounded-full bg-[#ebe4d9]"></div>
+                </div>
+            </div>
+
+            {{-- Card 4 — enterprise ready --}}
+            <div class="rounded-2xl border border-[#ebe4d9]/60 bg-white/60 p-6 transition-all hover:border-[#d9cebf] hover:shadow-sm">
+                <h3 class="text-[14px] font-semibold text-[#121110]">{{ $feature_4_title ?? 'Enterprise Ready' }}</h3>
+                <p class="mt-1.5 text-[13px] leading-relaxed text-[#9a8a70]">{{ $feature_4_text ?? 'Scale confidently with enterprise-grade security and reliability.' }}</p>
+                <div class="mt-6 flex items-center justify-center" aria-hidden="true">
+                    <svg class="size-16 text-[#ebe4d9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+            </div>
+
+            {{-- Card 5 — auto tasks --}}
+            <div class="rounded-2xl border border-[#ebe4d9]/60 bg-white/60 p-6 transition-all hover:border-[#d9cebf] hover:shadow-sm">
+                <h3 class="text-[14px] font-semibold text-[#121110]">{{ $feature_5_title ?? 'Auto Tasks' }}</h3>
+                <p class="mt-1.5 text-[13px] leading-relaxed text-[#9a8a70]">{{ $feature_5_text ?? 'Automate repetitive work with built-in triggers and workflows.' }}</p>
+                <div class="mt-6 flex items-center gap-2" aria-hidden="true">
+                    <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ebe4d9]">
+                        <div class="h-full w-3/4 rounded-full bg-[#121110]/20"></div>
+                    </div>
+                    <span class="text-[10px] text-[#b8a990]">75%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

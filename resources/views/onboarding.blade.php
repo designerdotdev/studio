@@ -17,7 +17,7 @@
         class="s-canvas relative h-full w-full overflow-y-auto"
         x-data="{
             step: 1,
-            selected: 'starter',
+            selected: 'atlas',
             applying: false,
 
             showTemplates() {
