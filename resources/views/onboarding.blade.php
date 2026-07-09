@@ -70,7 +70,7 @@
                 Welcome to Designer Studio
             </h1>
             <p class="onboard-up mt-4 max-w-md text-[15px] leading-relaxed text-soft" style="animation-delay: 220ms">
-                The visual editor for your Laravel site. Developers define the sections — anyone on the team edits the pages.
+                The visual designer for your Laravel site. Developers define the sections — anyone on the team edits the pages.
             </p>
 
             <div class="onboard-up mt-10" style="animation-delay: 300ms">
