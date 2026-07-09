@@ -25,7 +25,9 @@ There are no tests or linting configured in this package. Verify changes against
 - **Hardening**: every route has parameter constraints (`[a-z0-9-]+` slugs/names); upload (30/min), publish/discard/export (12/min) are throttled; `StudioController::editorNotices()` surfaces floating canvas banners for unprotected-in-production and unwritable-storage states; the editor shows a small-screen overlay below `lg`
 - **Concurrent edits**: `EditorPanel::$docVersions` tracks page/layout `updated_at` at load; `guardConflict()` blocks every mutation with a Reload toast if the doc changed elsewhere (block-content edits skip the guard — blocks are shared by design)
 - **SEO extras**: `/sitemap.xml` (indexable published pages, `page_routing.sitemap` config) and 301s for renamed slugs (`previous_slugs` on the page doc, written by PageRepository::update, resolved in PageController)
-- **Page routing**: two STATIC routes registered in a `booted()` callback (after app routes, skipped when routes are cached): `/` (only if the app doesn't define its own root) and a single-segment `GET /{slug}` catch-all constrained to `[a-z0-9-]+`. Which pages exist is resolved at request time from live storage — `route:cache`-safe, and newly published pages are routable instantly. `/{home_slug}` 301s to `/`
+- **Page routing**: two STATIC routes registered in a `booted()` callback (after app routes, skipped when routes are cached): `/` (only if the app doesn't define its own root) and a single-segment `GET /{slug}` catch-all constrained to `[a-z0-9-]+`. Which pages exist is resolved at request time from live storage — `route:cache`-safe, and newly published pages are routable instantly. `/{home_slug}` 301s to `/` only when Studio owns the root route (`SiteUrls::ownsRoot()`); when the app defines its own `/`, the home page serves at `/{home_slug}` instead and the editor shows an `app-owns-root` notice
+- **Claiming `/`**: `Support/WelcomeRoutePruner` auto-removes the stock Laravel welcome route from the host's `routes/web.php` (strict regex — customized routes are never touched) so the published homepage serves at `/`. Runs idempotently at seed completion, on publish (`home_claimed` in the JSON response → toast), and on editor load (self-heal); requires a live home page; clears the route cache when needed. `Support/SiteUrls::pageUrl()` is the single source for public page URLs (sitemap, previous-slug 301s, editor live-URL)
+- **Dev mode**: `Support/DevMode::enabled()` — `config('studio.dev_mode')` (env `STUDIO_DEV_MODE`), default null = local environment only. When on (server gate + `$store.studio.devMode` toggle in the hamburger menu), the inspector header shows an Edit-code button that opens a CodeMirror modal (HTML/YAML tabs) for the selected section's source. `DevModeController` (`GET|PUT /studio/api/dev/components/{name}`) validates YAML (name key immutable), copy-on-writes to the app's `resources/views/designer/`, re-syncs the library; the frontend then refreshes the preview and dispatches `studio:code-saved` (EditorPanel reloads fields)
 - **Dependencies**: livewire/livewire + symfony/yaml only (no Filament, no Katana)
 
 ### Backend (PHP)
@@ -37,9 +39,9 @@ There are no tests or linting configured in this package. Verify changes against
 - `Storage/BlockRepository` — global blocks (`storage/studio/blocks/`): a synced section instance (component_ref + variables) that pages/layouts reference via lightweight placements (`{id, block_ref, order, hidden}`); `hydrate()` expands placements in all render paths, `usage()`/`deleteEverywhere()` manage cross-page placements. Editing any placement writes to the block → updates everywhere. Placements keep position/hidden local. Teal chrome in the canvas, "Global blocks" category in the Add-Section modal, Make global / Detach / Delete everywhere in the panel
 - `Storage/LayoutRepository` — reusable layouts (`storage/studio/layouts/`): page-like docs whose `components` array contains one `@content` slot entry (id `__content__`); sections before it are the shared header, after it the shared footer. Pages opt in via `layout_ref`. The slot can't be removed/hidden/duplicated; all render paths (iframe, PageController, BladeGenerator) merge `regions()` around the page's own sections
 - `Storage/ComponentRepository` — library CRUD, `grouped()` returns categories in canonical order (`CATEGORY_ORDER`)
-- `DesignSyncService` — discovers `.yml`+`.html` pairs in `resources/views/designer/` (app copy preferred), syncs into the library; skips writes when content unchanged
+- `DesignSyncService` — discovers `.yml`+`.html` pairs in `resources/views/designer/` (app copy preferred), syncs into the library; skips writes when content unchanged. Also publishes image files sitting beside designs into `public/studio-uploads/designer/` so field defaults can reference `/studio-uploads/designer/<file>` (e.g. the Atlas hero backdrop)
 - `BladeGenerator` — exports pages to static Blade files; statically evaluates the supported `@if` subset, keeps `@foreach` + a `@php` JSON preamble for repeaters, skips hidden sections
-- `TemplateRegistry` — the 5 onboarding templates (blank/starter/launch/studio/horizon) incl. multi-page + per-section variable overrides; non-blank templates define a `layout` key (`name`/`before`/`after`) that SampleDataSeeder turns into a shared layout applied to every seeded page (blank seeds plain pages — no layout)
+- `TemplateRegistry` — the 6 onboarding templates (blank/atlas/starter/launch/studio/horizon) incl. multi-page + per-section variable overrides; non-blank templates define a `layout` key (`name`/`before`/`after`) that SampleDataSeeder turns into a shared layout applied to every seeded page (blank seeds plain pages — no layout). **Atlas is the onboarding default** (preselected in onboarding.blade.php) — a warm editorial landing page built from the 11 `atlas-*` sections (own sand palette via arbitrary Tailwind values, DM Serif Display headings, self-contained per section)
 - `SampleDataSeeder` — creates pages from a template
 
 **Livewire** (`src/Livewire/`):
@@ -54,7 +56,7 @@ There are no tests or linting configured in this package. Verify changes against
 
 ### Frontend
 
-- `resources/js/studio.js` — single bundle for BOTH the editor window and the preview iframe. Contains: toasts (`Studio.toast`), the editor↔iframe postMessage bridge, keyboard shortcuts, save-status tracking (Livewire commit hooks), SortableJS drag-reorder helper, upload helper, and the iframe-side `StudioPreview` runtime (selection overlay, live re-render via blade.js). Boots per-document based on `window.__studioPreview` or `#studio-canvas-frame`.
+- `resources/js/studio.js` — single bundle for BOTH the editor window and the preview iframe. Contains: toasts (`Studio.toast`), the editor↔iframe postMessage bridge, keyboard shortcuts, save-status tracking (Livewire commit hooks), SortableJS drag-reorder helper, upload helper, `Studio.codeEditor` (CodeMirror 6, statically bundled — the biggest chunk of the bundle) + `Studio.codeModalOpen` (global shortcuts stand down while the dev-mode code modal is open), and the iframe-side `StudioPreview` runtime (selection overlay, live re-render via blade.js). Boots per-document based on `window.__studioPreview` or `#studio-canvas-frame`.
 - `resources/js/blade.js` — client-side Blade renderer: `{{ }}`, `{!! !!}`, `??` defaults, `@if/@else/@endif` (incl. `?? false`), `@foreach` with `$item['key']` access + nested `children` loops. This defines the section authoring subset — keep in sync with `BladeGenerator::evaluateConditionals` and `docs/authoring-sections.md`.
 - `resources/css/studio.css` — Tailwind 4 with the editor design tokens (`@theme`: shell/panel/raised/ink/soft/accent…) and all `s-*` component classes (buttons, inputs, popovers, modals, preview cards, toasts).
 - Editor chrome typeface: Geist (Google Fonts, loaded in the app layout).
@@ -71,7 +73,7 @@ There are no tests or linting configured in this package. Verify changes against
 
 ### Sections (`resources/views/designer/<category>/`)
 
-Each section = `<name>.html` + `<name>.yml` (filename matches the `name` key). ~30 sections across canonical categories: banners, headers, heroes, logos, features, stats, content, gallery, testimonials, pricing, faq, team, blog, contact, newsletter, cta, footers.
+Each section = `<name>.html` + `<name>.yml` (filename matches the `name` key). ~40 sections across canonical categories: banners, headers, heroes, logos, features, stats, content, gallery, testimonials, pricing, faq, team, blog, contact, newsletter, cta, footers. The 11 `atlas-*` sections form the Atlas template family and carry their own inlined sand palette + Google-Fonts links so each renders standalone.
 
 **The authoring contract lives in `docs/authoring-sections.md` — read it before creating or editing any section.** Sections must stay inside the supported Blade subset because they render in three engines (PHP Blade, blade.js, BladeGenerator).
 
@@ -87,6 +89,7 @@ Each section = `<name>.html` + `<name>.yml` (filename matches the `name` key). ~
 - `POST|PUT|DELETE /studio/api/pages…` — page + section CRUD
 - `POST /studio/api/upload` — image uploads
 - `POST /studio/api/generate/{slug}` — Blade export
+- `GET|PUT /studio/api/dev/components/{name}` — dev-mode section source read/write (404 unless `DevMode::enabled()`)
 
 ### Artisan Commands
 

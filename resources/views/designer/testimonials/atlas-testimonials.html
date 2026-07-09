@@ -1,0 +1,27 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap">
+<style>
+    .atlas-serif { font-family: 'DM Serif Display', Georgia, serif; }
+</style>
+<section class="border-t border-[#ebe4d9]/60 bg-[#faf8f5] py-24" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif" id="testimonials">
+    <div class="mx-auto w-full max-w-2xl px-6">
+        <h2 class="atlas-serif text-3xl tracking-tight text-[#121110] sm:text-4xl">{{ $heading ?? 'What our customers say' }}</h2>
+        @if($subheading)
+            <p class="mt-3 text-[15px] text-[#9a8a70]">{{ $subheading }}</p>
+        @endif
+
+        <div class="mt-12 grid gap-3 sm:grid-cols-2">
+            @foreach($testimonials as $item)
+                <div class="rounded-2xl border border-[#ebe4d9]/60 bg-white/60 p-5 transition-all hover:border-[#d9cebf]">
+                    <div class="mb-4 flex items-center gap-3">
+                        <div class="flex size-8 items-center justify-center rounded-full bg-[#ebe4d9] text-[10px] font-semibold text-[#7a6d59]">{{ $item['initials'] }}</div>
+                        <div>
+                            <p class="text-[13px] font-medium text-[#121110]">{{ $item['name'] }}</p>
+                            <p class="text-[11px] text-[#b8a990]">{{ $item['role'] }}</p>
+                        </div>
+                    </div>
+                    <p class="text-[14px] leading-relaxed text-[#7a6d59]">{{ $item['quote'] }}</p>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</section>

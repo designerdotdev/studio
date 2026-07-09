@@ -1,0 +1,32 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap">
+<style>
+    @keyframes atlas-marquee {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+    .atlas-marquee { animation: atlas-marquee 30s linear infinite; }
+    .atlas-marquee:hover { animation-play-state: paused; }
+</style>
+<section class="overflow-hidden border-t border-[#ebe4d9]/60 bg-[#faf8f5] py-12" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif">
+    @if($heading)
+        <div class="mx-auto mb-6 max-w-5xl px-6">
+            <p class="text-center text-[11px] font-medium uppercase tracking-widest text-[#b8a990]">{{ $heading }}</p>
+        </div>
+    @endif
+    <div class="relative">
+        <div class="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-24 bg-gradient-to-r from-[#faf8f5] to-transparent"></div>
+        <div class="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-24 bg-gradient-to-l from-[#faf8f5] to-transparent"></div>
+        <div class="atlas-marquee flex whitespace-nowrap">
+            <div class="flex items-center gap-12 px-6">
+                @foreach($logos as $logo)
+                    <span class="text-lg font-semibold tracking-tight text-[#d9cebf]">{{ $logo['name'] }}</span>
+                @endforeach
+            </div>
+            <div class="flex items-center gap-12 px-6" aria-hidden="true">
+                @foreach($logos as $logo)
+                    <span class="text-lg font-semibold tracking-tight text-[#d9cebf]">{{ $logo['name'] }}</span>
+                @endforeach
+            </div>
+        </div>
+    </div>
+</section>

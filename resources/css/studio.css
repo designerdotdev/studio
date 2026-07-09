@@ -310,12 +310,12 @@
     /* --- topbar ----------------------------------------------------- */
 
     .s-topbar {
-        @apply relative z-40 flex h-14 shrink-0 items-center gap-1.5 border-b border-line bg-shell px-3;
+        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-shell px-3;
     }
 
     /* Boxed square button (hamburger) */
     .s-box-btn {
-        @apply flex h-9.5 w-9.5 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-raised text-soft transition-all duration-150;
+        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line bg-raised text-soft transition-all duration-150;
     }
 
     .s-box-btn:hover {
@@ -379,13 +379,13 @@
     }
 
     .s-reveal > button {
-        transform: translateX(-44px);
+        transform: translateX(-36px);
         opacity: 0;
         transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease 40ms;
     }
 
     .s-reveal.is-out {
-        width: 38px;
+        width: 32px;
         margin-left: 0;
     }
 
@@ -421,7 +421,7 @@
 
     /* Browser-style nav buttons (back / forward / reload) */
     .s-nav-btn {
-        @apply flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-colors duration-150;
+        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-colors duration-150;
     }
 
     .s-nav-btn:hover {
@@ -434,7 +434,7 @@
 
     /* Full-width browser URL bar — clicking it opens the page switcher */
     .s-urlbar {
-        @apply flex h-9.5 cursor-pointer select-none items-center gap-2.5 rounded-xl border border-line bg-raised pl-3.5 pr-2 transition-colors duration-150;
+        @apply flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border border-line bg-raised pl-3 pr-1.5 transition-colors duration-150;
     }
 
     .s-urlbar:hover,
@@ -450,7 +450,7 @@
 
     /* Hover-reveal actions at the right edge of the URL bar */
     .s-urlbar-action {
-        @apply flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md text-soft;
+        @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-soft;
         opacity: 0;
         transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
     }
@@ -467,11 +467,11 @@
     }
 
     .s-seg {
-        @apply flex h-9.5 items-center gap-0.5 rounded-xl border border-line bg-raised p-1;
+        @apply flex h-8 items-center gap-0.5 rounded-lg border border-line bg-raised p-0.5;
     }
 
     .s-seg-btn {
-        @apply flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg text-faint transition-all duration-150;
+        @apply flex h-7 w-7.5 cursor-pointer items-center justify-center rounded-[6px] text-faint transition-all duration-150;
     }
 
     .s-seg-btn:hover {
@@ -748,6 +748,24 @@
             opacity: 1;
             transform: translateX(0);
         }
+    }
+
+    /* Dev-mode source editor (CodeMirror host) */
+    .s-code-pane .cm-editor {
+        height: 100%;
+        font-size: 12.5px;
+        background: var(--color-shell);
+        outline: none;
+    }
+
+    .s-code-pane .cm-gutters {
+        background: var(--color-shell);
+        border-right: 1px solid var(--color-line);
+    }
+
+    .s-code-pane .cm-scroller {
+        font-family: var(--font-mono);
+        line-height: 1.6;
     }
 
     /* Empty-state dashed tile */

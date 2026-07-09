@@ -22,8 +22,15 @@ class PageController extends Controller
 
     public function show(string $slug)
     {
-        // The home page lives at '/' — keep '/{home_slug}' canonical
-        if ($slug === config('studio.page_routing.home_slug', 'home') && request()->path() !== '/') {
+        // The home page lives at '/' — keep '/{home_slug}' canonical. Only
+        // when Studio owns the root route, though: if the app defines its
+        // own '/', redirecting would make the homepage unreachable, so it
+        // serves at its slug instead.
+        if (
+            $slug === config('studio.page_routing.home_slug', 'home')
+            && request()->path() !== '/'
+            && \Designer\Studio\Support\SiteUrls::ownsRoot()
+        ) {
             return redirect('/', 301);
         }
 
@@ -90,13 +97,12 @@ class PageController extends Controller
     protected function redirectForPreviousSlug(string $slug): ?string
     {
         $storage = app(\Designer\Studio\Services\Storage\StudioStorage::class);
-        $homeSlug = config('studio.page_routing.home_slug', 'home');
 
         foreach ($storage->list('pages') as $pageSlug) {
             $doc = $storage->read("pages/{$pageSlug}.json");
 
             if (in_array($slug, $doc['previous_slugs'] ?? [], true)) {
-                return $pageSlug === $homeSlug ? url('/') : url('/' . $pageSlug);
+                return \Designer\Studio\Support\SiteUrls::pageUrl($pageSlug);
             }
         }
 
@@ -115,8 +121,8 @@ class PageController extends Controller
         $urls = $this->pages->all()
             ->reject(fn ($page) => !empty($page->meta['noindex']))
             ->sortBy(fn ($page) => $page->slug === $homeSlug ? 0 : 1)
-            ->map(function ($page) use ($homeSlug) {
-                $loc = $page->slug === $homeSlug ? url('/') : url('/' . $page->slug);
+            ->map(function ($page) {
+                $loc = \Designer\Studio\Support\SiteUrls::pageUrl($page->slug);
                 $lastmod = substr($page->updated_at, 0, 10);
 
                 return "    <url>\n        <loc>" . e($loc) . "</loc>\n        <lastmod>{$lastmod}</lastmod>\n    </url>";

@@ -59,6 +59,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Dev Mode
+    |--------------------------------------------------------------------------
+    |
+    | Dev mode adds an "Edit code" button to the editor that opens the
+    | selected section's .html and .yml source files in a code editor and
+    | writes changes back to resources/views/designer. Because it edits
+    | application source files from the browser, it defaults to being
+    | available only in the local environment. Set true/false to force it
+    | on or off regardless of environment.
+    |
+    */
+    'dev_mode' => env('STUDIO_DEV_MODE'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Storage Path
     |--------------------------------------------------------------------------
     |

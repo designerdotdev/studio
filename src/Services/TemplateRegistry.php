@@ -31,6 +31,39 @@ class TemplateRegistry
                 ],
             ],
 
+            'atlas' => [
+                'name' => 'atlas',
+                'title' => 'Atlas',
+                'description' => 'A warm, editorial SaaS landing page with a serif voice — the recommended starting point.',
+                'layout' => [
+                    'name' => 'Main',
+                    'before' => $this->sections([
+                        ['atlas-header'],
+                    ]),
+                    'after' => $this->sections([
+                        ['atlas-footer'],
+                    ]),
+                ],
+                'pages' => [
+                    [
+                        'title' => 'Home',
+                        'slug' => 'home',
+                        'description' => 'Atlas landing page',
+                        'components' => $this->sections([
+                            ['atlas-hero'],
+                            ['atlas-logos'],
+                            ['atlas-steps'],
+                            ['atlas-features'],
+                            ['atlas-stats'],
+                            ['atlas-pricing'],
+                            ['atlas-testimonials'],
+                            ['atlas-faq'],
+                            ['atlas-cta'],
+                        ]),
+                    ],
+                ],
+            ],
+
             'starter' => [
                 'name' => 'starter',
                 'title' => 'Starter',

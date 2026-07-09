@@ -35,6 +35,10 @@ class StudioController extends Controller
         // Always sync designs from resource files so edits are reflected
         $this->designSync->syncAll();
 
+        // Self-heal: sites published while the stock welcome route still
+        // owned '/' (it blocks Studio's home route) get claimed here.
+        $homeClaimed = $this->pruner()->claimHome();
+
         $homeSlugForSort = config('studio.page_routing.home_slug', 'home');
         $pages = $this->pages->all()
             ->sortBy(fn($p) => [$p->slug === $homeSlugForSort ? 0 : 1, $p->title])
@@ -76,15 +80,16 @@ class StudioController extends Controller
             ])->values()->all(),
             'draftMode' => $draftMode,
             'publishStatus' => $draftMode ? $this->publisher()->status() : null,
-            'notices' => $this->editorNotices(),
+            'notices' => $this->editorNotices($homeClaimed),
         ]);
     }
 
     /**
      * Operational warnings surfaced inside the editor: an unprotected
-     * Studio in production, or storage that can't be written to.
+     * Studio in production, storage that can't be written to, or an app
+     * '/' route that keeps the homepage off the root URL.
      */
-    protected function editorNotices(): array
+    protected function editorNotices(bool $homeClaimed = false): array
     {
         $notices = [];
 
@@ -112,7 +117,34 @@ class StudioController extends Controller
             ];
         }
 
+        // The app owns '/' with something Studio won't touch (a customized
+        // route, or an unwritable routes file) — the homepage can't serve
+        // at the root URL. Skipped when claimHome() just pruned the stock
+        // route: the route collection still lists '/' for THIS request,
+        // but the next one is clean.
+        $pruner = $this->pruner();
+        $homeSlug = config('studio.page_routing.home_slug', 'home');
+
+        $rootBlocked = config('studio.page_routing.enabled', true)
+            && !$homeClaimed
+            && $pruner->liveHomePageExists()
+            && $pruner->appDefinesRootRoute();
+
+        if ($rootBlocked) {
+            $notices[] = [
+                'id' => 'app-owns-root',
+                'tone' => 'warn',
+                'dismissible' => true,
+                'text' => "Your app defines its own / route, so your homepage is served at /{$homeSlug} instead. Remove that route from routes/web.php to let Studio serve it at /.",
+            ];
+        }
+
         return $notices;
+    }
+
+    protected function pruner(): \Designer\Studio\Support\WelcomeRoutePruner
+    {
+        return app(\Designer\Studio\Support\WelcomeRoutePruner::class);
     }
 
     /**
@@ -435,6 +467,9 @@ class StudioController extends Controller
             'success' => true,
             'published' => $published['items'],
             'count' => count($published['items']),
+            // Publishing is the moment the site goes live — take over '/'
+            // from the stock Laravel welcome route if it's still there.
+            'home_claimed' => $this->pruner()->claimHome(),
         ]);
     }
 

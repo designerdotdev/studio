@@ -1,0 +1,120 @@
+name: atlas-pricing
+title: Atlas pricing pair
+description: Two warm pricing cards — flexible plan beside a highlighted best-value plan
+category: pricing
+tags:
+    - pricing
+    - plans
+    - atlas
+    - billing
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "One Plan, Simple Pricing"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        default: "Everything you need to build powerful integrations. Choose your billing cycle."
+
+    plan_1_name:
+        type: text
+        label: Plan 1 name
+        default: "Monthly"
+
+    plan_1_note:
+        type: text
+        label: Plan 1 note
+        default: "Flexible month-to-month billing"
+
+    plan_1_price:
+        type: text
+        label: Plan 1 price
+        default: "$29"
+
+    plan_1_period:
+        type: text
+        label: Plan 1 period
+        default: "/month"
+
+    plan_1_features:
+        type: repeater
+        label: Plan 1 features
+        add_button_label: Add feature
+        sub_fields:
+            text:
+                type: text
+                label: Feature
+                default: "Feature"
+        default:
+            - text: "All features included"
+            - text: "Cancel anytime"
+            - text: "No long-term commitment"
+
+    plan_1_button_text:
+        type: text
+        label: Plan 1 button text
+        default: "Get Started"
+
+    plan_1_button_link:
+        type: url
+        label: Plan 1 button link
+        default: "#"
+
+    plan_2_badge:
+        type: text
+        label: Plan 2 badge
+        description: Clear to hide the corner ribbon.
+        default: "Best Value"
+
+    plan_2_name:
+        type: text
+        label: Plan 2 name
+        default: "Annual"
+
+    plan_2_note:
+        type: text
+        label: Plan 2 note
+        default: "Save 35% with annual billing"
+
+    plan_2_price:
+        type: text
+        label: Plan 2 price
+        default: "$19"
+
+    plan_2_period:
+        type: text
+        label: Plan 2 period
+        default: "/month"
+
+    plan_2_features:
+        type: repeater
+        label: Plan 2 features
+        add_button_label: Add feature
+        sub_fields:
+            text:
+                type: text
+                label: Feature
+                default: "Feature"
+        default:
+            - text: "All features included"
+            - text: "2 months free"
+            - text: "Priority onboarding"
+
+    plan_2_button_text:
+        type: text
+        label: Plan 2 button text
+        default: "Get Started"
+
+    plan_2_button_link:
+        type: url
+        label: Plan 2 button link
+        default: "#"
+
+    footnote:
+        type: text
+        label: Footnote
+        default: "All plans include a 14-day free trial. No credit card required."

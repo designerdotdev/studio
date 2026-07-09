@@ -1,0 +1,47 @@
+name: atlas-stats
+title: Atlas stats with chart
+description: Serif stat trio over a rising editorial bar chart
+category: stats
+tags:
+    - stats
+    - chart
+    - atlas
+    - metrics
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "Trusted by teams worldwide"
+        required: true
+
+    subheading:
+        type: textarea
+        label: Subheading
+        default: "Measurable results that help businesses scale faster and work smarter."
+
+    stats:
+        type: repeater
+        label: Stats
+        add_button_label: Add stat
+        sub_fields:
+            value:
+                type: text
+                label: Value
+                default: "99.9%"
+            label:
+                type: text
+                label: Label
+                default: "Label"
+        default:
+            - value: "99.9%"
+              label: "Uptime guarantee"
+            - value: "10M+"
+              label: "API requests daily"
+            - value: "500+"
+              label: "Enterprise customers"
+
+    show_chart:
+        type: toggle
+        label: Show bar chart
+        default: true
