@@ -9,15 +9,15 @@
     --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    /* Surfaces (cool near-black family) */
-    --color-shell: #0b0b0d;
-    --color-panel: #121215;
-    --color-raised: #1a1a1f;
-    --color-overlay: #1e1e24;
+    /* Surfaces: a near-black shell behind a graphite workspace card */
+    --color-shell: #0c0c0e;
+    --color-panel: #18181b;
+    --color-raised: #222226;
+    --color-overlay: #202024;
 
     /* Hairlines */
-    --color-line: rgba(255, 255, 255, 0.11);
-    --color-line-strong: rgba(255, 255, 255, 0.14);
+    --color-line: rgba(255, 255, 255, 0.08);
+    --color-line-strong: rgba(255, 255, 255, 0.13);
 
     /* Text */
     --color-ink: #f4f4f6;
@@ -34,7 +34,7 @@
     --color-danger: #f37272;
 
     /* Canvas */
-    --color-canvas: #101014;
+    --color-canvas: #101012;
 
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
@@ -335,15 +335,15 @@ html.studio-light {
     /* --- the rail (panel switcher beside the sidebar) ---------------- */
 
     .s-rail {
-        @apply flex w-12 shrink-0 flex-col items-center gap-1 bg-shell pb-2 pt-3.5;
+        @apply flex w-14 shrink-0 flex-col items-center gap-2 bg-shell pb-2 pt-2.5;
     }
 
     .s-rail-gap {
-        @apply my-1 h-px w-6 shrink-0 bg-line;
+        @apply my-0.5 h-px w-7 shrink-0 bg-line-strong;
     }
 
     .s-rail-btn {
-        @apply flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
+        @apply flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
     }
 
     .s-rail-btn:hover {
@@ -449,7 +449,7 @@ html.studio-light {
     /* --- topbar ----------------------------------------------------- */
 
     .s-topbar {
-        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-panel px-3;
+        @apply relative z-40 flex h-11 shrink-0 items-center gap-1.5 border-b border-line bg-panel px-2.5;
     }
 
     /* Assistant suggestion — a wrapping outline button */
@@ -627,7 +627,7 @@ html.studio-light {
     /* The workspace card: toolbar + canvas as one surface inset from the shell */
     .s-workspace {
         @apply my-2 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 40px -20px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 48px -24px rgba(0, 0, 0, 0.7);
     }
 
     /* Desktop preview fills the card; narrower devices sit on a dotted canvas */
@@ -960,14 +960,14 @@ html.studio-light .s-workspace {
 /* ------------------------------------------------------------------ */
 
 .s-pop-inverse {
-    --color-overlay: #ffffff;
+    --color-overlay: #e9e9ed;
     --color-ink: #141417;
-    --color-soft: #5f6069;
-    --color-faint: #9a9aa4;
-    --color-line: rgba(17, 17, 20, 0.08);
-    --color-line-strong: rgba(17, 17, 20, 0.14);
-    --color-wash: rgba(17, 17, 20, 0.05);
-    --color-wash-strong: rgba(17, 17, 20, 0.09);
+    --color-soft: #55565e;
+    --color-faint: #8d8d97;
+    --color-line: rgba(17, 17, 20, 0.1);
+    --color-line-strong: rgba(17, 17, 20, 0.16);
+    --color-wash: rgba(17, 17, 20, 0.06);
+    --color-wash-strong: rgba(17, 17, 20, 0.11);
     border: 0;
     box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
 }
