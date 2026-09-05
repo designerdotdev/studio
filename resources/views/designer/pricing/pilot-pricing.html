@@ -1,0 +1,71 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+    .pilot-mono { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    /* The highlighted plan: ink border, solid button, ink check marks. */
+    .pilot-plan { border-color: rgba(15, 15, 14, 0.11); background-color: rgba(255, 255, 255, 0.6); }
+    .pilot-plan:hover { border-color: rgba(15, 15, 14, 0.24); }
+    .pilot-plan .pilot-check { fill: #97968f; }
+    .pilot-plan-featured { border-color: rgba(15, 15, 14, 0.24); background-color: #ffffff; }
+    .pilot-plan-featured .pilot-check { fill: #0f0f0e; }
+</style>
+<section id="pricing" class="relative bg-[#f6f5f2] py-20 sm:py-28" style="font-family: 'Geist', ui-sans-serif, system-ui, sans-serif">
+    <div class="mx-auto w-full max-w-6xl px-6">
+
+        <div class="max-w-[38ch]">
+            @if($eyebrow)
+                <p class="pilot-mono text-[11px] uppercase tracking-widest text-[#0f0f0e]">{{ $eyebrow }}</p>
+            @endif
+            <h2 class="mt-5 text-balance text-3xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#0f0f0e] sm:text-4xl">{{ $heading ?? 'Free to run. Pay for what you keep.' }}</h2>
+            @if($text)
+                <p class="mt-5 text-base/7 text-[#6c6b66]">{{ $text }}</p>
+            @endif
+        </div>
+
+        <div class="mt-14 grid gap-3 sm:mt-16 lg:grid-cols-3">
+            @foreach($items as $item)
+                <div class="pilot-plan relative flex flex-col rounded-2xl border p-7 transition-colors duration-300 sm:p-8 @if($item['featured']) pilot-plan-featured @endif">
+                    @if($item['featured'])
+                        <span class="absolute -top-3 left-7 rounded-full bg-[#0f0f0e] px-3 py-1 text-[11px] font-medium text-[#f6f5f2]">{{ $item['badge'] }}</span>
+                    @endif
+
+                    <p class="text-lg font-semibold tracking-tight text-[#0f0f0e]">{{ $item['name'] }}</p>
+                    <p class="mt-2 text-[13px]/6 text-[#6c6b66]">{{ $item['tagline'] }}</p>
+
+                    <p class="mt-7 flex items-baseline gap-1.5">
+                        <span class="text-5xl font-semibold tracking-[-0.03em] text-[#0f0f0e]">{{ $item['price'] }}</span>
+                        <span class="text-[13px] text-[#97968f]">{{ $item['period'] }}</span>
+                    </p>
+
+                    @if($item['featured'])
+                        <a href="{{ $item['button_link'] ?? '#' }}" class="mt-7 rounded-full bg-[#0f0f0e] px-5 py-3 text-center text-sm font-medium text-[#f6f5f2] transition-opacity duration-200 hover:opacity-90">{{ $item['button_text'] }}</a>
+                    @else
+                        <a href="{{ $item['button_link'] ?? '#' }}" class="mt-7 rounded-full border border-[#0f0f0e]/10 px-5 py-3 text-center text-sm font-medium text-[#0f0f0e] transition-colors duration-200 hover:bg-[#eeece6]">{{ $item['button_text'] }}</a>
+                    @endif
+
+                    <ul role="list" class="mt-8 flex flex-col gap-3 border-t border-[#0f0f0e]/10 pt-8 text-[14px] text-[#6c6b66]">
+                        @if($item['feature_1'])
+                            <li class="flex items-start gap-2.5"><svg viewBox="0 0 20 20" class="pilot-check mt-0.5 size-4 shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>{{ $item['feature_1'] }}</li>
+                        @endif
+                        @if($item['feature_2'])
+                            <li class="flex items-start gap-2.5"><svg viewBox="0 0 20 20" class="pilot-check mt-0.5 size-4 shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>{{ $item['feature_2'] }}</li>
+                        @endif
+                        @if($item['feature_3'])
+                            <li class="flex items-start gap-2.5"><svg viewBox="0 0 20 20" class="pilot-check mt-0.5 size-4 shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>{{ $item['feature_3'] }}</li>
+                        @endif
+                        @if($item['feature_4'])
+                            <li class="flex items-start gap-2.5"><svg viewBox="0 0 20 20" class="pilot-check mt-0.5 size-4 shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>{{ $item['feature_4'] }}</li>
+                        @endif
+                        @if($item['feature_5'])
+                            <li class="flex items-start gap-2.5"><svg viewBox="0 0 20 20" class="pilot-check mt-0.5 size-4 shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>{{ $item['feature_5'] }}</li>
+                        @endif
+                        @if($item['feature_6'])
+                            <li class="flex items-start gap-2.5"><svg viewBox="0 0 20 20" class="pilot-check mt-0.5 size-4 shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>{{ $item['feature_6'] }}</li>
+                        @endif
+                    </ul>
+                </div>
+            @endforeach
+        </div>
+
+    </div>
+</section>

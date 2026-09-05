@@ -1,0 +1,92 @@
+name: pilot-header
+title: Pilot header
+description: Fixed top bar that turns to glass on scroll, with soft-black dropdown menus and three calls to action
+category: headers
+fixed: true
+tags:
+    - header
+    - navigation
+    - pilot
+    - dropdown
+
+fields:
+    brand:
+        type: text
+        label: Brand name
+        default: "Pilot"
+        required: true
+
+    nav_links:
+        type: repeater
+        label: Navigation links
+        description: Nest links under an item to turn it into a dropdown menu.
+        nestable: true
+        max_depth: 2
+        add_button_label: Add link
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "New link"
+            url:
+                type: url
+                label: Link
+                default: "/"
+        default:
+            - text: "Product"
+              url: "#"
+              children:
+                  - text: "Overview"
+                    url: "/features"
+                  - text: "How it works"
+                    url: "/#how-it-works"
+                  - text: "What's in the box"
+                    url: "/#capabilities"
+                  - text: "Runtimes and integrations"
+                    url: "/features#integrations"
+            - text: "Resources"
+              url: "#"
+              children:
+                  - text: "All guides"
+                    url: "/guides"
+                  - text: "Designing an agent loop"
+                    url: "/designing-an-agent-loop"
+                  - text: "Tools that fail well"
+                    url: "/tools-that-fail-well"
+                  - text: "Evaluating agents"
+                    url: "/evaluating-agents"
+            - text: "Pricing"
+              url: "/pricing"
+
+    secondary_text:
+        type: text
+        label: Quiet link text
+        description: Clear to hide.
+        default: "Talk to us"
+
+    secondary_link:
+        type: url
+        label: Quiet link
+        default: "mailto:hello@pilot.dev"
+
+    sign_in_text:
+        type: text
+        label: Outlined button text
+        description: Clear to hide.
+        default: "Sign in"
+
+    sign_in_link:
+        type: url
+        label: Outlined button link
+        default: "#"
+
+    cta_text:
+        type: text
+        label: Solid button text
+        description: Clear to hide.
+        default: "Get Pilot"
+
+    cta_link:
+        type: url
+        label: Solid button link
+        default: "/pricing"

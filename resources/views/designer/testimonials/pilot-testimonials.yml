@@ -1,0 +1,84 @@
+name: pilot-testimonials
+title: Pilot testimonials
+description: Quotes in a masonry flow — one lead quote set large, the rest fall in around it at their natural heights
+category: testimonials
+tags:
+    - testimonials
+    - pilot
+    - masonry
+    - quotes
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        default: "Evidence"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Engineers who put agents in front of customers"
+        required: true
+
+    lead_quote:
+        type: textarea
+        label: Lead quote
+        rows: 4
+        default: "We had six months of agent demos and nothing in production. The thing that changed was checkpointing — once a run could survive a bad tool call, we could actually put one in front of customers."
+
+    lead_name:
+        type: text
+        label: Lead quote — name
+        default: "Mara Vane"
+
+    lead_role:
+        type: text
+        label: Lead quote — role
+        default: "Staff engineer, Northbeam"
+
+    lead_image:
+        type: image
+        label: Lead quote — photo
+        default: "https://i.pravatar.cc/144?img=47"
+
+    lead_metric:
+        type: text
+        label: Lead quote — metric chip
+        description: Clear to hide.
+        default: "8 agents in prod"
+
+    items:
+        type: repeater
+        label: More quotes
+        add_button_label: Add quote
+        sub_fields:
+            quote:
+                type: textarea
+                label: Quote
+                rows: 4
+                default: "What they said."
+            name:
+                type: text
+                label: Name
+                default: "New name"
+            role:
+                type: text
+                label: Role
+                default: "Role, Company"
+            image:
+                type: image
+                label: Photo
+                default: "https://i.pravatar.cc/144?img=12"
+        default:
+            - quote: "The trace is the product. When an agent does something strange at 2am, I can replay the exact run instead of guessing from logs."
+              name: "Theo Adeyemi"
+              role: "Platform lead, Cadence"
+              image: "https://i.pravatar.cc/144?img=59"
+            - quote: "Typed tools caught more bugs in a week than our eval suite caught in a quarter. The model simply cannot pass an argument that does not compile."
+              name: "Priya Raman"
+              role: "Founder, Vector Field"
+              image: "https://i.pravatar.cc/144?img=32"
+            - quote: "We moved off a homegrown loop in an afternoon. That is the whole review."
+              name: "Jonas Meyer"
+              role: "Backend engineer, Substrate"
+              image: "https://i.pravatar.cc/144?img=14"

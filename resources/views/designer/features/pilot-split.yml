@@ -1,0 +1,157 @@
+name: pilot-split
+title: Pilot split with chart
+description: Copy on one side, a bar chart drawn in markup on the other — a spend ladder or a run timeline
+category: features
+tags:
+    - features
+    - pilot
+    - split
+    - chart
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        default: "Cost"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Know what a run costs before it runs"
+        required: true
+
+    text:
+        type: textarea
+        label: Supporting copy
+        rows: 3
+        default: "Agents are cheap until they are not. Pilot meters every call, attributes it to the step that made it, and stops a run that walks past its budget."
+
+    point_1:
+        type: text
+        label: Point one
+        default: "Per-run and per-step spend, live"
+
+    point_2:
+        type: text
+        label: Point two
+        default: "Hard budget ceilings that halt instead of overrun"
+
+    point_3:
+        type: text
+        label: Point three
+        default: "Cached tool results reused across retries"
+
+    link_text:
+        type: text
+        label: Link text
+        description: Clear to hide.
+        default: "How Pilot meters a run"
+
+    link_url:
+        type: url
+        label: Link
+        default: "/evaluating-agents"
+
+    visual_left:
+        type: toggle
+        label: Chart on the left
+        description: Off puts the chart on the right.
+        default: false
+
+    show_ruler:
+        type: toggle
+        label: Show the ruler above the bars
+        description: Turns the ladder into a timeline.
+        default: false
+
+    visual_title:
+        type: text
+        label: Chart title
+        default: "Spend by step"
+
+    visual_chip:
+        type: text
+        label: Chart chip
+        default: "Last 24h"
+
+    visual_note:
+        type: text
+        label: Chart footnote
+        default: "Averaged over 3,410 runs on this workspace."
+
+    ruler_1:
+        type: text
+        label: Ruler mark 1
+        description: Only shown when the ruler is on.
+        default: "0s"
+
+    ruler_2:
+        type: text
+        label: Ruler mark 2
+        default: "60s"
+
+    ruler_3:
+        type: text
+        label: Ruler mark 3
+        default: "120s"
+
+    ruler_4:
+        type: text
+        label: Ruler mark 4
+        default: "180s"
+
+    ruler_5:
+        type: text
+        label: Ruler mark 5
+        default: "252s"
+
+    items:
+        type: repeater
+        label: Rows
+        description: Each row draws a bar. Start and width are percentages of the track.
+        add_button_label: Add row
+        sub_fields:
+            label:
+                type: text
+                label: Label
+                default: "New row"
+            value:
+                type: text
+                label: Value
+                default: "$0"
+            start:
+                type: text
+                label: Bar start (%)
+                default: "0"
+            width:
+                type: text
+                label: Bar width (%)
+                default: "50"
+            featured:
+                type: select
+                label: Highlight
+                options:
+                    "": "No"
+                    "1": "Yes"
+                default: ""
+        default:
+            - label: "Planning"
+              value: "$0.21"
+              start: "0"
+              width: "18"
+              featured: ""
+            - label: "Tool calls"
+              value: "$1.02"
+              start: "0"
+              width: "72"
+              featured: "1"
+            - label: "Review pass"
+              value: "$0.44"
+              start: "0"
+              width: "34"
+              featured: ""
+            - label: "Retries"
+              value: "$0.27"
+              start: "0"
+              width: "21"
+              featured: ""

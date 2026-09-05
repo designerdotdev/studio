@@ -1,0 +1,66 @@
+name: pilot-faq
+title: Pilot FAQ
+description: A sticky heading column beside a native accordion — questions open without JavaScript
+category: faq
+tags:
+    - faq
+    - pilot
+    - accordion
+    - questions
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        default: "Questions"
+
+    heading:
+        type: text
+        label: Heading
+        default: "The ones people actually ask"
+        required: true
+
+    text:
+        type: textarea
+        label: Supporting copy
+        rows: 2
+        default: "Still unsure? Write to us and a person answers."
+
+    link_text:
+        type: text
+        label: Link text
+        description: Clear to hide.
+        default: "hello@pilot.dev"
+
+    link_url:
+        type: url
+        label: Link
+        default: "mailto:hello@pilot.dev"
+
+    items:
+        type: repeater
+        label: Questions
+        add_button_label: Add question
+        sub_fields:
+            question:
+                type: text
+                label: Question
+                default: "New question"
+            answer:
+                type: textarea
+                label: Answer
+                rows: 4
+                default: "The answer."
+        default:
+            - question: "Is this another orchestration DSL?"
+              answer: "No. Pilot is a library you call from ordinary code — a function, a queue worker, a controller. There is no graph to draw and no YAML to learn. If you can write a class and a few typed methods, you have written an agent."
+            - question: "What happens when a tool call fails?"
+              answer: "The step retries with backoff. If it keeps failing, the run parks at its last checkpoint with the error attached rather than unwinding. You fix the tool, resume the run, and it picks up from that step instead of starting over."
+            - question: "Which models does it work with?"
+              answer: "Any of them. Pilot speaks the OpenAI and Anthropic wire formats natively and anything OpenAI-compatible through configuration. Model choice is per-step, so a cheap model can plan and an expensive one can write."
+            - question: "Do I have to send you my data?"
+              answer: "Only if you want hosted traces. The open-source runtime writes traces to your own Postgres and never calls home. Cloud is a place to put them, not a dependency of the framework."
+            - question: "How is this different from just calling the API in a loop?"
+              answer: "For a demo it is not. The difference shows up the first time a run dies at minute nine of twelve, or a tool gets an argument that does not type-check, or someone asks why the agent refunded that customer in March."
+            - question: "Can a human approve things mid-run?"
+              answer: "Yes, and this is the part teams underestimate. Put a gate anywhere in the loop; the run parks, routes to whoever should decide, and resumes exactly where it stopped once they do. Runs can wait for days."

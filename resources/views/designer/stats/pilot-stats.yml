@@ -1,0 +1,39 @@
+name: pilot-stats
+title: Pilot stats band
+description: A full-bleed row of proof points on hairline dividers, with a footnote
+category: stats
+tags:
+    - stats
+    - pilot
+    - numbers
+    - band
+
+fields:
+    label:
+        type: text
+        label: Footnote
+        description: Clear to hide.
+        default: "Measured across 1.4M agent runs on Pilot in 2025"
+
+    items:
+        type: repeater
+        label: Numbers
+        add_button_label: Add number
+        sub_fields:
+            value:
+                type: text
+                label: Number
+                default: "0×"
+            label:
+                type: text
+                label: Description
+                default: "What it measures"
+        default:
+            - value: "41ms"
+              label: "Median framework overhead per step"
+            - value: "8.4×"
+              label: "Cheaper after caching and model routing"
+            - value: "99.2%"
+              label: "Runs that resume cleanly after a failure"
+            - value: "12k"
+              label: "Agents in production on Pilot today"

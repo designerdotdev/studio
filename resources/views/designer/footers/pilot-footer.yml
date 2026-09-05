@@ -1,0 +1,113 @@
+name: pilot-footer
+title: Pilot footer
+description: Brand block with a social row beside nestable link columns, on a hairline-topped band
+category: footers
+tags:
+    - footer
+    - pilot
+    - columns
+    - social
+
+fields:
+    brand:
+        type: text
+        label: Brand name
+        default: "Pilot"
+        required: true
+
+    tagline:
+        type: textarea
+        label: Tagline
+        rows: 2
+        default: "The runtime for agents that do real work."
+
+    columns:
+        type: repeater
+        label: Link columns
+        description: Each top-level item is a column heading. Nest links beneath it.
+        nestable: true
+        max_depth: 2
+        add_button_label: Add column
+        sub_fields:
+            text:
+                type: text
+                label: Text
+                default: "New column"
+            url:
+                type: url
+                label: Link
+                default: "#"
+        default:
+            - text: "Product"
+              url: "#"
+              children:
+                  - text: "Overview"
+                    url: "/features"
+                  - text: "Pricing"
+                    url: "/pricing"
+                  - text: "How it works"
+                    url: "/#how-it-works"
+                  - text: "What's in the box"
+                    url: "/#capabilities"
+            - text: "Resources"
+              url: "#"
+              children:
+                  - text: "All guides"
+                    url: "/guides"
+                  - text: "Designing an agent loop"
+                    url: "/designing-an-agent-loop"
+                  - text: "Tools that fail well"
+                    url: "/tools-that-fail-well"
+                  - text: "Evaluating agents"
+                    url: "/evaluating-agents"
+            - text: "Company"
+              url: "#"
+              children:
+                  - text: "Get Pilot"
+                    url: "/pricing"
+                  - text: "Sign in"
+                    url: "#"
+                  - text: "hello@pilot.dev"
+                    url: "mailto:hello@pilot.dev"
+                  - text: "Status"
+                    url: "#"
+
+    social:
+        type: repeater
+        label: Social links
+        add_button_label: Add social link
+        sub_fields:
+            text:
+                type: text
+                label: Name
+                default: "X"
+            url:
+                type: url
+                label: Link
+                default: "#"
+            icon:
+                type: textarea
+                label: Icon SVG
+                description: Inline SVG. Use fill='currentColor' so it follows the theme.
+                rows: 3
+                default: ""
+        default:
+            - text: "X"
+              url: "#"
+              icon: "<svg viewBox='0 0 20 20' class='size-4 fill-current' aria-hidden='true'><path d='M15.3 2h2.8l-6.1 7 7.2 9.5h-5.6l-4.4-5.8L4.1 18.5H1.3l6.5-7.5L.9 2h5.8l4 5.3L15.3 2Zm-1 15h1.6L6.1 3.6H4.4L14.3 17Z'/></svg>"
+            - text: "GitHub"
+              url: "#"
+              icon: "<svg viewBox='0 0 20 20' class='size-4 fill-current' aria-hidden='true'><path fill-rule='evenodd' d='M10 1.5a8.5 8.5 0 0 0-2.69 16.57c.43.08.58-.19.58-.41v-1.6c-2.37.51-2.87-1.01-2.87-1.01-.39-.99-.95-1.25-.95-1.25-.77-.53.06-.52.06-.52.86.06 1.31.88 1.31.88.76 1.31 2 .93 2.49.71.08-.55.3-.93.54-1.15-1.89-.21-3.88-.95-3.88-4.21 0-.93.33-1.69.88-2.29-.09-.21-.38-1.08.08-2.25 0 0 .71-.23 2.34.87a8.1 8.1 0 0 1 4.26 0c1.62-1.1 2.33-.87 2.33-.87.46 1.17.17 2.04.09 2.25.55.6.87 1.36.87 2.29 0 3.27-1.99 4-3.89 4.21.31.26.58.78.58 1.57v2.33c0 .23.15.5.59.41A8.5 8.5 0 0 0 10 1.5Z' clip-rule='evenodd'/></svg>"
+            - text: "Discord"
+              url: "#"
+              icon: "<svg viewBox='0 0 20 20' class='size-4 fill-current' aria-hidden='true'><path d='M16.1 4.6A13 13 0 0 0 12.9 3.6l-.2.4a12 12 0 0 0-5.4 0l-.2-.4a13 13 0 0 0-3.2 1A13.6 13.6 0 0 0 1.5 14a13 13 0 0 0 3.9 2l.8-1.3a8.5 8.5 0 0 1-1.3-.6l.3-.3a9.3 9.3 0 0 0 7.9 0l.3.3a8.5 8.5 0 0 1-1.3.6l.8 1.3a13 13 0 0 0 3.9-2 13.6 13.6 0 0 0-2.7-9.4ZM7.3 12.1c-.8 0-1.4-.7-1.4-1.6s.6-1.6 1.4-1.6 1.4.7 1.4 1.6-.6 1.6-1.4 1.6Zm5.4 0c-.8 0-1.4-.7-1.4-1.6s.6-1.6 1.4-1.6 1.4.7 1.4 1.6-.6 1.6-1.4 1.6Z'/></svg>"
+
+    copyright:
+        type: text
+        label: Copyright
+        default: "© 2026 Pilot Labs, Inc."
+
+    note:
+        type: text
+        label: Footer note
+        default: "Apache 2.0 · Built in the open."
