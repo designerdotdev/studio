@@ -1,0 +1,102 @@
+name: pilot-guides
+title: Pilot guides listing
+description: The lead guide as a wide feature card with a pull quote, the rest in a hairlined list
+category: blog
+tags:
+    - blog
+    - pilot
+    - guides
+    - listing
+
+fields:
+    lead_category:
+        type: text
+        label: Lead guide — category
+        default: "Architecture"
+
+    lead_read_time:
+        type: text
+        label: Lead guide — read time
+        default: "9 min read"
+
+    lead_title:
+        type: text
+        label: Lead guide — title
+        default: "Designing an agent loop that survives production"
+        required: true
+
+    lead_text:
+        type: textarea
+        label: Lead guide — summary
+        rows: 3
+        default: "Almost every agent that dies in production dies the same way. The fix is not a smarter model — it is a loop built from steps that can each fail independently."
+
+    lead_author:
+        type: text
+        label: Lead guide — author
+        default: "Mara Vane"
+
+    lead_author_image:
+        type: image
+        label: Lead guide — author photo
+        default: "https://i.pravatar.cc/144?img=47"
+
+    lead_date:
+        type: text
+        label: Lead guide — date
+        default: "14 January 2026"
+
+    lead_quote:
+        type: textarea
+        label: Lead guide — pull quote
+        description: Stands in for cover art.
+        rows: 3
+        default: "The unit of work is the step, not the run."
+
+    lead_link:
+        type: url
+        label: Lead guide — link
+        default: "/designing-an-agent-loop"
+
+    items:
+        type: repeater
+        label: More guides
+        add_button_label: Add guide
+        sub_fields:
+            category:
+                type: text
+                label: Category
+                default: "Guide"
+            title:
+                type: text
+                label: Title
+                default: "New guide"
+            text:
+                type: textarea
+                label: Summary
+                rows: 3
+                default: "What this guide covers."
+            read_time:
+                type: text
+                label: Read time
+                default: "6 min read"
+            link:
+                type: url
+                label: Link
+                default: "#"
+        default:
+            - category: "Tools"
+              title: "Tools that fail well"
+              text: "The model will pass your tool something absurd — reliably, on a long enough timeline. Whether that becomes a corrected second attempt or a support ticket is entirely down to how the tool is written."
+              read_time: "7 min read"
+              link: "/tools-that-fail-well"
+            - category: "Evaluation"
+              title: "How to actually evaluate an agent"
+              text: "Most agent evaluation is a number that goes up. When it goes down you have no idea which of the eleven steps got worse — here is the boring, specific alternative."
+              read_time: "8 min read"
+              link: "/evaluating-agents"
+            - category: "Cost"
+              title: "What a run really costs"
+              text: "The bill is never the model. It is the retry you did not notice, the context you resent forty times, and the planning step running a frontier model to pick between three tools."
+              read_time: "6 min read"
+              link: "/the-cost-of-a-run"

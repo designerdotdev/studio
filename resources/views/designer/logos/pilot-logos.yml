@@ -1,0 +1,49 @@
+name: pilot-logos
+title: Pilot logo marquee
+description: A full-bleed band of client marks that scrolls on a loop and pauses on hover
+category: logos
+tags:
+    - logos
+    - pilot
+    - marquee
+    - social-proof
+
+fields:
+    label:
+        type: text
+        label: Label
+        description: Clear to hide.
+        default: "Teams running agents on Pilot today"
+
+    items:
+        type: repeater
+        label: Names
+        add_button_label: Add name
+        sub_fields:
+            name:
+                type: text
+                label: Name
+                default: "New studio"
+            icon:
+                type: textarea
+                label: Mark SVG
+                description: Inline SVG. Use fill='currentColor' so it follows the theme.
+                rows: 3
+                default: ""
+        default:
+            - name: "Northbeam"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path d='M8 1 15 15H1Z'/></svg>"
+            - name: "Cadence"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path fill-rule='evenodd' d='M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 3.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z' clip-rule='evenodd'/></svg>"
+            - name: "Vector Field"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path d='M2 2h5L5 14H0Zm7 0h5l-2 12H7Z'/></svg>"
+            - name: "Ledgerline"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><rect x='1' y='1' width='14' height='14' rx='4'/></svg>"
+            - name: "Substrate"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path d='M1 9h14v2H1Zm2-5h10v3H3Z'/></svg>"
+            - name: "Ironwood"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path d='M8 0.5 15.5 8 8 15.5 0.5 8Z'/></svg>"
+            - name: "Halcyon"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path d='M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8Z'/></svg>"
+            - name: "Fieldnote"
+              icon: "<svg viewBox='0 0 16 16' class='size-3.5 fill-current' aria-hidden='true'><path fill-rule='evenodd' d='M1 1h14v14H1Zm2.5 2.5v9h9v-9Z' clip-rule='evenodd'/><circle cx='8' cy='8' r='2'/></svg>"

@@ -1,0 +1,136 @@
+name: pilot-pricing
+title: Pilot pricing plans
+description: Three matching plan cards — set Highlight on one to give it the ink border and its badge
+category: pricing
+tags:
+    - pricing
+    - pilot
+    - plans
+    - cards
+
+fields:
+    eyebrow:
+        type: text
+        label: Eyebrow
+        default: "Plans"
+
+    heading:
+        type: text
+        label: Heading
+        default: "Free to run. Pay for what you keep."
+        required: true
+
+    text:
+        type: textarea
+        label: Supporting copy
+        rows: 3
+        default: "Every plan runs the same runtime — the open-source one. What Cloud and Enterprise add is somewhere to put the traces, the evals, and the approvals."
+
+    items:
+        type: repeater
+        label: Plans
+        add_button_label: Add plan
+        sub_fields:
+            name:
+                type: text
+                label: Name
+                default: "New plan"
+            tagline:
+                type: text
+                label: Tagline
+                default: "Who it is for"
+            price:
+                type: text
+                label: Price
+                default: "$0"
+            period:
+                type: text
+                label: Period
+                default: "/ month"
+            button_text:
+                type: text
+                label: Button text
+                default: "Get started"
+            button_link:
+                type: url
+                label: Button link
+                default: "#"
+            featured:
+                type: select
+                label: Highlight
+                options:
+                    "": "No"
+                    "1": "Yes"
+                default: ""
+            badge:
+                type: text
+                label: Badge
+                description: Only shown on the highlighted plan.
+                default: "Most popular"
+            feature_1:
+                type: text
+                label: Feature one
+                default: ""
+            feature_2:
+                type: text
+                label: Feature two
+                default: ""
+            feature_3:
+                type: text
+                label: Feature three
+                default: ""
+            feature_4:
+                type: text
+                label: Feature four
+                default: ""
+            feature_5:
+                type: text
+                label: Feature five
+                default: ""
+            feature_6:
+                type: text
+                label: Feature six
+                default: ""
+        default:
+            - name: "Open source"
+              tagline: "The full framework, self-hosted."
+              price: "$0"
+              period: "forever"
+              button_text: "Read the guides"
+              button_link: "/guides"
+              featured: ""
+              badge: ""
+              feature_1: "The whole runtime, Apache 2.0"
+              feature_2: "Durable loop and checkpoints"
+              feature_3: "Typed tools and schema derivation"
+              feature_4: "Local traces and replay"
+              feature_5: "Bring your own models and storage"
+              feature_6: "Community support"
+            - name: "Cloud"
+              tagline: "Hosted traces, evals, and approvals."
+              price: "$99"
+              period: "/ month"
+              button_text: "Get started"
+              button_link: "#"
+              featured: "1"
+              badge: "Most teams"
+              feature_1: "Everything in Open source"
+              feature_2: "Hosted trace store, 90-day retention"
+              feature_3: "Eval suites that run in CI"
+              feature_4: "Approval routing to Slack and email"
+              feature_5: "Spend metering and budget ceilings"
+              feature_6: "Five seats included"
+            - name: "Enterprise"
+              tagline: "Your VPC, your compliance team."
+              price: "Talk to us"
+              period: ""
+              button_text: "Contact sales"
+              button_link: "mailto:hello@pilot.dev"
+              featured: ""
+              badge: ""
+              feature_1: "Everything in Cloud"
+              feature_2: "Self-hosted control plane in your VPC"
+              feature_3: "SSO, SCIM, and audit logs"
+              feature_4: "Unlimited retention"
+              feature_5: "Private model endpoints"
+              feature_6: "A named engineer, not a queue"

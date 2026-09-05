@@ -1,0 +1,35 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+    .pilot-mono { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+<section id="integrations" class="relative border-t border-[#0f0f0e]/10 bg-[#f6f5f2] py-20 sm:py-28" style="font-family: 'Geist', ui-sans-serif, system-ui, sans-serif">
+    <div class="mx-auto w-full max-w-6xl px-6">
+
+        <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+            <div>
+                @if($eyebrow)
+                    <p class="pilot-mono text-[11px] uppercase tracking-widest text-[#0f0f0e]">{{ $eyebrow }}</p>
+                @endif
+                <h2 class="mt-5 max-w-[16ch] text-balance text-3xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#0f0f0e] sm:text-4xl">{{ $heading ?? 'A library, not a platform' }}</h2>
+            </div>
+            @if($text)
+                <p class="max-w-[52ch] self-end text-base/7 text-[#6c6b66]">{{ $text }}</p>
+            @endif
+        </div>
+
+        <ul role="list" class="mt-14 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#0f0f0e]/10 bg-[#0f0f0e]/10 sm:mt-16 sm:grid-cols-3 lg:grid-cols-4">
+            @foreach($items as $item)
+                <li class="flex flex-col gap-3 bg-[#f6f5f2] p-6 transition-colors duration-300 hover:bg-white">
+                    <span class="flex size-9 items-center justify-center rounded-lg border border-[#0f0f0e]/10 bg-[#eeece6] text-[#0f0f0e]">
+                        {!! $item['icon'] !!}
+                    </span>
+                    <span>
+                        <span class="block text-[14px] font-medium text-[#0f0f0e]">{{ $item['name'] }}</span>
+                        <span class="block text-[12px] text-[#97968f]">{{ $item['category'] }}</span>
+                    </span>
+                </li>
+            @endforeach
+        </ul>
+
+    </div>
+</section>

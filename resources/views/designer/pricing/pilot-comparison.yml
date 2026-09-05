@@ -1,0 +1,147 @@
+name: pilot-comparison
+title: Pilot plan comparison
+description: The line-by-line table — each cell shows a check mark or prints its text as written
+category: pricing
+tags:
+    - pricing
+    - pilot
+    - comparison
+    - table
+
+fields:
+    heading:
+        type: text
+        label: Heading
+        default: "Every plan, line by line"
+        required: true
+
+    column_1:
+        type: text
+        label: Column one
+        default: "Open source"
+
+    column_2:
+        type: text
+        label: Column two
+        description: Set in ink — the plan to draw the eye to.
+        default: "Cloud"
+
+    column_3:
+        type: text
+        label: Column three
+        default: "Enterprise"
+
+    items:
+        type: repeater
+        label: Rows
+        description: Set a column to Check mark to show a tick instead of its text.
+        add_button_label: Add row
+        sub_fields:
+            label:
+                type: text
+                label: Feature
+                default: "New feature"
+            check_1:
+                type: select
+                label: Column one shows
+                options:
+                    "": "The text below"
+                    "1": "Check mark"
+                default: ""
+            one:
+                type: text
+                label: Column one text
+                default: "—"
+            check_2:
+                type: select
+                label: Column two shows
+                options:
+                    "": "The text below"
+                    "1": "Check mark"
+                default: "1"
+            two:
+                type: text
+                label: Column two text
+                default: ""
+            check_3:
+                type: select
+                label: Column three shows
+                options:
+                    "": "The text below"
+                    "1": "Check mark"
+                default: "1"
+            three:
+                type: text
+                label: Column three text
+                default: ""
+        default:
+            - label: "The runtime and durable loop"
+              check_1: "1"
+              one: ""
+              check_2: "1"
+              two: ""
+              check_3: "1"
+              three: ""
+            - label: "Typed tools and validation"
+              check_1: "1"
+              one: ""
+              check_2: "1"
+              two: ""
+              check_3: "1"
+              three: ""
+            - label: "Trace retention"
+              check_1: ""
+              one: "Local only"
+              check_2: ""
+              two: "90 days"
+              check_3: ""
+              three: "Unlimited"
+            - label: "Eval suites in CI"
+              check_1: ""
+              one: "—"
+              check_2: "1"
+              two: ""
+              check_3: "1"
+              three: ""
+            - label: "Approval routing"
+              check_1: ""
+              one: "—"
+              check_2: "1"
+              two: ""
+              check_3: "1"
+              three: ""
+            - label: "Spend metering and budgets"
+              check_1: ""
+              one: "—"
+              check_2: "1"
+              two: ""
+              check_3: "1"
+              three: ""
+            - label: "Seats"
+              check_1: ""
+              one: "Unlimited"
+              check_2: ""
+              two: "5 included"
+              check_3: ""
+              three: "Unlimited"
+            - label: "Self-hosted control plane"
+              check_1: ""
+              one: "—"
+              check_2: ""
+              two: "—"
+              check_3: "1"
+              three: ""
+            - label: "SSO, SCIM, audit logs"
+              check_1: ""
+              one: "—"
+              check_2: ""
+              two: "—"
+              check_3: "1"
+              three: ""
+            - label: "Support"
+              check_1: ""
+              one: "Community"
+              check_2: ""
+              two: "Priority"
+              check_3: ""
+              three: "Named engineer"

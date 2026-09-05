@@ -1,0 +1,70 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+    .pilot-mono { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .pilot-spotlight { position: relative; overflow: hidden; }
+    .pilot-spotlight::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(15, 15, 14, 0.13), transparent 62%);
+    }
+    .pilot-spotlight:hover::after { opacity: 1; }
+</style>
+<section class="relative bg-[#f6f5f2] py-20 sm:py-24" style="font-family: 'Geist', ui-sans-serif, system-ui, sans-serif">
+    <div class="mx-auto w-full max-w-6xl px-6">
+
+        <!-- The lead guide -->
+        <a href="{{ $lead_link ?? '#' }}" class="group pilot-spotlight block overflow-hidden rounded-2xl border border-[#0f0f0e]/10 bg-white/70 transition-colors duration-300 hover:border-[#0f0f0e]/25" @pointermove="$el.style.setProperty('--mx', ($event.clientX - $el.getBoundingClientRect().left) + 'px'); $el.style.setProperty('--my', ($event.clientY - $el.getBoundingClientRect().top) + 'px')">
+            <div class="grid lg:grid-cols-[1.15fr_1fr]">
+                <div class="relative z-10 flex flex-col justify-between p-8 sm:p-10">
+                    <div>
+                        <span class="pilot-mono flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-widest text-[#0f0f0e]">
+                            {{ $lead_category ?? '' }}
+                            <span class="text-[#97968f]">{{ $lead_read_time ?? '' }}</span>
+                        </span>
+                        <h2 class="mt-5 max-w-[18ch] text-balance text-3xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#0f0f0e] sm:text-4xl">{{ $lead_title ?? '' }}</h2>
+                        <p class="mt-5 max-w-[52ch] text-base/7 text-[#6c6b66]">{{ $lead_text ?? '' }}</p>
+                    </div>
+
+                    <span class="mt-10 flex items-center gap-3 text-[13px]">
+                        @if($lead_author_image ?? false)
+                            <img src="{{ $lead_author_image }}" alt="" class="size-8 rounded-full object-cover" width="32" height="32" loading="lazy">
+                        @endif
+                        <span class="font-medium text-[#0f0f0e]">{{ $lead_author ?? '' }}</span>
+                        <span class="text-[#97968f]">{{ $lead_date ?? '' }}</span>
+                    </span>
+                </div>
+
+                <!-- The pull quote stands in for cover art -->
+                <div class="relative flex items-center border-[#0f0f0e]/10 bg-[#eeece6]/40 p-8 max-lg:border-t sm:p-10 lg:border-l">
+                    <p class="text-balance text-xl font-medium leading-[1.4] tracking-[-0.02em] text-[#0f0f0e] sm:text-2xl">{{ $lead_quote ?? '' }}</p>
+                </div>
+            </div>
+        </a>
+
+        <div class="mt-14 border-t border-[#0f0f0e]/10 sm:mt-16">
+            @foreach($items as $item)
+                <a href="{{ $item['link'] ?? '#' }}" class="group grid gap-4 border-b border-[#0f0f0e]/10 py-8 transition-colors duration-200 lg:grid-cols-[0.28fr_1fr_auto] lg:items-baseline lg:gap-10">
+                    <span class="pilot-mono text-[11px] uppercase tracking-widest text-[#97968f]">{{ $item['category'] }}</span>
+
+                    <span>
+                        <span class="block max-w-[42ch] text-xl font-semibold tracking-[-0.02em] text-[#0f0f0e] transition-colors duration-200 group-hover:text-[#3d3d3a]">{{ $item['title'] }}</span>
+                        <span class="mt-2 block max-w-[62ch] text-[15px]/7 text-[#6c6b66]">{{ $item['text'] }}</span>
+                    </span>
+
+                    <span class="flex items-center gap-4 text-[12px] text-[#97968f] lg:justify-end">
+                        <span>{{ $item['read_time'] }}</span>
+                        <svg viewBox="0 0 16 16" class="size-3.5 shrink-0 fill-[#97968f] transition-all duration-200 group-hover:translate-x-0.5 group-hover:fill-[#0f0f0e]" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M2 8a.75.75 0 0 1 .75-.75h8.69L8.22 4.03a.75.75 0 0 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 0 1-1.06-1.06l3.22-3.22H2.75A.75.75 0 0 1 2 8Z" clip-rule="evenodd"/>
+                        </svg>
+                    </span>
+                </a>
+            @endforeach
+        </div>
+
+    </div>
+</section>
