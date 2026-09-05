@@ -335,7 +335,7 @@ html.studio-light {
     /* --- the rail (panel switcher beside the sidebar) ---------------- */
 
     .s-rail {
-        @apply flex w-12 shrink-0 flex-col items-center gap-1 bg-shell pt-1.5 pb-2;
+        @apply flex w-12 shrink-0 flex-col items-center gap-1 bg-shell pb-2 pt-3.5;
     }
 
     .s-rail-gap {
@@ -952,4 +952,34 @@ html.studio-light .s-urlbar.is-open {
 
 html.studio-light .s-workspace {
     box-shadow: 0 1px 2px rgba(17, 17, 20, 0.04), 0 8px 24px -16px rgba(17, 17, 20, 0.12);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Inverse popover — the main menu flips against the chrome           */
+/*  (white on dark, black on light), borderless, like the Sites menu   */
+/* ------------------------------------------------------------------ */
+
+.s-pop-inverse {
+    --color-overlay: #ffffff;
+    --color-ink: #141417;
+    --color-soft: #5f6069;
+    --color-faint: #9a9aa4;
+    --color-line: rgba(17, 17, 20, 0.08);
+    --color-line-strong: rgba(17, 17, 20, 0.14);
+    --color-wash: rgba(17, 17, 20, 0.05);
+    --color-wash-strong: rgba(17, 17, 20, 0.09);
+    border: 0;
+    box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+html.studio-light .s-pop-inverse {
+    --color-overlay: #141417;
+    --color-ink: #f4f4f6;
+    --color-soft: #b9b9c2;
+    --color-faint: #7c7c86;
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-line-strong: rgba(255, 255, 255, 0.16);
+    --color-wash: rgba(255, 255, 255, 0.08);
+    --color-wash-strong: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 16px 40px -8px rgba(17, 17, 20, 0.35), 0 2px 6px rgba(17, 17, 20, 0.12);
 }

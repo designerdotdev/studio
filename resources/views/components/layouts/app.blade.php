@@ -81,7 +81,8 @@
                     :aria-hidden="!$store.studio.sidebar"
                     :inert="!$store.studio.sidebar"
                 >
-                    <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden">
+                    {{-- pt-2 lines the 48px header row up with the topbar inside the inset workspace card --}}
+                    <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden pt-2">
                         {{ $sidebar }}
                     </div>
                 </aside>

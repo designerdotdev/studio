@@ -520,10 +520,10 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute left-full top-0 z-50 ml-2 w-60 origin-top-left"
+                class="s-pop s-pop-inverse absolute left-0 top-full z-50 mt-1.5 w-60 origin-top-left"
             >
                 <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
-                    <svg class="h-[17px] w-auto -translate-y-0.5 text-neutral-100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
+                    <svg class="h-[17px] w-auto -translate-y-0.5 text-ink" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
                     <span class="text-[13px] font-semibold text-ink">Designer Studio</span>
                 </div>
         
