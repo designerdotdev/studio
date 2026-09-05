@@ -21,7 +21,7 @@
         {{-- ======================================================== --}}
         <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="inspector-{{ $selectedId }}">
             {{-- Inspector header --}}
-            <div class="flex shrink-0 items-center gap-1 border-b border-line px-2 py-2.5">
+            <div class="flex h-12 shrink-0 items-center gap-1 border-b border-line px-2">
                 <button wire:click="closeInspector" class="s-icon-btn" title="Back to sections (Esc)">
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
@@ -174,7 +174,7 @@
         {{-- Tabs — Sections list / Page settings                      --}}
         {{-- ======================================================== --}}
         <div class="s-panel-enter-back flex h-full min-h-0 flex-col" wire:key="panel-tabs">
-            <div class="flex shrink-0 items-center gap-1.5 border-b border-line p-2">
+            <div class="flex h-12 shrink-0 items-center gap-1.5 border-b border-line px-2">
                 <div class="grid min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-lg border border-line bg-shell p-0.5">
                     <button
                         wire:click="$set('tab', 'sections')"
@@ -536,7 +536,7 @@
                                             type="button"
                                             role="switch"
                                             aria-checked="{{ $on ? 'true' : 'false' }}"
-                                            class="relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 {{ $on ? 'bg-accent' : 'bg-white/12' }}"
+                                            class="relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 {{ $on ? 'bg-accent' : 'bg-wash-strong' }}"
                                             wire:click="$set('page.{{ $toggleKey }}', {{ $on ? 'false' : 'true' }})"
                                         >
                                             <span class="sr-only">Toggle {{ $toggleLabel }}</span>

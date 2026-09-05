@@ -10,7 +10,7 @@
         type="button"
         role="switch"
         aria-checked="{{ $on ? 'true' : 'false' }}"
-        class="relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 {{ $on ? 'bg-accent' : 'bg-white/12' }}"
+        class="relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 {{ $on ? 'bg-accent' : 'bg-wash-strong' }}"
         wire:click="setVariable('{{ $sectionId }}', '{{ $key }}', {{ $on ? 'false' : 'true' }})"
         x-on:click="preview('{{ $sectionId }}', '{{ $key }}', {{ $on ? 'false' : 'true' }})"
     >

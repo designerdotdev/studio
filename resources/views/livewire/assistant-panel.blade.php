@@ -129,7 +129,7 @@
     }"
 >
     {{-- Header --}}
-    <div class="flex shrink-0 items-center gap-1 border-b border-line px-3 py-2">
+    <div class="flex h-12 shrink-0 items-center gap-1 border-b border-line px-3">
         <p class="s-microlabel flex-1">Assistant</p>
         <div class="relative" x-data="{ open: false }" @click.outside="open = false">
             <button type="button" class="s-icon-btn" title="Conversation history" aria-label="Conversation history" @click="open = !open">
@@ -140,7 +140,7 @@
                 <div class="max-h-64 overflow-y-auto">
                     @forelse($this->threads as $item)
                         <div wire:key="thread-{{ $item['id'] }}" class="group flex items-center">
-                            <button type="button" class="s-menu-item min-w-0 flex-1 {{ $item['id'] === $threadId ? 'bg-white/6 !text-ink' : '' }}" @click="open = false" wire:click="open('{{ $item['id'] }}')">
+                            <button type="button" class="s-menu-item min-w-0 flex-1 {{ $item['id'] === $threadId ? 'bg-wash !text-ink' : '' }}" @click="open = false" wire:click="open('{{ $item['id'] }}')">
                                 <span class="min-w-0 flex-1 truncate">{{ $item['title'] }}</span>
                                 <span class="shrink-0 text-[10px] text-faint">{{ $item['count'] }}</span>
                             </button>
@@ -267,7 +267,7 @@
 
                     {{-- Engine picker --}}
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                        <button type="button" class="flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] text-soft hover:bg-white/6 hover:text-ink" @click="open = !open">
+                        <button type="button" class="flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] text-soft hover:bg-wash hover:text-ink" @click="open = !open">
                             <span>{{ $engines[$engine]['label'] ?? 'Engine' }}</span>
                             <svg class="h-3 w-3 text-faint" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                         </button>
