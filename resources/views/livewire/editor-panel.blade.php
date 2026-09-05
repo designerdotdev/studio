@@ -21,7 +21,7 @@
         {{-- ======================================================== --}}
         <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="inspector-{{ $selectedId }}">
             {{-- Inspector header --}}
-            <div class="flex h-12 shrink-0 items-center gap-1 px-2">
+            <div class="flex h-11 shrink-0 items-center gap-1 px-2">
                 <button wire:click="closeInspector" class="s-icon-btn" title="Back to sections (Esc)">
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
@@ -174,7 +174,7 @@
         {{-- Tabs — Sections list / Page settings                      --}}
         {{-- ======================================================== --}}
         <div class="s-panel-enter-back flex h-full min-h-0 flex-col" wire:key="panel-tabs">
-            <div class="flex h-12 shrink-0 items-center gap-1.5 px-2">
+            <div class="flex h-11 shrink-0 items-center gap-1.5 px-2">
                 <div class="grid min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-lg border border-line bg-shell p-0.5">
                     <button
                         wire:click="$set('tab', 'sections')"
