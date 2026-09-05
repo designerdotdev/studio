@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class StudioStorage
 {
     /** Document trees that exist per-workspace (draft vs live) */
-    public const WORKSPACE_TREES = ['pages', 'layouts', 'blocks'];
+    public const WORKSPACE_TREES = ['pages', 'layouts', 'blocks', 'collections', 'site'];
 
     protected string $basePath;
 

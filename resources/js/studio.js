@@ -1,9 +1,7 @@
-import blade from './blade.js';
 import Sortable from 'sortablejs';
 import collapse from '@alpinejs/collapse';
 
 // Client-side Blade renderer (used by the preview iframe)
-window.blade = blade;
 
 // Register Alpine plugins used by the editor chrome (Livewire bundles Alpine core only)
 document.addEventListener('alpine:init', () => {
@@ -98,6 +96,8 @@ const StudioEditor = {
             switch (type) {
                 case 'studio:section-selected':
                     this.selectedId = data.sectionId;
+                    // Selecting on the canvas always lands in the Sections panel
+                    window.Alpine?.store('studio')?.setRail?.('sections', true);
                     window.Livewire?.dispatch('studio:select-section', { id: data.sectionId });
                     break;
 
@@ -120,6 +120,11 @@ const StudioEditor = {
                     window.dispatchEvent(new CustomEvent('studio:open-code-editor', {
                         detail: { ref: data.ref, title: data.title },
                     }));
+                    break;
+
+                case 'studio:element-selected':
+                    // The Assistant composer listens for this and shows a chip
+                    window.dispatchEvent(new CustomEvent('studio:element-selected', { detail: data }));
                     break;
 
                 case 'studio:key':
@@ -283,14 +288,27 @@ function isTyping(doc = document) {
 
 const StudioPreview = {
     variables: {},
-    templates: {},
+    refs: {},
     blocks: {},
     selectedId: null,
+    renderUrl: null,
+    csrf: null,
+    // Per-section render state: an in-flight request, plus the newest
+    // values that arrived while it was out (only the last one matters).
+    renderInFlight: new Set(),
+    renderQueued: new Set(),
+    renderTimer: null,
+    renderPending: new Set(),
 
-    init({ variables, templates, blocks }) {
+    init({ variables, bindings, refs, blocks, renderUrl, csrf }) {
         this.variables = variables || {};
-        this.templates = templates || {};
+        // Per-section {field: 'collections.<name>'} — sent with every render
+        // so bound repeaters keep reading the collection, not stale values
+        this.bindings = bindings || {};
+        this.refs = refs || {};
         this.blocks = blocks || {};
+        this.renderUrl = renderUrl || null;
+        this.csrf = csrf || null;
 
         // Dev-mode chrome (Edit-code buttons) follows the editor's toggle —
         // on by default, sticky once the user turns it off
@@ -326,6 +344,10 @@ const StudioPreview = {
 
                 case 'studio:deselect':
                     this.clearSelection();
+                    break;
+
+                case 'studio:element-select':
+                    this.setElementSelect(!!data.on);
                     break;
 
                 case 'studio:devmode':
@@ -615,6 +637,53 @@ const StudioPreview = {
         this.menuCloseTimer = setTimeout(() => menu.remove(), 130);
     },
 
+    /* --- element select (Assistant context) ------------------------- */
+
+    /**
+     * Crosshair mode: the next click inside a section reports the clicked
+     * element (its path from the section root, tag, and text) to the
+     * editor instead of selecting the section.
+     */
+    setElementSelect(on) {
+        document.documentElement.classList.toggle('studio-element-select', on);
+
+        if (on && !this.elementSelectHandler) {
+            this.elementSelectHandler = (event) => {
+                const content = event.target.closest?.('[data-section-content]');
+                if (!content) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                const section = content.closest('[data-section]');
+                const path = [];
+                let node = event.target;
+
+                while (node && node !== content) {
+                    path.unshift(node.tagName.toLowerCase());
+                    node = node.parentElement;
+                }
+
+                this.post('studio:element-selected', {
+                    sectionId: section?.dataset.section || null,
+                    ref: section?.dataset.ref || null,
+                    path: path.join(' > '),
+                    tag: event.target.tagName.toLowerCase(),
+                    text: (event.target.innerText || '').trim().slice(0, 160),
+                });
+
+                this.setElementSelect(false);
+            };
+
+            document.addEventListener('click', this.elementSelectHandler, true);
+        }
+
+        if (!on && this.elementSelectHandler) {
+            document.removeEventListener('click', this.elementSelectHandler, true);
+            this.elementSelectHandler = null;
+        }
+    },
+
     /* --- live re-rendering ----------------------------------------- */
 
     // A global block placement mirrors every sibling placement of the
@@ -644,13 +713,90 @@ const StudioPreview = {
         }
     },
 
+    /**
+     * Queue a section for re-rendering. Keystrokes arrive far faster than a
+     * round trip, so edits collect for a beat and then go out together; a
+     * section already waiting on a response is re-queued rather than
+     * double-requested, and only its newest values are ever sent.
+     */
     render(sectionId) {
+        if (!this.renderUrl || !this.refs[sectionId]) return;
+
+        this.renderPending.add(sectionId);
+
+        clearTimeout(this.renderTimer);
+        this.renderTimer = setTimeout(() => this.flushRenders(), 90);
+    },
+
+    flushRenders() {
+        const ready = [];
+
+        for (const id of this.renderPending) {
+            if (this.renderInFlight.has(id)) {
+                this.renderQueued.add(id);
+            } else {
+                ready.push(id);
+            }
+        }
+
+        this.renderPending.clear();
+
+        if (!ready.length) return;
+
+        const sections = ready.map((id) => ({
+            id,
+            ref: this.refs[id],
+            variables: this.variables[id] || {},
+            bindings: this.bindings[id] || {},
+        }));
+
+        ready.forEach((id) => this.renderInFlight.add(id));
+
+        fetch(this.renderUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': this.csrf || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ sections }),
+        })
+            .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+            .then(({ html }) => {
+                for (const [id, markup] of Object.entries(html || {})) {
+                    this.paint(id, markup);
+                }
+            })
+            .catch(() => {
+                // A failed render leaves the last good markup in place — the
+                // next keystroke retries, and the editor itself is already
+                // telling the user if the connection is gone.
+            })
+            .finally(() => {
+                let requeue = false;
+
+                for (const id of ready) {
+                    this.renderInFlight.delete(id);
+
+                    if (this.renderQueued.delete(id)) {
+                        this.renderPending.add(id);
+                        requeue = true;
+                    }
+                }
+
+                if (requeue) {
+                    clearTimeout(this.renderTimer);
+                    this.renderTimer = setTimeout(() => this.flushRenders(), 0);
+                }
+            });
+    },
+
+    paint(sectionId, markup) {
         const el = document.querySelector(`[data-section="${sectionId}"] [data-section-content]`);
-        const template = this.templates[sectionId];
 
-        if (!el || !template) return;
+        if (!el) return;
 
-        el.innerHTML = blade.renderBladeTemplate(template, this.variables[sectionId] || {});
+        el.innerHTML = markup;
 
         // Boot Alpine behaviors inside re-rendered markup
         if (window.Alpine?.initTree) {
@@ -790,6 +936,25 @@ window.Studio = {
      */
     maxUploadMb: 5,
 
+    /**
+     * Ask the Media panel for an image. Opens the panel in picker mode and
+     * resolves with the chosen URL, or null when the pick is cancelled.
+     */
+    mediaPick() {
+        return new Promise((resolve) => {
+            const id = (window.crypto?.randomUUID?.() || String(Date.now() + Math.random()));
+
+            const onPicked = (event) => {
+                if (event.detail?.id !== id) return;
+                window.removeEventListener('studio:media-picked', onPicked);
+                resolve(event.detail.url ?? null);
+            };
+
+            window.addEventListener('studio:media-picked', onPicked);
+            window.dispatchEvent(new CustomEvent('studio:media-pick', { detail: { id } }));
+        });
+    },
+
     async upload(file, { url, csrf }) {
         const sizeMb = file.size / (1024 * 1024);
         if (sizeMb > this.maxUploadMb) {
@@ -848,4 +1013,3 @@ function boot() {
     }
 }
 
-export { blade };

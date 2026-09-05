@@ -12,11 +12,32 @@ class PageRepository
         protected StudioStorage $storage
     ) {}
 
+    /**
+     * Every page, in Pages-panel order: explicitly ordered pages first
+     * (by `order`), then the rest by title.
+     */
     public function all(): Collection
     {
         $slugs = $this->storage->list('pages');
 
-        return collect($slugs)->map(fn($slug) => $this->find($slug))->filter();
+        return collect($slugs)
+            ->map(fn($slug) => $this->find($slug))
+            ->filter()
+            ->sortBy(fn(PageData $p) => [$p->order ?? PHP_INT_MAX, mb_strtolower($p->title)])
+            ->values();
+    }
+
+    /** Persist a new order: the position of each slug in the list */
+    public function reorder(array $slugs): void
+    {
+        foreach (array_values($slugs) as $position => $slug) {
+            $existing = $this->storage->read("pages/{$slug}.json");
+
+            if ($existing && ($existing['order'] ?? null) !== $position) {
+                $existing['order'] = $position;
+                $this->storage->write("pages/{$slug}.json", $existing);
+            }
+        }
     }
 
     public function find(string $slug): ?PageData
@@ -217,6 +238,12 @@ class PageRepository
             'variables' => $variables,
         ];
 
+        // A repeater declared with `source: collections.<name>` starts
+        // bound to that collection when it exists in this site.
+        if ($bindings = self::defaultBindings($componentRef)) {
+            $newComponent['bindings'] = $bindings;
+        }
+
         if ($insertAtIndex !== null && $insertAtIndex >= 0 && $insertAtIndex <= count($components)) {
             // Insert at specific position
             array_splice($components, $insertAtIndex, 0, [$newComponent]);
@@ -234,6 +261,37 @@ class PageRepository
         return $this->update($pageSlug, ['components' => $components]);
     }
 
+    /**
+     * The `{field: "collections.<name>"}` map a freshly added section should
+     * start with: every repeater whose yml declares a `source` naming a
+     * collection that exists. Shared by pages and layouts.
+     */
+    public static function defaultBindings(string $componentRef): array
+    {
+        $component = app(ComponentRepository::class)->find($componentRef);
+
+        if (!$component) {
+            return [];
+        }
+
+        $collections = app(CollectionRepository::class);
+        $bindings = [];
+
+        foreach ($component->fields as $key => $config) {
+            if (($config['type'] ?? '') !== 'repeater') {
+                continue;
+            }
+
+            $name = \Designer\Studio\Services\CollectionBinder::collectionName($config['source'] ?? null);
+
+            if ($name !== null && $collections->exists($name)) {
+                $bindings[$key] = 'collections.' . $name;
+            }
+        }
+
+        return $bindings;
+    }
+
     public function updateComponentVariables(string $pageSlug, string $componentId, array $variables): ?PageData
     {
         $page = $this->storage->read("pages/{$pageSlug}.json");
@@ -245,6 +303,38 @@ class PageRepository
         $components = collect($page['components'] ?? [])->map(function ($comp) use ($componentId, $variables) {
             if ($comp['id'] === $componentId) {
                 $comp['variables'] = array_merge($comp['variables'] ?? [], $variables);
+            }
+
+            return $comp;
+        })->toArray();
+
+        return $this->update($pageSlug, ['components' => $components]);
+    }
+
+    /**
+     * Replace an instance's collection bindings (`{field: "collections.x"}`).
+     * Passing an empty array unbinds every field; `$variables`, when given,
+     * is merged at the same time (used to keep a copy of the rows on unbind).
+     */
+    public function updateComponentBindings(string $pageSlug, string $componentId, array $bindings, ?array $variables = null): ?PageData
+    {
+        $page = $this->storage->read("pages/{$pageSlug}.json");
+
+        if (!$page) {
+            return null;
+        }
+
+        $components = collect($page['components'] ?? [])->map(function ($comp) use ($componentId, $bindings, $variables) {
+            if ($comp['id'] === $componentId) {
+                if ($bindings === []) {
+                    unset($comp['bindings']);
+                } else {
+                    $comp['bindings'] = $bindings;
+                }
+
+                if ($variables !== null) {
+                    $comp['variables'] = array_merge($comp['variables'] ?? [], $variables);
+                }
             }
 
             return $comp;

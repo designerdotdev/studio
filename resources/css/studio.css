@@ -307,19 +307,130 @@
         @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-line-strong bg-raised px-1 font-mono text-[10px] text-faint;
     }
 
+    /* --- the rail (panel switcher beside the sidebar) ---------------- */
+
+    .s-rail {
+        @apply flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-shell py-2;
+    }
+
+    .s-rail-btn {
+        @apply flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
+    }
+
+    .s-rail-btn:hover {
+        @apply text-ink bg-white/6;
+    }
+
+    .s-rail-btn.is-active {
+        @apply text-ink bg-white/10;
+    }
+
+    .s-rail-btn:active {
+        transform: scale(0.94);
+    }
+
+    /* --- rich text (collections) ------------------------------------- */
+
+    .s-richtext {
+        @apply overflow-hidden rounded-lg border border-line bg-raised;
+    }
+
+    .s-richtext-bar {
+        @apply flex flex-wrap items-center gap-0.5 border-b border-line px-1 py-1;
+    }
+
+    .s-richtext-bar button {
+        @apply flex h-6 min-w-6 cursor-pointer items-center justify-center rounded px-1.5 text-[11px] text-soft transition-colors;
+    }
+
+    .s-richtext-bar button:hover {
+        @apply text-ink bg-white/8;
+    }
+
+    .s-richtext-sep {
+        @apply mx-0.5 h-4 w-px bg-line;
+    }
+
+    .s-richtext-body {
+        @apply min-h-40 px-3 py-2 text-[13px] leading-relaxed text-ink outline-none;
+    }
+
+    .s-richtext-body:focus {
+        @apply bg-white/3;
+    }
+
+    .s-richtext-body > * + * {
+        margin-top: 0.6em;
+    }
+
+    .s-richtext-body h2 {
+        @apply text-base font-semibold;
+    }
+
+    .s-richtext-body h3 {
+        @apply text-sm font-semibold;
+    }
+
+    .s-richtext-body ul {
+        @apply list-disc pl-5;
+    }
+
+    .s-richtext-body ol {
+        @apply list-decimal pl-5;
+    }
+
+    .s-richtext-body blockquote {
+        @apply border-l-2 border-line-strong pl-3 text-soft;
+    }
+
+    .s-richtext-body a {
+        @apply text-accent underline;
+    }
+
+    .s-richtext-body code {
+        @apply rounded bg-shell px-1 font-mono text-[12px];
+    }
+
+    /* --- media panel ------------------------------------------------- */
+
+    .s-media-tile {
+        @apply relative min-w-0 rounded-lg p-0.5 transition-colors duration-150;
+    }
+
+    .s-media-tile:hover {
+        @apply bg-white/5;
+    }
+
+    .s-media-tile.is-pickable button:first-child {
+        @apply cursor-copy ring-2 ring-transparent transition-shadow;
+    }
+
+    .s-media-tile.is-pickable:hover button:first-child {
+        box-shadow: 0 0 0 2px var(--color-accent);
+    }
+
+    .s-media-tile-menu {
+        @apply absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-black/60 text-white/90 opacity-0 transition-opacity duration-100;
+    }
+
+    .s-media-tile:hover .s-media-tile-menu {
+        opacity: 1;
+    }
+
     /* --- topbar ----------------------------------------------------- */
 
     .s-topbar {
         @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-shell px-3;
     }
 
-    /* Boxed square button (hamburger) */
+    /* Flat square button (menu, sidebar toggle) — same rest/hover
+       treatment as the browser nav buttons: no chrome until hovered */
     .s-box-btn {
-        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line bg-raised text-soft transition-all duration-150;
+        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-all duration-150;
     }
 
     .s-box-btn:hover {
-        @apply text-ink border-line-strong;
+        @apply text-ink bg-white/6;
     }
 
     .s-box-btn:active {
@@ -341,7 +452,7 @@
     }
 
     .s-logo-btn .s-logo-btn-logo {
-        opacity: 0.55;
+        opacity: 1;
     }
 
     .s-logo-btn .s-logo-btn-menu {
@@ -349,10 +460,9 @@
         scale: 0.72;
     }
 
-    /* Menu open (no hover needed): full-strength icon + border */
+    /* Menu open (no hover needed): keep the hover state */
     .s-logo-btn.is-open {
-        color: var(--color-ink);
-        border-color: var(--color-line-strong);
+        @apply text-ink bg-white/6;
     }
 
     .s-logo-btn:hover .s-logo-btn-logo,
@@ -405,23 +515,33 @@
         transform: scale(0.94);
     }
 
-    /* Full-width browser URL bar — clicking it opens the page switcher */
+    /* Device toggle: one nav button that cycles desktop → tablet → mobile.
+       Tinted while a narrow preview is active so the state reads at a glance */
+    .s-device-btn.is-narrow {
+        color: var(--color-accent);
+    }
+
+    .s-device-btn.is-narrow:hover {
+        color: var(--color-accent);
+        filter: brightness(1.15);
+    }
+
+    /* Centered page pill — borderless, clicking it opens the page switcher */
     .s-urlbar {
-        @apply flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border border-line bg-raised pl-3 pr-1.5 transition-colors duration-150;
+        @apply flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-lg bg-raised px-1 transition-colors duration-150;
     }
 
     .s-urlbar:hover,
     .s-urlbar.is-open {
-        border-color: var(--color-line-strong);
+        @apply bg-white/8;
     }
 
     .s-urlbar:focus-visible {
         outline: none;
-        border-color: var(--color-accent);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
     }
 
-    /* Hover-reveal actions at the right edge of the URL bar */
+    /* Hover-reveal actions at either edge of the pill */
     .s-urlbar-action {
         @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-soft;
         opacity: 0;
@@ -432,6 +552,13 @@
     .s-urlbar.is-open .s-urlbar-action,
     .s-urlbar-action:focus-visible {
         opacity: 1;
+    }
+
+    /* The rest-state element in a hover slot (the status dot) hides while
+       its action is shown */
+    .s-urlbar:hover .s-urlbar-rest,
+    .s-urlbar.is-open .s-urlbar-rest {
+        opacity: 0;
     }
 
     .s-urlbar-action:hover,

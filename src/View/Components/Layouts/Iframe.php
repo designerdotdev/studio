@@ -13,6 +13,8 @@ class Iframe extends Component
     public array $extraScripts;
     public string $bodyClass;
     public string $headHtml;
+    public string $htmlClass;
+    public \Illuminate\Support\HtmlString $siteChrome;
 
     public function __construct()
     {
@@ -23,8 +25,14 @@ class Iframe extends Component
         ));
         $this->extraStyles = config('studio.iframe.extra_styles', []);
         $this->extraScripts = config('studio.iframe.extra_scripts', []);
-        $this->bodyClass = config('studio.iframe.body_class', 'min-h-screen w-full');
         $this->headHtml = config('studio.iframe.head_html', '');
+
+        // An imported template's palette, fonts, and motion scripts — the
+        // canvas has to load them or the preview is not the page.
+        $chrome = app(\Designer\Studio\Support\SiteChrome::class);
+        $this->siteChrome = $chrome->head();
+        $this->bodyClass = $chrome->bodyClass();
+        $this->htmlClass = $chrome->htmlClass();
     }
 
     public function render()

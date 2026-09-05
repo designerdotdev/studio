@@ -97,6 +97,24 @@ class BlockRepository
         ]);
     }
 
+    /** Replace a block's collection bindings; [] unbinds (see PageRepository) */
+    public function updateBindings(string $slug, array $bindings, ?array $variables = null): ?array
+    {
+        $block = $this->find($slug);
+
+        if (!$block) {
+            return null;
+        }
+
+        $data = ['bindings' => $bindings];
+
+        if ($variables !== null) {
+            $data['variables'] = array_merge($block['variables'] ?? [], $variables);
+        }
+
+        return $this->update($slug, $data);
+    }
+
     public function delete(string $slug): bool
     {
         return $this->storage->delete("blocks/{$slug}.json");
@@ -132,6 +150,7 @@ class BlockRepository
             $hydrated[] = array_merge($instance, [
                 'component_ref' => $block['component_ref'],
                 'variables' => $block['variables'] ?? [],
+                'bindings' => $block['bindings'] ?? [],
             ]);
         }
 

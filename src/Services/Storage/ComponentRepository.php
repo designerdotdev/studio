@@ -91,7 +91,7 @@ class ComponentRepository
             'html' => $data['html'] ?? '',
             'fields' => $data['fields'] ?? [],
             'preview_variables' => $data['preview_variables'] ?? [],
-            'source' => 'local',
+            'source' => $data['source'] ?? 'local',
             // Fixed-position sections (sticky headers) get special canvas
             // handling — pinned live, in-flow with a "Fixed" tag in the editor
             'fixed' => (bool) ($data['fixed'] ?? false),

@@ -3,11 +3,11 @@
 namespace Designer\Studio\Http\Controllers;
 
 use Designer\Studio\Services\DesignSyncService;
+use Designer\Studio\Services\SectionRenderer;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\LayoutRepository;
 use Designer\Studio\Services\Storage\PageRepository;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Blade;
 
 class PageController extends Controller
 {
@@ -18,6 +18,7 @@ class PageController extends Controller
         protected ComponentRepository $components,
         protected LayoutRepository $layouts,
         protected DesignSyncService $designSync,
+        protected SectionRenderer $renderer,
     ) {}
 
     public function show(string $slug)
@@ -27,7 +28,7 @@ class PageController extends Controller
         // own '/', redirecting would make the homepage unreachable, so it
         // serves at its slug instead.
         if (
-            $slug === config('studio.page_routing.home_slug', 'home')
+            $slug === \Designer\Studio\Support\SiteUrls::homeSlug()
             && request()->path() !== '/'
             && \Designer\Studio\Support\SiteUrls::ownsRoot()
         ) {
@@ -79,13 +80,11 @@ class PageController extends Controller
                 continue;
             }
 
-            $vars = $component->resolveVariables($instance['variables'] ?? []);
-
-            try {
-                $rendered[] = Blade::render($component->html, $vars);
-            } catch (\Throwable $e) {
-                report($e);
-            }
+            $rendered[] = $this->renderer->render(
+                $component,
+                $component->resolveVariables($instance['variables'] ?? []),
+                $instance['bindings'] ?? []
+            );
         }
 
         return $rendered;
@@ -116,7 +115,7 @@ class PageController extends Controller
     {
         $this->ensureComponentsSynced();
 
-        $homeSlug = config('studio.page_routing.home_slug', 'home');
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
 
         $urls = $this->pages->all()
             ->reject(fn ($page) => !empty($page->meta['noindex']))

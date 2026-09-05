@@ -83,6 +83,16 @@ class ComponentData
             $vars[$key] = $value;
         }
 
+        // Values with no field behind them still reach the section. An
+        // imported template binds page data straight to a component prop
+        // (`:items="$logos"`) without ever declaring it as editable, and
+        // dropping those would empty half the page.
+        foreach ($overrides as $key => $value) {
+            if (!array_key_exists($key, $vars)) {
+                $vars[$key] = $value;
+            }
+        }
+
         return $vars;
     }
 

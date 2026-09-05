@@ -10,7 +10,6 @@ use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\TemplateRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -39,20 +38,21 @@ class StudioController extends Controller
         // owned '/' (it blocks Studio's home route) get claimed here.
         $homeClaimed = $this->pruner()->claimHome();
 
-        $homeSlugForSort = config('studio.page_routing.home_slug', 'home');
+        $homeSlugForSort = \Designer\Studio\Support\SiteUrls::homeSlug();
+        // Home first, then the Pages-panel order (PageRepository::all sorts by it)
         $pages = $this->pages->all()
-            ->sortBy(fn($p) => [$p->slug === $homeSlugForSort ? 0 : 1, $p->title])
+            ->sortBy(fn($p, $i) => [$p->slug === $homeSlugForSort ? 0 : 1, $i])
             ->values();
 
         // Show onboarding when no pages exist
         if ($pages->isEmpty()) {
             return view('studio::onboarding', [
-                'templates' => $this->templates->all(),
+                'templates' => app(\Designer\Studio\Services\Templates\TemplateCatalog::class)->all(),
             ]);
         }
 
         // Load the requested page, preferring the home page as the default
-        $homeSlug = config('studio.page_routing.home_slug', 'home');
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
         $defaultSlug = $pages->firstWhere('slug', $homeSlug)?->slug ?? $pages->first()?->slug;
 
         $slug = $request->query('page', $defaultSlug);
@@ -123,7 +123,7 @@ class StudioController extends Controller
         // route: the route collection still lists '/' for THIS request,
         // but the next one is clean.
         $pruner = $this->pruner();
-        $homeSlug = config('studio.page_routing.home_slug', 'home');
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
 
         $rootBlocked = config('studio.page_routing.enabled', true)
             && !$homeClaimed
@@ -170,12 +170,14 @@ class StudioController extends Controller
 
         $sections = [];
         $componentVariables = [];
+        $componentBindings = [];
         $blockByInstance = [];
+        $binder = app(\Designer\Studio\Services\CollectionBinder::class);
         $pageComponents = collect($page->components)->sortBy('order')->values()->all();
         // Layout doc length includes the content slot entry
         $layoutCount = $layout ? count($layout['components'] ?? []) : 0;
 
-        $push = function (array $instances, string $scope, int $indexOffset, int $docCount) use (&$sections, &$componentVariables, &$blockByInstance, $blocks) {
+        $push = function (array $instances, string $scope, int $indexOffset, int $docCount) use (&$sections, &$componentVariables, &$componentBindings, &$blockByInstance, $blocks, $binder) {
             // Hydrate WITHOUT dropping missing blocks so doc indexes stay
             // aligned with the raw components array (insertion positions).
             foreach (array_values($instances) as $i => $instance) {
@@ -214,7 +216,11 @@ class StudioController extends Controller
                     'docLast' => $docIndex === $docCount - 1,
                 ];
 
-                $componentVariables[$instance['id']] = $component->resolveVariables($instance['variables'] ?? []);
+                $componentBindings[$instance['id']] = $instance['bindings'] ?? [];
+                $componentVariables[$instance['id']] = $binder->apply(
+                    $component->resolveVariables($instance['variables'] ?? []),
+                    $instance['bindings'] ?? []
+                );
             }
         };
 
@@ -229,6 +235,7 @@ class StudioController extends Controller
             'page' => $page,
             'sections' => $sections,
             'componentVariables' => $componentVariables,
+            'componentBindings' => $componentBindings,
             'blockByInstance' => $blockByInstance,
             'layout' => $layout,
             'layoutBeforeCount' => count($regions['before']),
@@ -327,18 +334,69 @@ class StudioController extends Controller
     public function applyTemplate(Request $request)
     {
         $validated = $request->validate([
-            'template' => 'required|string',
+            'template' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9-]+$/'],
         ]);
 
-        $pages = $this->seeder->seedFromTemplate($validated['template']);
+        $name = $validated['template'];
+        $catalog = app(\Designer\Studio\Services\Templates\TemplateCatalog::class);
 
-        $firstPage = $pages[0] ?? null;
+        if ($catalog->sourceOf($name) === null) {
+            return response()->json([
+                'success' => false,
+                'message' => "Template [{$name}] is not available.",
+            ], 422);
+        }
+
+        // A template synced from a repository is a whole site — sections,
+        // assets, and theme — so it is installed by the importer rather
+        // than composed out of the existing library.
+        if ($catalog->sourceOf($name) === 'repository') {
+            try {
+                $report = app(\Designer\Studio\Services\Templates\TemplateImporter::class)->import($name);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
+            $slug = $report['pages'][0] ?? null;
+        } else {
+            $pages = $this->seeder->seedFromTemplate($name);
+            $slug = ($pages[0] ?? null)?->slug;
+        }
+
+        // Land on the home page when the template has one, whichever
+        // installer built it.
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
+        $slug = $this->pages->find($homeSlug) ? $homeSlug : $slug;
 
         return response()->json([
             'success' => true,
-            'redirect' => $firstPage
-                ? route('studio.index', ['page' => $firstPage->slug])
+            'redirect' => $slug
+                ? route('studio.index', ['page' => $slug])
                 : route('studio.index'),
+        ]);
+    }
+
+    /**
+     * The picture a repository template ships of itself. Built-in templates
+     * are previewed live instead, since their sections are already in the
+     * library.
+     */
+    public function templateThumbnail(string $name)
+    {
+        $path = app(\Designer\Studio\Services\Templates\TemplateCatalog::class)->thumbnailPath($name);
+
+        if (!$path) {
+            abort(404);
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, max-age=300',
         ]);
     }
 
@@ -398,7 +456,7 @@ class StudioController extends Controller
      */
     public function previewPage(?string $slug = null)
     {
-        $slug = $slug ?: config('studio.page_routing.home_slug', 'home');
+        $slug = $slug ?: \Designer\Studio\Support\SiteUrls::homeSlug();
 
         $page = $this->pages->find($slug);
 
@@ -415,6 +473,9 @@ class StudioController extends Controller
             ...$regions['after'],
         ]);
 
+        // Same renderer as the live page (PageController): DataBag-wrapped
+        // rows, $site injected, failures shown in place instead of dropped.
+        $renderer = app(\Designer\Studio\Services\SectionRenderer::class);
         $renderedSections = [];
 
         foreach ($instances as $instance) {
@@ -428,14 +489,11 @@ class StudioController extends Controller
                 continue;
             }
 
-            try {
-                $renderedSections[] = Blade::render(
-                    $component->html,
-                    $component->resolveVariables($instance['variables'] ?? [])
-                );
-            } catch (\Throwable $e) {
-                report($e);
-            }
+            $renderedSections[] = $renderer->render(
+                $component,
+                $component->resolveVariables($instance['variables'] ?? []),
+                $instance['bindings'] ?? []
+            );
         }
 
         return view('studio::page', [
@@ -726,14 +784,7 @@ class StudioController extends Controller
      */
     protected function renderSection(string $html, array $variables, string $ref): string
     {
-        try {
-            return Blade::render($html, $variables);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return '<div style="padding:48px 24px;text-align:center;font-family:ui-sans-serif,system-ui,sans-serif;color:#991b1b;background:#fef2f2;border:1px dashed #fecaca;">'
-                . 'Section “' . e($ref) . '” failed to render: ' . e($e->getMessage())
-                . '</div>';
-        }
+        return app(\Designer\Studio\Services\SectionRenderer::class)
+            ->renderHtml($html, $variables, $ref);
     }
 }

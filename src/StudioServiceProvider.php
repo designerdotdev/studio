@@ -6,6 +6,8 @@ use Designer\Studio\Console\Commands\DevReset;
 use Designer\Studio\Console\Commands\PublishAssets;
 use Designer\Studio\Console\Commands\SeedSampleData;
 use Designer\Studio\Console\Commands\SyncDesigns;
+use Designer\Studio\Console\Commands\TemplatesImport;
+use Designer\Studio\Console\Commands\TemplatesSync;
 use Designer\Studio\Console\Commands\Uninstall;
 use Designer\Studio\Livewire\EditorPanel;
 use Designer\Studio\Services\BladeGenerator;
@@ -36,6 +38,16 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(BladeGenerator::class);
         $this->app->singleton(\Designer\Studio\Services\PublishService::class);
         $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\SiteRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\SectionRenderer::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\CollectionRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\CollectionBinder::class);
+        $this->app->singleton(\Designer\Studio\Services\MediaLibrary::class);
+        $this->app->singleton(\Designer\Studio\Support\SiteChrome::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateSync::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateCatalog::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\SectionTagParser::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateChrome::class);
         $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
     }
 
@@ -64,6 +76,10 @@ class StudioServiceProvider extends ServiceProvider
 
         // Register Livewire components
         Livewire::component('studio::editor-panel', EditorPanel::class);
+        Livewire::component('studio::pages-panel', \Designer\Studio\Livewire\PagesPanel::class);
+        Livewire::component('studio::media-panel', \Designer\Studio\Livewire\MediaPanel::class);
+        Livewire::component('studio::content-panel', \Designer\Studio\Livewire\ContentPanel::class);
+        Livewire::component('studio::assistant-panel', \Designer\Studio\Livewire\AssistantPanel::class);
 
         // Register Blade directives for self-contained assets
         $this->registerAssetDirectives();
@@ -74,6 +90,8 @@ class StudioServiceProvider extends ServiceProvider
                 PublishAssets::class,
                 SeedSampleData::class,
                 SyncDesigns::class,
+                TemplatesImport::class,
+                TemplatesSync::class,
                 Uninstall::class,
             ]);
 
@@ -112,6 +130,7 @@ class StudioServiceProvider extends ServiceProvider
                 $storage->ensureDirectoryExists('pages');
                 $storage->ensureDirectoryExists('layouts');
                 $storage->ensureDirectoryExists('blocks');
+                $storage->ensureDirectoryExists('collections');
                 $storage->ensureDirectoryExists('components/library');
 
                 if (config('studio.draft_mode', true)) {
@@ -206,7 +225,7 @@ class StudioServiceProvider extends ServiceProvider
         }
 
         $middleware = config('studio.page_routing.middleware', ['web']);
-        $homeSlug = config('studio.page_routing.home_slug', 'home');
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
 
         $pruner = $this->app->make(\Designer\Studio\Support\WelcomeRoutePruner::class);
 

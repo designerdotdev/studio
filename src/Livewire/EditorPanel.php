@@ -63,6 +63,9 @@ class EditorPanel extends Component
     /** Resolved variables per section instance id (page + layout) */
     public array $variables = [];
 
+    /** Per-section {field: 'collections.<name>'} — repeaters bound to a collection */
+    public array $bindings = [];
+
     public ?string $selectedId = null;
 
     /** Active sidebar tab: sections | page | layout */
@@ -254,6 +257,7 @@ class EditorPanel extends Component
 
             $this->fieldsByRef[$component->name] = $component->fields;
             $this->variables[$instance['id']] = $component->resolveVariables($instance['variables'] ?? []);
+            $this->bindings[$instance['id']] = $instance['bindings'] ?? [];
         }
 
         return $rows;
@@ -619,6 +623,73 @@ class EditorPanel extends Component
         if ($property === 'selectedBlockName') {
             $this->renameSelectedBlock();
         }
+    }
+
+    /* ------------------------------------------------------------ */
+    /*  Collection bindings                                          */
+    /* ------------------------------------------------------------ */
+
+    /** Collections available to bind: name => title */
+    public function getCollectionsProperty(): array
+    {
+        return collect(app(\Designer\Studio\Services\Storage\CollectionRepository::class)->all())
+            ->map(fn ($doc) => $doc['title'])
+            ->toArray();
+    }
+
+    /** Point a repeater at a collection; its rows now come from Content */
+    public function bindRepeater(string $sectionId, string $key, string $collection): void
+    {
+        $name = \Designer\Studio\Services\CollectionBinder::collectionName('collections.' . $collection);
+
+        if ($name === null || !app(\Designer\Studio\Services\Storage\CollectionRepository::class)->exists($name)) {
+            return;
+        }
+
+        $bindings = ($this->bindings[$sectionId] ?? []) + [$key => 'collections.' . $name];
+        $bindings[$key] = 'collections.' . $name;
+
+        $this->persistBindings($sectionId, $bindings);
+        $this->dispatch('studio:toast', message: 'Bound to ' . ($this->collections[$name] ?? $name), type: 'success');
+    }
+
+    /** Detach a repeater from its collection, keeping the current rows as plain values */
+    public function unbindRepeater(string $sectionId, string $key): void
+    {
+        $bindings = $this->bindings[$sectionId] ?? [];
+        $source = $bindings[$key] ?? null;
+        unset($bindings[$key]);
+
+        $rows = null;
+
+        if ($name = \Designer\Studio\Services\CollectionBinder::collectionName($source)) {
+            $rows = app(\Designer\Studio\Services\Storage\CollectionRepository::class)->rows($name);
+            $this->variables[$sectionId][$key] = $rows;
+        }
+
+        $this->persistBindings($sectionId, $bindings, $rows === null ? null : [$key => $rows]);
+    }
+
+    protected function persistBindings(string $sectionId, array $bindings, ?array $variables = null): void
+    {
+        if ($block = $this->blockFor($sectionId)) {
+            $this->blockRepo()->updateBindings($block, $bindings, $variables);
+        } elseif ($this->isLayoutSection($sectionId)) {
+            if ($this->guardConflict('layout')) {
+                return;
+            }
+            $updated = $this->layoutRepo()->updateComponentBindings($this->layoutSlug, $sectionId, $bindings, $variables);
+            $this->docVersions['layout'] = $updated['updated_at'] ?? $this->docVersions['layout'] ?? null;
+        } else {
+            if ($this->guardConflict('page')) {
+                return;
+            }
+            $updated = $this->pages()->updateComponentBindings($this->pageSlug, $sectionId, $bindings, $variables);
+            $this->docVersions['page'] = $updated?->updated_at ?? $this->docVersions['page'] ?? null;
+        }
+
+        $this->bindings[$sectionId] = $bindings;
+        $this->dispatch('studio:refresh-preview');
     }
 
     protected function saveVariables(string $sectionId): void

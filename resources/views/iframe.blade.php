@@ -6,6 +6,33 @@
                 position: relative;
             }
 
+            /* Element-select mode (the Assistant's crosshair): outline whatever
+               is under the pointer inside a section; the next click reports it */
+            html.studio-element-select,
+            html.studio-element-select * {
+                cursor: crosshair !important;
+            }
+
+            html.studio-element-select [data-section-content] *:hover {
+                outline: 2px solid #4c7dfa !important;
+                outline-offset: 1px;
+            }
+
+            /* Scroll-reveal systems (site templates tag elements with data-reveal
+               and hide them until their own script observes them into view)
+               would leave freshly re-rendered markup invisible on the canvas —
+               the template's observer only ever saw the original nodes. The
+               canvas is an editing surface, so everything simply stays shown. */
+            .studio-section [data-reveal] {
+                opacity: 1 !important;
+                visibility: visible !important;
+                transform: none !important;
+                translate: none !important;
+                filter: none !important;
+                transition: none !important;
+                animation: none !important;
+            }
+
             .studio-section::after {
                 content: '';
                 position: absolute;
@@ -611,12 +638,18 @@
         </style>
     @endpush
 
-    {{-- Section templates + variables for client-side re-rendering --}}
+    {{-- Live-edit state. Sections re-render on the server (POST
+         studio.api.render) so the canvas uses the same Blade engine as the
+         published page — only the current values and the section refs need
+         to travel with the document. --}}
     <script>
         window.__studioPreview = {
-            templates: @js(collect($sections)->pluck('html', 'id')->toArray()),
+            refs: @js(collect($sections)->pluck('ref', 'id')->toArray()),
             variables: @js($componentVariables),
+            bindings: @js($componentBindings ?? []),
             blocks: @js($blockByInstance),
+            renderUrl: @js(route('studio.api.render')),
+            csrf: @js(csrf_token()),
         };
     </script>
 
@@ -656,12 +689,8 @@
             @endif
 
             @php
-                $rendered = '';
-                try {
-                    $rendered = \Illuminate\Support\Facades\Blade::render($section['html'], $componentVariables[$section['id']] ?? []);
-                } catch (\Throwable $e) {
-                    $rendered = '<div style="padding:48px 24px;text-align:center;font-family:ui-sans-serif,system-ui,sans-serif;color:#991b1b;background:#fef2f2;border:1px dashed #fecaca;">Section “' . e($section['ref']) . '” failed to render: ' . e($e->getMessage()) . '</div>';
-                }
+                $rendered = app(\Designer\Studio\Services\SectionRenderer::class)
+                    ->renderHtml($section['html'], $componentVariables[$section['id']] ?? [], $section['ref']);
                 $isLayout = $section['scope'] === 'layout';
                 $isBlock = !empty($section['block']);
             @endphp

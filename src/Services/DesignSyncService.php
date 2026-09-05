@@ -91,6 +91,13 @@ class DesignSyncService
 
             $existing = $this->components->find($name);
 
+            // A component installed by a template import is owned by that
+            // template, not by the design files, even if the names happen
+            // to match. Leave it be.
+            if ($existing && str_starts_with($existing->source, 'template:')) {
+                continue;
+            }
+
             if ($existing) {
                 // Only write when the design file actually changed
                 if ($this->isDirty($existing, $data)) {
