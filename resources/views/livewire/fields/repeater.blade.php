@@ -52,7 +52,7 @@
         >
             {{-- Item header --}}
             <div
-                class="flex cursor-pointer items-center gap-1.5 py-1.5 pl-2.5 pr-1.5 transition-colors hover:bg-white/4"
+                class="flex cursor-pointer items-center gap-1.5 py-1.5 pl-2.5 pr-1.5 transition-colors hover:bg-wash"
                 x-on:click="open = !open"
             >
                 <svg class="h-3 w-3 shrink-0 text-faint transition-transform duration-150" :class="open && 'rotate-90'" viewBox="0 0 20 20" fill="currentColor">

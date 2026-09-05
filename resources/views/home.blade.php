@@ -39,6 +39,13 @@
                         if (!this.sidebar) this.toggleSidebar();
                         window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name } }));
                     },
+                    // Editor chrome theme: dark by default, 'light' mirrors the Sites builder
+                    theme: document.documentElement.classList.contains('studio-light') ? 'light' : 'dark',
+                    toggleTheme() {
+                        this.theme = this.theme === 'light' ? 'dark' : 'light';
+                        localStorage.setItem('studio.theme', this.theme);
+                        document.documentElement.classList.toggle('studio-light', this.theme === 'light');
+                    },
                     devMode: localStorage.getItem('studio.devmode') !== '0',
                     toggleDevMode() {
                         this.devMode = !this.devMode;
@@ -65,102 +72,7 @@
             });
         </script>
 
-        {{-- Menu --}}
-        <div
-            class="relative"
-            x-data="{
-                open: false,
-
-                async duplicatePage() {
-                    this.open = false;
-                    try {
-                        const response = await fetch(@js(route('studio.api.pages.duplicate', ['slug' => $page->slug])), {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                                'Accept': 'application/json',
-                            },
-                        });
-                        const data = await response.json();
-                        if (data.success) {
-                            window.location.href = data.editor_url;
-                            return;
-                        }
-                        window.Studio.toast(data.error || 'Could not duplicate the page', 'error');
-                    } catch (e) {
-                        window.Studio.toast('Could not duplicate the page', 'error');
-                    }
-                },
-
-                exportBlade() {
-                    this.open = false;
-                    window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
-                }
-            }"
-            @click.outside="open = false"
-            @keydown.escape.window="open = false"
-        >
-            <button @click="open = !open" class="s-box-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
-                <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
-                <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
-            </button>
-
-            <div
-                x-show="open"
-                x-cloak
-                x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute left-0 top-full mt-1.5 w-60 origin-top-left"
-            >
-                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
-                    <svg class="h-[17px] w-auto -translate-y-0.5 text-neutral-100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
-                    <span class="text-[13px] font-semibold text-ink">Designer Studio</span>
-                </div>
-
-                <div class="s-divider mb-1"></div>
-
-                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                    New page…
-                </button>
-                <button @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
-                    New layout…
-                </button>
-                <button @click="duplicatePage()" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
-                    Duplicate this page
-                </button>
-
-                <div class="s-divider my-1"></div>
-
-                <button @click="exportBlade()" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
-                    Export Blade file
-                </button>
-                @if(\Designer\Studio\Support\DevMode::enabled())
-                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" title="Edit section .html and .yml source files from the editor">
-                        <span class="flex items-center gap-2.5">
-                            <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
-                            Dev mode
-                        </span>
-                        <span class="s-chip" :class="$store.studio.devMode && '!border-accent/50 !text-accent'" x-text="$store.studio.devMode ? 'On' : 'Off'"></span>
-                    </button>
-                @endif
-                @if($liveUrl)
-                    <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
-                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
-                        View live site
-                    </a>
-                @endif
-            </div>
-        </div>
-
-        {{-- Sidebar toggle — always visible beside the menu button --}}
+        {{-- Sidebar toggle — first thing in the topbar, aligned with the canvas edge --}}
         <div x-data class="shrink-0">
             <button
                 @click="$store.studio.toggleSidebar()"
@@ -272,7 +184,7 @@
                 @foreach($pages as $p)
                     <a
                         href="{{ route('studio.index', ['page' => $p->slug]) }}"
-                        class="s-menu-item {{ $p->slug === $page->slug ? 'bg-white/6 !text-ink' : '' }}"
+                        class="s-menu-item {{ $p->slug === $page->slug ? 'bg-wash !text-ink' : '' }}"
                         role="menuitem"
                     >
                         <svg class="h-3.5 w-3.5 shrink-0 {{ $p->slug === $page->slug ? 'text-accent' : 'text-transparent' }}" viewBox="0 0 20 20" fill="currentColor">
@@ -558,6 +470,110 @@
     {{-- ============================================================ --}}
     {{-- Sidebar — Livewire editor panel                               --}}
     {{-- ============================================================ --}}
+    <x-slot:menu>
+        {{-- Menu --}}
+        <div
+            class="relative"
+            x-data="{
+                open: false,
+        
+                async duplicatePage() {
+                    this.open = false;
+                    try {
+                        const response = await fetch(@js(route('studio.api.pages.duplicate', ['slug' => $page->slug])), {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = data.editor_url;
+                            return;
+                        }
+                        window.Studio.toast(data.error || 'Could not duplicate the page', 'error');
+                    } catch (e) {
+                        window.Studio.toast('Could not duplicate the page', 'error');
+                    }
+                },
+        
+                exportBlade() {
+                    this.open = false;
+                    window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
+                }
+            }"
+            @click.outside="open = false"
+            @keydown.escape.window="open = false"
+        >
+            <button @click="open = !open" class="s-rail-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
+                <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
+                <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+            </button>
+        
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0 -translate-y-1"
+                class="s-pop absolute left-full top-0 z-50 ml-2 w-60 origin-top-left"
+            >
+                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
+                    <svg class="h-[17px] w-auto -translate-y-0.5 text-neutral-100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
+                    <span class="text-[13px] font-semibold text-ink">Designer Studio</span>
+                </div>
+        
+                <div class="s-divider mb-1"></div>
+        
+                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                    New page…
+                </button>
+                <button @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
+                    New layout…
+                </button>
+                <button @click="duplicatePage()" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
+                    Duplicate this page
+                </button>
+        
+                <div class="s-divider my-1"></div>
+        
+                <button @click="exportBlade()" class="s-menu-item">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
+                    Export Blade file
+                </button>
+                @if(\Designer\Studio\Support\DevMode::enabled())
+                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" title="Edit section .html and .yml source files from the editor">
+                        <span class="flex items-center gap-2.5">
+                            <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+                            Dev mode
+                        </span>
+                        <span class="s-chip" :class="$store.studio.devMode && '!border-accent/50 !text-accent'" x-text="$store.studio.devMode ? 'On' : 'Off'"></span>
+                    </button>
+                @endif
+                <button @click="$store.studio.toggleTheme()" class="s-menu-item justify-between" title="Switch between the dark and light editor chrome">
+                    <span class="flex items-center gap-2.5">
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 2ZM10 15a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 15ZM10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM15.657 5.404a.75.75 0 1 0-1.06-1.06l-1.061 1.06a.75.75 0 0 0 1.06 1.06l1.06-1.06ZM6.464 14.596a.75.75 0 1 0-1.06-1.06l-1.06 1.06a.75.75 0 0 0 1.06 1.06l1.06-1.06ZM18 10a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 18 10ZM5 10a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 5 10ZM14.596 15.657a.75.75 0 0 0 1.06-1.06l-1.06-1.061a.75.75 0 1 0-1.06 1.06l1.06 1.06ZM5.404 6.464a.75.75 0 0 0 1.06-1.06l-1.06-1.06a.75.75 0 1 0-1.061 1.06l1.06 1.06Z"/></svg>
+                        Light mode
+                    </span>
+                    <span class="s-chip" :class="$store.studio.theme === 'light' && '!border-accent/50 !text-accent'" x-text="$store.studio.theme === 'light' ? 'On' : 'Off'"></span>
+                </button>
+                @if($liveUrl)
+                    <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        View live site
+                    </a>
+                @endif
+            </div>
+        </div>
+    </x-slot:menu>
+
     <x-slot:sidebar>
         <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'sections'">
             <livewire:studio::editor-panel :page-slug="$page->slug" />
@@ -740,7 +756,7 @@
                         <button
                             @click="category = 'all'"
                             class="s-menu-item justify-between"
-                            :class="category === 'all' && 'bg-white/6 !text-ink'"
+                            :class="category === 'all' && 'bg-wash !text-ink'"
                         >
                             All
                             <span class="text-[10.5px] text-faint">{{ $totalComponents }}</span>
@@ -750,7 +766,7 @@
                             <button
                                 @click="category = @js($categoryName)"
                                 class="s-menu-item justify-between capitalize"
-                                :class="category === @js($categoryName) && 'bg-white/6 !text-ink'"
+                                :class="category === @js($categoryName) && 'bg-wash !text-ink'"
                             >
                                 {{ str_replace('-', ' ', $categoryName) }}
                                 <span class="text-[10.5px] text-faint">{{ $components->count() }}</span>
@@ -1125,7 +1141,7 @@
                     <button @click="save()" :disabled="saving || loading" class="s-btn-accent">
                         <span x-show="!saving">Save</span>
                         <span x-show="saving" x-cloak>Saving…</span>
-                        <span class="s-kbd !border-white/25 !bg-transparent !text-white/80">⌘S</span>
+                        <span class="s-kbd !border-line-strong !bg-transparent !text-white/80">⌘S</span>
                     </button>
                 </div>
             </div>

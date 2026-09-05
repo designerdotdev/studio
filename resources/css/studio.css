@@ -35,6 +35,31 @@
 
     /* Canvas */
     --color-canvas: #101014;
+
+    /* Hover washes — a translucent tint over any surface (flips with the theme) */
+    --color-wash: rgba(255, 255, 255, 0.06);
+    --color-wash-strong: rgba(255, 255, 255, 0.1);
+    --color-wash-faint: rgba(255, 255, 255, 0.025);
+}
+
+/* Light chrome — the Sites builder look. Toggled from the menu; dark stays the default. */
+html.studio-light {
+    --color-shell: #f6f6f7;
+    --color-panel: #ffffff;
+    --color-raised: #f1f1f4;
+    --color-overlay: #ffffff;
+    --color-line: rgba(17, 17, 20, 0.08);
+    --color-line-strong: rgba(17, 17, 20, 0.14);
+    --color-ink: #141417;
+    --color-soft: #5f6069;
+    --color-faint: #9a9aa4;
+    --color-accent: #3b6ff0;
+    --color-accent-hover: #2f5fe0;
+    --color-canvas: #e8e9ed;
+    --color-wash: rgba(17, 17, 20, 0.05);
+    --color-wash-strong: rgba(17, 17, 20, 0.09);
+    --color-wash-faint: rgba(17, 17, 20, 0.025);
+    color-scheme: light;
 }
 
 /* ------------------------------------------------------------------ */
@@ -144,11 +169,11 @@
     }
 
     .s-btn-primary {
-        @apply bg-white text-neutral-950;
+        @apply bg-ink text-shell;
     }
 
     .s-btn-primary:hover {
-        background: #e8e8ec;
+        background: color-mix(in srgb, var(--color-ink) 90%, var(--color-shell));
     }
 
     .s-btn-accent {
@@ -164,7 +189,7 @@
     }
 
     .s-btn-ghost:hover {
-        @apply text-ink bg-white/6;
+        @apply text-ink bg-wash;
     }
 
     .s-btn-outline {
@@ -172,7 +197,7 @@
     }
 
     .s-btn-outline:hover {
-        @apply bg-white/6;
+        @apply bg-wash;
     }
 
     .s-btn-danger {
@@ -188,7 +213,7 @@
     }
 
     .s-icon-btn:hover {
-        @apply text-ink bg-white/8;
+        @apply text-ink bg-wash-strong;
     }
 
     .s-icon-btn:active {
@@ -240,7 +265,7 @@
     /* --- settings groups (Page tab) --------------------------------- */
 
     .s-group {
-        @apply overflow-hidden rounded-xl border border-line bg-white/[0.02];
+        @apply overflow-hidden rounded-xl border border-line bg-wash-faint;
         transition: border-color 150ms ease, background-color 150ms ease;
     }
 
@@ -300,7 +325,7 @@
     }
 
     .s-menu-item:hover {
-        @apply bg-white/6 text-ink;
+        @apply bg-wash text-ink;
     }
 
     .s-kbd {
@@ -310,7 +335,11 @@
     /* --- the rail (panel switcher beside the sidebar) ---------------- */
 
     .s-rail {
-        @apply flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-shell py-2;
+        @apply flex w-12 shrink-0 flex-col items-center gap-1 bg-shell pt-1.5 pb-2;
+    }
+
+    .s-rail-gap {
+        @apply my-1 h-px w-6 shrink-0 bg-line;
     }
 
     .s-rail-btn {
@@ -318,11 +347,11 @@
     }
 
     .s-rail-btn:hover {
-        @apply text-ink bg-white/6;
+        @apply text-ink bg-wash;
     }
 
     .s-rail-btn.is-active {
-        @apply text-ink bg-white/10;
+        @apply text-ink bg-wash-strong;
     }
 
     .s-rail-btn:active {
@@ -344,7 +373,7 @@
     }
 
     .s-richtext-bar button:hover {
-        @apply text-ink bg-white/8;
+        @apply text-ink bg-wash-strong;
     }
 
     .s-richtext-sep {
@@ -356,7 +385,7 @@
     }
 
     .s-richtext-body:focus {
-        @apply bg-white/3;
+        @apply bg-wash-faint;
     }
 
     .s-richtext-body > * + * {
@@ -398,7 +427,7 @@
     }
 
     .s-media-tile:hover {
-        @apply bg-white/5;
+        @apply bg-wash;
     }
 
     .s-media-tile.is-pickable button:first-child {
@@ -430,7 +459,7 @@
     }
 
     .s-box-btn:hover {
-        @apply text-ink bg-white/6;
+        @apply text-ink bg-wash;
     }
 
     .s-box-btn:active {
@@ -462,7 +491,7 @@
 
     /* Menu open (no hover needed): keep the hover state */
     .s-logo-btn.is-open {
-        @apply text-ink bg-white/6;
+        @apply text-ink bg-wash;
     }
 
     .s-logo-btn:hover .s-logo-btn-logo,
@@ -508,7 +537,7 @@
     }
 
     .s-nav-btn:hover {
-        @apply text-ink bg-white/6;
+        @apply text-ink bg-wash;
     }
 
     .s-nav-btn:active {
@@ -533,7 +562,7 @@
 
     .s-urlbar:hover,
     .s-urlbar.is-open {
-        @apply bg-white/8;
+        @apply bg-wash-strong;
     }
 
     .s-urlbar:focus-visible {
@@ -563,7 +592,7 @@
 
     .s-urlbar-action:hover,
     .s-urlbar-action.is-active {
-        @apply bg-white/10 text-ink;
+        @apply bg-wash-strong text-ink;
     }
 
     .s-seg {
@@ -579,7 +608,7 @@
     }
 
     .s-seg-btn.is-active {
-        @apply bg-white/10 text-ink;
+        @apply bg-wash-strong text-ink;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
     }
 
@@ -616,7 +645,7 @@
     }
 
     .s-section-row:hover {
-        @apply bg-white/5;
+        @apply bg-wash;
     }
 
     .s-section-row.is-active {
@@ -868,4 +897,21 @@
         border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
         background: color-mix(in srgb, var(--color-accent) 6%, transparent);
     }
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Light chrome adjustments                                           */
+/* ------------------------------------------------------------------ */
+
+html.studio-light .s-pop {
+    box-shadow: 0 10px 30px rgba(17, 17, 20, 0.12), 0 0 0 1px rgba(17, 17, 20, 0.06);
+}
+
+html.studio-light .s-frame {
+    box-shadow: 0 1px 2px rgba(17, 17, 20, 0.06), 0 12px 32px -12px rgba(17, 17, 20, 0.18), 0 0 0 1px rgba(17, 17, 20, 0.06);
+}
+
+html.studio-light .s-canvas {
+    background-image: none;
 }

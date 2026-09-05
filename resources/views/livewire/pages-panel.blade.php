@@ -1,6 +1,6 @@
 <div class="flex h-full min-h-0 flex-col">
     {{-- Header --}}
-    <div class="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+    <div class="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3">
         <p class="s-microlabel flex-1">Pages</p>
         <button
             type="button"
