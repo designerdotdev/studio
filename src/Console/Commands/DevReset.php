@@ -32,12 +32,20 @@ class DevReset extends Command
         $storage->purge();
         $this->info('  Done.');
 
+        // 2b. Files a template import wrote outside the storage tree —
+        // published assets and the supporting components copied into the app
+        $this->line('  Removing imported template files...');
+        app(\Designer\Studio\Services\Templates\TemplateImporter::class)->purgeInstalled();
+        $this->info('  Done.');
+
         // 3. Re-create storage directories
         $this->line('  Re-creating storage directories...');
         $storage->ensureDirectoryExists();
         $storage->ensureDirectoryExists('pages');
         $storage->ensureDirectoryExists('layouts');
         $storage->ensureDirectoryExists('blocks');
+        $storage->ensureDirectoryExists('collections');
+        $storage->ensureDirectoryExists('site');
         $storage->ensureDirectoryExists('components/library');
 
         if (config('studio.draft_mode', true)) {

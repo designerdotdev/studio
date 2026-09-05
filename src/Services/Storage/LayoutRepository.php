@@ -169,6 +169,10 @@ class LayoutRepository
             'variables' => $variables,
         ];
 
+        if ($bindings = PageRepository::defaultBindings($componentRef)) {
+            $newComponent['bindings'] = $bindings;
+        }
+
         if ($insertAtIndex !== null && $insertAtIndex >= 0 && $insertAtIndex <= count($components)) {
             array_splice($components, $insertAtIndex, 0, [$newComponent]);
         } else {
@@ -192,6 +196,32 @@ class LayoutRepository
         $components = collect($layout['components'] ?? [])->map(function ($comp) use ($componentId, $variables) {
             if ($comp['id'] === $componentId) {
                 $comp['variables'] = array_merge($comp['variables'] ?? [], $variables);
+            }
+
+            return $comp;
+        })->toArray();
+
+        return $this->update($slug, ['components' => $components]);
+    }
+
+    /** Replace an instance's collection bindings; [] unbinds (see PageRepository) */
+    public function updateComponentBindings(string $slug, string $componentId, array $bindings, ?array $variables = null): ?array
+    {
+        if ($this->isSlot($componentId) || !($layout = $this->find($slug))) {
+            return null;
+        }
+
+        $components = collect($layout['components'] ?? [])->map(function ($comp) use ($componentId, $bindings, $variables) {
+            if ($comp['id'] === $componentId) {
+                if ($bindings === []) {
+                    unset($comp['bindings']);
+                } else {
+                    $comp['bindings'] = $bindings;
+                }
+
+                if ($variables !== null) {
+                    $comp['variables'] = array_merge($comp['variables'] ?? [], $variables);
+                }
             }
 
             return $comp;

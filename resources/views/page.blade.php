@@ -1,5 +1,6 @@
+@php $chrome = app(\Designer\Studio\Support\SiteChrome::class); @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $chrome->htmlClass() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -106,12 +107,15 @@
 
     {!! config('studio.iframe.head_html', '') !!}
 
+    {{-- The site's own fonts, theme tokens, and scripts (set by a template import) --}}
+    {!! $chrome->head() !!}
+
     {{-- Per-page custom head HTML --}}
     @if(!empty($meta['head_html']))
         {!! $meta['head_html'] !!}
     @endif
 </head>
-<body class="{{ config('studio.iframe.body_class', 'min-h-screen w-full') }}">
+<body class="{{ $chrome->bodyClass() }}">
     @foreach($renderedSections as $html)
         {!! $html !!}
     @endforeach

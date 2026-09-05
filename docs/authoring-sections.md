@@ -64,6 +64,13 @@ fields:
 A repeater may set `nestable: true` (+ `max_depth: 2`) to allow one level of child items —
 used for nav dropdowns and footer link columns. Children live in `$item['children']`.
 
+A repeater may also declare `source: collections.<name>`. When a section is added to a page
+and that collection exists in the site, the repeater starts **bound** to it: its rows come
+from the collection (edited in the Content panel) instead of the instance, and the inspector
+shows a locked "Bound to …" panel with Unbind. Any repeater can be bound or unbound later
+from the inspector. Bindings live on the page/layout/block instance as
+`"bindings": {"items": "collections.guides"}` and are honoured by every render path.
+
 `preview_variables` (optional, top-level) overrides field defaults for the picker preview and
 for the starting content when a user adds the section. Usually the field `default`s are enough —
 make them excellent, because they *are* the demo content.
@@ -77,52 +84,59 @@ section's root really is fixed.
 `stats`, `content`, `gallery`, `testimonials`, `pricing`, `faq`, `team`, `blog`, `contact`,
 `newsletter`, `cta`, `footers`.
 
-## The HTML file — supported Blade subset
+## The HTML file — Blade
 
-Sections render in **three engines**: real Blade (live pages + exports), a client-side renderer
-(instant preview while typing), and a static compiler (Blade file generation). Only the subset
-below works in all three. **Stay inside it.**
+Every render path — the canvas, the live page, the draft preview, and Blade exports —
+compiles sections with Laravel's own Blade engine, so anything Blade accepts works here.
+There is no reduced subset to stay inside any more.
 
-### Allowed
+### The common shapes
 
 ```blade
 {{ $heading ?? 'Fallback copy' }}          {{-- escaped echo (use for all text) --}}
 {!! $logo_svg !!}                           {{-- raw echo (svg/html fields only) --}}
-{!! $quote ?? 'Fallback' !!}
 
-@if($show_badge) … @endif                   {{-- toggle a block --}}
-@if($show_badge) … @else … @endif
-@if($image ?? false) … @endif
+@if($show_badge) … @else … @endif           {{-- toggle a block --}}
+@if($plan === 'pro' && $seats > 5) … @endif {{-- comparisons and nesting are fine --}}
 
 @foreach($items as $item)                   {{-- repeater loop --}}
-    {{ $item['title'] }}
-    {{ $item['subtitle'] ?? '' }}
-    {!! $item['icon'] !!}
-    @if($item['href']) … @else … @endif
-
-    @if(count($item['children']) > 0)       {{-- nested repeater only --}}
-        @foreach($item['children'] as $child)
-            {{ $child['text'] }}
-        @endforeach
-    @endif
+    {{ $item['title'] }}  {{-- or $item->title; both resolve --}}
+    {{ $loop->index }}
+    @foreach($item['children'] as $child) {{ $child['text'] }} @endforeach
 @endforeach
 ```
 
-### Forbidden — will break at least one renderer
+Repeater rows answer to array access *and* property access, so `$item['title']` and
+`$item->title` are the same value. Studio's own sections use the first; sections imported
+from a site-template repository use the second.
 
-- `@php`, `@include`, `<x-… />` components, `<script>` tags
-- `$loop`, method calls, ternaries (`{{ $a ? 'x' : 'y' }}`), string concatenation in echoes
-- Nested `@if` inside another `@if` (loops may contain `@if`, that's fine)
-- `@elseif`
-- Blade echoes **inside Alpine attributes** (`x-data="{ open: {{ … }} }"` — never)
-- Echoing one variable inside another field's default
+### Also available
+
+- **`@props`** at the top of the file, exactly as an anonymous component would declare it.
+  Props with no matching field still get their defaults.
+- **`$loop`**, `@php`, `@include`, `@elseif`, ternaries, and method calls.
+- **Nested `<x-… />` components**, resolved the way Laravel resolves any anonymous
+  component. A template import copies its own supporting components into
+  `resources/views/components/studio-templates/<template>/` and rewrites their tags to match.
+- **`$site`** — the site-wide document (company name, nav links, socials), injected into
+  every section unless the section declares a field of its own by that name.
+
+### Still worth avoiding
+
+- Blade echoes **inside Alpine attributes** (`x-data="{ open: {{ … }} }"`) — quoting breaks.
+- Echoing one variable inside another field's default.
+- Anything that reaches for application state a section cannot assume exists: the database,
+  the authenticated user, named routes.
 
 Alpine.js attributes (`x-data`, `x-show`, `@click`, …) are fine for interactivity
 (mobile menus, accordions) — they pass through untouched. Use `x-show` with an inline
 `style="display: none"` rather than `x-cloak` so hidden panels never flash.
 
-Always keep whitespace (or a tag boundary) before `@if`, `@else`, `@endif`, `@foreach`,
-`@endforeach` — Blade does not recognize directives glued to a word character (`ON@else`).
+Always keep whitespace (or a tag boundary) before a directive — Blade does not recognize
+one glued to a word character (`ON@else`).
+
+Use HTML comments in sections, not `{{-- --}}`, when the comment should survive into the
+rendered page.
 
 ## Design language
 
@@ -154,6 +168,6 @@ Sections from different categories get stacked on one page — they must feel li
 
 1. Every piece of copy a marketer would want to change is a field.
 2. Field defaults read like a real product’s page, not a template.
-3. Uses only the supported Blade subset above.
+3. Renders correctly on its own, with no application state behind it.
 4. Looks right at 390px, 768px, and 1280px.
 5. `name` is unique; `category` is canonical; `title`/`description` are human.

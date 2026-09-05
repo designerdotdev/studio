@@ -29,6 +29,7 @@ Route::group([
     Route::get('/preview/component/{name}', [StudioController::class, 'componentPreview'])->where('name', '[a-z0-9-]+')->name('preview.component');
     Route::get('/preview/template/{name}', [StudioController::class, 'templatePreview'])->where('name', '[a-z0-9-]+')->name('preview.template');
     Route::get('/preview/block/{slug}', [StudioController::class, 'blockPreview'])->where('slug', '[a-z0-9-]+')->name('preview.block');
+    Route::get('/preview/thumbnail/{name}', [StudioController::class, 'templateThumbnail'])->where('name', '[a-z0-9-]+')->name('preview.thumbnail');
 
     // Draft site preview (page slugs never contain '/', so these can't
     // shadow the two-segment preview routes above)
@@ -47,8 +48,21 @@ Route::group([
         Route::delete('/pages/{slug}/components/{componentId}', [StudioController::class, 'removeComponentFromPage'])->where(['slug' => '[a-z0-9-]+', 'componentId' => '[a-zA-Z0-9_-]+'])->name('api.pages.components.remove');
         Route::post('/pages/{slug}/components/{componentId}/move', [StudioController::class, 'moveComponentOnPage'])->where(['slug' => '[a-z0-9-]+', 'componentId' => '[a-zA-Z0-9_-]+'])->name('api.pages.components.move');
 
+        // Live canvas rendering — one round trip per edit, batched across
+        // the sibling placements of a global block. Typing is the load
+        // here, so the limit is generous.
+        Route::post('/render', \Designer\Studio\Http\Controllers\RenderController::class)->middleware('throttle:600,1')->name('api.render');
+
         // Uploads (image fields)
         Route::post('/upload', [StudioController::class, 'upload'])->middleware('throttle:30,1')->name('api.upload');
+
+        // Media library (public/studio-uploads)
+        Route::get('/media', [\Designer\Studio\Http\Controllers\MediaController::class, 'index'])->name('api.media.index');
+        Route::post('/media/upload', [\Designer\Studio\Http\Controllers\MediaController::class, 'upload'])->middleware('throttle:60,1')->name('api.media.upload');
+        Route::post('/media/folder', [\Designer\Studio\Http\Controllers\MediaController::class, 'folder'])->middleware('throttle:60,1')->name('api.media.folder');
+        Route::patch('/media', [\Designer\Studio\Http\Controllers\MediaController::class, 'update'])->middleware('throttle:120,1')->name('api.media.update');
+        Route::post('/media/duplicate', [\Designer\Studio\Http\Controllers\MediaController::class, 'duplicate'])->middleware('throttle:60,1')->name('api.media.duplicate');
+        Route::delete('/media', [\Designer\Studio\Http\Controllers\MediaController::class, 'destroy'])->middleware('throttle:60,1')->name('api.media.destroy');
 
         // Onboarding
         Route::post('/onboarding/apply-template', [StudioController::class, 'applyTemplate'])->name('api.onboarding.apply');
@@ -60,6 +74,12 @@ Route::group([
         // Dev mode — section source editing (404s unless the gate passes)
         Route::get('/dev/components/{name}', [\Designer\Studio\Http\Controllers\DevModeController::class, 'show'])->where('name', '[a-z0-9-]+')->name('api.dev.components.show');
         Route::put('/dev/components/{name}', [\Designer\Studio\Http\Controllers\DevModeController::class, 'update'])->where('name', '[a-z0-9-]+')->middleware('throttle:30,1')->name('api.dev.components.update');
+
+        // Assistant — the local AI CLI (404s unless dev mode is on)
+        Route::get('/assistant/engines', [\Designer\Studio\Http\Controllers\AssistantController::class, 'engines'])->name('api.assistant.engines');
+        Route::post('/assistant/turn', [\Designer\Studio\Http\Controllers\AssistantController::class, 'turn'])->middleware('throttle:60,1')->name('api.assistant.turn');
+        Route::get('/assistant/stream/{turn}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'stream'])->where('turn', '[a-f0-9-]{36}')->name('api.assistant.stream');
+        Route::delete('/assistant/stream/{turn}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'stop'])->where('turn', '[a-f0-9-]{36}')->name('api.assistant.stop');
 
         // Draft publishing
         Route::get('/publish/status', [StudioController::class, 'publishStatus'])->name('api.publish.status');

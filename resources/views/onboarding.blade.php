@@ -91,7 +91,7 @@
                 <div>
                     <p class="s-microlabel">Step 2 of 2</p>
                     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-ink">Pick a starting point</h1>
-                    <p class="mt-1.5 text-[13.5px] text-soft">Live previews, built from the section library. You can add, remove, and rewrite everything.</p>
+                    <p class="mt-1.5 text-[13.5px] text-soft">Whole sites, ready to edit. You can add, remove, and rewrite everything.</p>
                 </div>
                 <button @click="step = 1" class="s-btn-ghost shrink-0">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>
@@ -116,7 +116,7 @@
                             class="pointer-events-none relative block w-full overflow-hidden bg-white"
                             style="aspect-ratio: 16/11"
                         >
-                            @if(($template['pages'][0]['components'] ?? []) === [])
+                            @if($template['preview'] === 'none')
                                 <span class="absolute inset-0 flex items-center justify-center bg-[#fafafa]">
                                     <span class="flex h-full w-full items-center justify-center" style="background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px); background-size: 18px 18px;">
                                         <span class="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 text-neutral-300">
@@ -124,6 +124,16 @@
                                         </span>
                                     </span>
                                 </span>
+                            @elseif($template['preview'] === 'thumbnail')
+                                {{-- A repository template ships its own picture; rendering it
+                                     live would mean installing it first. --}}
+                                <img
+                                    src="{{ route('studio.preview.thumbnail', ['name' => $key]) }}"
+                                    loading="lazy"
+                                    alt="{{ $template['title'] }} preview"
+                                    class="absolute inset-0 h-full w-full object-cover object-top"
+                                >
+                                <span class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/5 to-transparent"></span>
                             @else
                                 <iframe
                                     src="{{ route('studio.preview.template', ['name' => $key]) }}"
@@ -153,8 +163,8 @@
                         <span class="flex flex-1 flex-col border-t border-line p-4">
                             <span class="flex items-center gap-2">
                                 <span class="text-[13.5px] font-semibold text-ink">{{ $template['title'] }}</span>
-                                @if(count($template['pages']) > 1)
-                                    <span class="s-chip">{{ count($template['pages']) }} pages</span>
+                                @if($template['pages'] > 1)
+                                    <span class="s-chip">{{ $template['pages'] }} pages</span>
                                 @endif
                             </span>
                             <span class="mt-1 text-xs leading-relaxed text-soft">{{ $template['description'] }}</span>

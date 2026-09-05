@@ -15,6 +15,8 @@ class PageData
         public readonly string $updated_at,
         public readonly array $meta,
         public readonly array $components,
+        /** Position in the Pages panel; null = unordered (sorted after ordered pages, by title) */
+        public readonly ?int $order = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -30,6 +32,7 @@ class PageData
             updated_at: $data['updated_at'] ?? now()->toIso8601String(),
             meta: $data['meta'] ?? [],
             components: $data['components'] ?? [],
+            order: isset($data['order']) ? (int) $data['order'] : null,
         );
     }
 
@@ -46,6 +49,7 @@ class PageData
             'updated_at' => $this->updated_at,
             'meta' => $this->meta,
             'components' => $this->components,
+            'order' => $this->order,
         ];
     }
 }

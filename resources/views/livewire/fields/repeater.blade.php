@@ -6,11 +6,38 @@
     $firstSubKey = array_key_first($subFields);
 @endphp
 
+@php
+    $bound = $this->bindings[$sectionId][$key] ?? null;
+    $boundName = \Designer\Studio\Services\CollectionBinder::collectionName($bound);
+    $collectionOptions = $this->collections;
+@endphp
+
 <div class="flex items-center justify-between">
     <span class="s-label !mb-0">{{ $field['label'] ?? \Illuminate\Support\Str::headline($key) }}</span>
-    <span class="text-[10.5px] text-faint">{{ count($items) }}</span>
+    @if(!$boundName)
+        <span class="text-[10.5px] text-faint">{{ count($items) }}</span>
+    @endif
 </div>
 
+@if($boundName)
+    {{-- Bound to a collection: rows live in the Content panel --}}
+    <div class="mt-1.5 rounded-lg border border-accent/30 bg-accent/8 p-2.5">
+        <div class="flex items-center gap-2">
+            <svg class="h-3.5 w-3.5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor"><path d="M10 1c3.866 0 7 1.79 7 4s-3.134 4-7 4-7-1.79-7-4 3.134-4 7-4Zm5.694 8.13c.464-.264.91-.583 1.306-.952V10c0 2.21-3.134 4-7 4s-7-1.79-7-4V8.178c.396.37.842.688 1.306.953C5.838 10.006 7.854 10.5 10 10.5s4.162-.494 5.694-1.37ZM3 13.179V15c0 2.21 3.134 4 7 4s7-1.79 7-4v-1.822c-.396.37-.842.688-1.306.953-1.532.875-3.548 1.369-5.694 1.369s-4.162-.494-5.694-1.37A7.009 7.009 0 0 1 3 13.179Z"/></svg>
+            <span class="min-w-0 flex-1 truncate text-xs text-ink">Bound to <span class="font-medium">{{ $collectionOptions[$boundName] ?? $boundName }}</span></span>
+        </div>
+        <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Rows come from the collection. Edit them in Content; unbind to edit a copy here.</p>
+        <div class="mt-2 flex gap-1.5">
+            <button
+                type="button"
+                class="s-btn-outline !h-7 flex-1 !text-[11px]"
+                x-data
+                @click="$store.studio.setRail('content', true); window.dispatchEvent(new CustomEvent('studio:open-collection', { detail: { name: @js($boundName) } }))"
+            >Edit in Content</button>
+            <button type="button" class="s-btn-ghost !h-7 !text-[11px]" wire:click="unbindRepeater('{{ $sectionId }}', '{{ $key }}')">Unbind</button>
+        </div>
+    </div>
+@else
 <div class="mt-1.5 space-y-1.5">
     @foreach($items as $itemIndex => $item)
         @php
@@ -116,4 +143,16 @@
         <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
         {{ $addLabel }}
     </button>
+
+    @if(!empty($collectionOptions))
+        <div class="flex items-center gap-1.5 pt-0.5" x-data="{ pick: '' }">
+            <select class="s-input !h-7 flex-1 !text-[11px]" x-model="pick" @change="if (pick) { $wire.bindRepeater('{{ $sectionId }}', '{{ $key }}', pick); pick = '' }">
+                <option value="">Bind to a collection…</option>
+                @foreach($collectionOptions as $name => $title)
+                    <option value="{{ $name }}">{{ $title }}</option>
+                @endforeach
+            </select>
+        </div>
+    @endif
 </div>
+@endif

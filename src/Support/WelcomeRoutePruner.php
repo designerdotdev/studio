@@ -103,7 +103,7 @@ class WelcomeRoutePruner
      */
     public function liveHomePageExists(): bool
     {
-        $homeSlug = config('studio.page_routing.home_slug', 'home');
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
 
         return is_file($this->storage->getBasePath() . '/pages/' . $homeSlug . '.json');
     }

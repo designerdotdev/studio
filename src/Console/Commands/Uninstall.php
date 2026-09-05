@@ -43,6 +43,11 @@ class Uninstall extends Command
             $this->line('Removing JSON data files...');
             $storage->purge();
             $this->info('  Done.');
+
+            // Template imports also write outside the storage tree
+            $this->line('Removing imported template files...');
+            app(\Designer\Studio\Services\Templates\TemplateImporter::class)->purgeInstalled();
+            $this->info('  Done.');
         } else {
             $this->line('Keeping JSON data files.');
         }

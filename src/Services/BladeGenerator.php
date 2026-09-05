@@ -5,13 +5,15 @@ namespace Designer\Studio\Services;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\DataTransferObjects\PageData;
+use Designer\Studio\Services\SectionRenderer;
 use Illuminate\Support\Facades\File;
 
 class BladeGenerator
 {
     public function __construct(
         protected PageRepository $pages,
-        protected ComponentRepository $components
+        protected ComponentRepository $components,
+        protected SectionRenderer $renderer
     ) {}
 
     protected function getOutputPath(): string
@@ -106,7 +108,7 @@ class BladeGenerator
 
         $head = [
             '<!DOCTYPE html>',
-            '<html lang="{{ str_replace(\'_\', \'-\', app()->getLocale()) }}">',
+            '<html lang="{{ str_replace(\'_\', \'-\', app()->getLocale()) }}" class="' . e(app(\Designer\Studio\Support\SiteChrome::class)->htmlClass()) . '">',
             '<head>',
             '    <meta charset="utf-8">',
             '    <meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -130,8 +132,24 @@ class BladeGenerator
         }
 
         $head[] = '    <style>[x-cloak] { display: none !important; }</style>';
+
+        // The site's own fonts, theme tokens, and scripts travel with the
+        // export — an imported template is unrecognisable without them.
+        // Fenced, because a stylesheet is full of at-rules (`@theme`,
+        // `@media`, `@keyframes`) that Blade would try to compile.
+        $chrome = app(\Designer\Studio\Support\SiteChrome::class);
+        $chromeHead = trim((string) $chrome->head());
+
+        if ($chromeHead !== '') {
+            foreach (explode("\n", $this->protectOutput($chromeHead)) as $line) {
+                if (trim($line) !== '') {
+                    $head[] = '    ' . $line;
+                }
+            }
+        }
+
         $head[] = '</head>';
-        $head[] = '<body class="' . e(config('studio.iframe.body_class', 'min-h-screen w-full')) . '">';
+        $head[] = '<body class="' . e($chrome->bodyClass()) . '">';
 
         $sections = $head;
 
@@ -189,10 +207,14 @@ class BladeGenerator
             $blocks[] = "";
             $blocks[] = "{$indent}{{-- {$component->title} --}}";
 
-            // Render the component HTML with the fully resolved variable set
-            $rendered = $this->renderComponentWithVariables(
-                $component->html,
-                $component->resolveVariables($instance['variables'] ?? [])
+            // Compiled by the same engine that serves the live page, so an
+            // export is always byte-identical to what the canvas showed.
+            $rendered = $this->protectOutput(
+                $this->renderer->render(
+                    $component,
+                    $component->resolveVariables($instance['variables'] ?? []),
+                    $instance['bindings'] ?? []
+                )
             );
 
             $blocks[] = collect(explode("\n", $rendered))
@@ -308,128 +330,24 @@ class BladeGenerator
     }
 
     /**
-     * Render component HTML, converting {{ $var ?? 'default' }} to static values.
-     * For array variables (repeaters), injects @php preamble and preserves @foreach directives.
+     * Fence rendered markup that would otherwise be read as Blade.
+     *
+     * Sections are already fully rendered by the time they reach the file,
+     * so any remaining `{{`, `{!!` or `@directive` is literal content — a
+     * code sample showing Blade syntax, an Alpine `@click`, an email
+     * address in text. `@verbatim` hands it through untouched.
      */
-    protected function renderComponentWithVariables(string $html, array $variables): string
+    protected function protectOutput(string $rendered): string
     {
-        // Statically evaluate @if blocks over known variables first, so
-        // toggle fields collapse into clean markup instead of leaving
-        // conditions over undefined variables in the generated file.
-        $html = $this->evaluateConditionals($html, $variables);
+        $looksLikeBlade = preg_match('/\{\{|\{!!|@[a-zA-Z]/', $rendered) === 1;
 
-        $preamble = '';
-        $arrayVars = [];
-
-        // Identify array variables and build @php preamble
-        foreach ($variables as $varName => $value) {
-            if (is_array($value)) {
-                $arrayVars[$varName] = true;
-                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $preamble .= "@php \${$varName} = json_decode('" . addcslashes($json, "'") . "', true); @endphp\n";
-            }
+        // A literal @endverbatim would close the fence early; nothing sane
+        // renders one, but leave such output alone rather than corrupt it.
+        if (!$looksLikeBlade || str_contains($rendered, '@endverbatim')) {
+            return $rendered;
         }
 
-        // Replace scalar Blade variable syntax with actual values.
-        // Two passes so 'single' and "double" quoted defaults can each
-        // contain the other quote character (e.g. "What we've built").
-        $result = $html;
-        foreach (['/{{\s*\$(\w+)\s*\?\?\s*\'([^\']*)\'\s*}}/', '/{{\s*\$(\w+)\s*\?\?\s*"([^"]*)"\s*}}/'] as $pattern) {
-            $result = preg_replace_callback($pattern, function ($matches) use ($variables, $arrayVars) {
-                $varName = $matches[1];
-                $default = $matches[2];
-
-                // Skip array variables — they're handled by @foreach in the template
-                if (isset($arrayVars[$varName])) {
-                    return $matches[0];
-                }
-
-                $value = $variables[$varName] ?? $default;
-
-                // Escape for HTML output
-                return e($value);
-            }, $result);
-        }
-
-        // Also handle {{ $varName }} without defaults for scalar vars
-        $result = preg_replace_callback('/{{\s*\$(\w+)\s*}}/', function ($matches) use ($variables, $arrayVars) {
-            $varName = $matches[1];
-
-            if (isset($arrayVars[$varName])) {
-                return $matches[0];
-            }
-
-            $value = $variables[$varName] ?? '';
-            return e($value);
-        }, $result);
-
-        // Handle {!! $varName !!} and {!! $varName ?? 'default' !!} for scalar vars
-        $result = preg_replace_callback('/{!!\s*\$(\w+)\s*(?:\?\?\s*[\'"]([^\'"]*)[\'"])?\s*!!}/', function ($matches) use ($variables, $arrayVars) {
-            $varName = $matches[1];
-
-            if (isset($arrayVars[$varName])) {
-                return $matches[0];
-            }
-
-            $default = $matches[2] ?? '';
-            return $variables[$varName] ?? $default;
-        }, $result);
-
-        if ($preamble) {
-            return $preamble . $result;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Statically evaluate simple @if / @else / @endif blocks against the
-     * known variable set. Only handles conditions of the form
-     * `@if($var)` or `@if($var ?? false)` where $var is a page-level
-     * variable — conditions referencing loop items (e.g. `$item['x']`)
-     * are left untouched for runtime evaluation.
-     */
-    protected function evaluateConditionals(string $html, array $variables): string
-    {
-        // Loop item names must never be statically evaluated
-        $reserved = ['loop' => true];
-        if (preg_match_all('/@foreach\s*\(\s*\$\w+\s+as\s+\$(\w+)\s*\)/', $html, $matches)) {
-            foreach ($matches[1] as $itemName) {
-                $reserved[$itemName] = true;
-            }
-        }
-
-        $pattern = '/@if\s*\(\s*\$(\w+)(?:\s*\?\?\s*(false|true|\'[^\']*\'|"[^"]*"))?\s*\)([\s\S]*?)@endif/';
-
-        return preg_replace_callback($pattern, function ($matches) use ($variables, $reserved) {
-            $varName = $matches[1];
-
-            if (isset($reserved[$varName])) {
-                return $matches[0];
-            }
-
-            $fallback = false;
-            if (isset($matches[2]) && $matches[2] !== '') {
-                $raw = $matches[2];
-                $fallback = match (true) {
-                    $raw === 'false' => false,
-                    $raw === 'true' => true,
-                    default => trim($raw, '\'"'),
-                };
-            }
-
-            $value = array_key_exists($varName, $variables) ? $variables[$varName] : $fallback;
-
-            $truthy = is_array($value)
-                ? count($value) > 0
-                : !($value === false || $value === null || $value === '' || $value === '0' || $value === 'false' || $value === 0);
-
-            $parts = explode('@else', $matches[3], 2);
-            $ifContent = $parts[0];
-            $elseContent = $parts[1] ?? '';
-
-            return $truthy ? $ifContent : $elseContent;
-        }, $html) ?? $html;
+        return "@verbatim\n{$rendered}\n@endverbatim";
     }
 
     /**
