@@ -129,7 +129,7 @@
     }"
 >
     {{-- Header --}}
-    <div class="flex h-12 shrink-0 items-center gap-1 border-b border-line px-3">
+    <div class="flex h-12 shrink-0 items-center gap-1 px-3">
         <p class="s-microlabel flex-1">Assistant</p>
         <div class="relative" x-data="{ open: false }" @click.outside="open = false">
             <button type="button" class="s-icon-btn" title="Conversation history" aria-label="Conversation history" @click="open = !open">
@@ -229,7 +229,7 @@
             @if(empty($messages))
                 <div class="mt-4 space-y-1.5" x-show="!busy">
                     @foreach($this->suggestions as $suggestion)
-                        <button type="button" class="s-btn-outline w-full !justify-start !text-left !text-[11.5px] !font-normal !text-soft hover:!text-ink" @click="use(@js($suggestion))">{{ $suggestion }}</button>
+                        <button type="button" class="s-suggestion" @click="use(@js($suggestion))">{{ $suggestion }}</button>
                     @endforeach
                 </div>
             @endif

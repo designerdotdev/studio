@@ -44,9 +44,9 @@
 
 /* Light chrome — the Sites builder look. Toggled from the menu; dark stays the default. */
 html.studio-light {
-    --color-shell: #f6f6f7;
+    --color-shell: #f4f4f5;
     --color-panel: #ffffff;
-    --color-raised: #f1f1f4;
+    --color-raised: #ffffff;
     --color-overlay: #ffffff;
     --color-line: rgba(17, 17, 20, 0.08);
     --color-line-strong: rgba(17, 17, 20, 0.14);
@@ -449,7 +449,17 @@ html.studio-light {
     /* --- topbar ----------------------------------------------------- */
 
     .s-topbar {
-        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-shell px-3;
+        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-panel px-3;
+    }
+
+    /* Assistant suggestion — a wrapping outline button */
+    .s-suggestion {
+        @apply w-full cursor-pointer rounded-lg border border-line-strong px-3 py-2 text-left text-[11.5px] leading-snug text-soft transition-colors duration-150;
+        white-space: normal;
+    }
+
+    .s-suggestion:hover {
+        @apply text-ink bg-wash;
     }
 
     /* Flat square button (menu, sidebar toggle) — same rest/hover
@@ -614,19 +624,33 @@ html.studio-light {
 
     /* --- canvas ----------------------------------------------------- */
 
+    /* The workspace card: toolbar + canvas as one surface inset from the shell */
+    .s-workspace {
+        @apply my-2 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 40px -20px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Desktop preview fills the card; narrower devices sit on a dotted canvas */
     .s-canvas {
+        background-color: var(--color-panel);
+    }
+
+    .s-canvas.is-device {
         background-color: var(--color-canvas);
-        background-image:
-            radial-gradient(ellipse 80% 50% at 50% -10%, rgba(76, 125, 250, 0.05), transparent),
-            radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-        background-size: 100% 100%, 22px 22px;
+        background-image: radial-gradient(circle, var(--color-line-strong) 1px, transparent 1px);
+        background-size: 22px 22px;
     }
 
     .s-frame {
         @apply flex h-full flex-col overflow-hidden rounded-xl;
         box-shadow:
-            0 0 0 1px rgba(255, 255, 255, 0.09),
-            0 24px 64px -16px rgba(0, 0, 0, 0.65);
+            0 0 0 1px var(--color-line-strong),
+            0 24px 64px -16px rgba(0, 0, 0, 0.45);
+    }
+
+    .s-frame.is-flush {
+        @apply rounded-none;
+        box-shadow: none;
     }
 
     .s-frame iframe {
@@ -909,9 +933,23 @@ html.studio-light .s-pop {
 }
 
 html.studio-light .s-frame {
-    box-shadow: 0 1px 2px rgba(17, 17, 20, 0.06), 0 12px 32px -12px rgba(17, 17, 20, 0.18), 0 0 0 1px rgba(17, 17, 20, 0.06);
+    box-shadow: 0 1px 2px rgba(17, 17, 20, 0.06), 0 12px 32px -12px rgba(17, 17, 20, 0.18), 0 0 0 1px rgba(17, 17, 20, 0.08);
 }
 
-html.studio-light .s-canvas {
-    background-image: none;
+html.studio-light .s-frame.is-flush {
+    box-shadow: none;
+}
+
+/* The page pill needs a fill on the white card */
+html.studio-light .s-urlbar {
+    background: var(--color-shell);
+}
+
+html.studio-light .s-urlbar:hover,
+html.studio-light .s-urlbar.is-open {
+    background: color-mix(in srgb, var(--color-shell) 60%, var(--color-wash-strong));
+}
+
+html.studio-light .s-workspace {
+    box-shadow: 0 1px 2px rgba(17, 17, 20, 0.04), 0 8px 24px -16px rgba(17, 17, 20, 0.12);
 }
