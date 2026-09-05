@@ -333,10 +333,28 @@
             busy: false,
 
             copyUrl() {
-                navigator.clipboard.writeText(@js($liveUrl)).then(() => {
+                // navigator.clipboard only exists in secure contexts (https/localhost);
+                // fall back to execCommand for plain-http dev domains like *.test
+                const url = @js($liveUrl);
+                const done = () => {
                     this.copied = true;
                     setTimeout(() => this.copied = false, 1800);
-                });
+                };
+                const fallback = () => {
+                    const el = document.createElement('textarea');
+                    el.value = url;
+                    el.setAttribute('readonly', '');
+                    el.style.position = 'fixed';
+                    el.style.opacity = '0';
+                    document.body.appendChild(el);
+                    el.select();
+                    try { document.execCommand('copy') && done(); } finally { el.remove(); }
+                };
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(url).then(done).catch(fallback);
+                } else {
+                    fallback();
+                }
             },
 
             async refreshStatus() {

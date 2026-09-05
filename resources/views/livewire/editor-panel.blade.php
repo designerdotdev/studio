@@ -29,7 +29,6 @@
                 </button>
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-[13px] font-semibold text-ink">{{ $selected['title'] }}</p>
-                    <p class="s-microlabel !normal-case !tracking-normal capitalize">{{ str_replace('-', ' ', $selected['category']) }}</p>
                 </div>
                 @if(\Designer\Studio\Support\DevMode::enabled())
                     <button
