@@ -76,8 +76,8 @@
                 {{-- The panel column. Its header row is 48px so it lines up with the topbar. --}}
                 <aside
                     x-data
-                    class="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-line bg-panel transition-[width] duration-200 ease-out"
-                    :class="$store.studio.sidebar ? '' : '!w-0 !border-r-0'"
+                    class="flex w-[320px] shrink-0 flex-col overflow-hidden bg-shell transition-[width] duration-200 ease-out"
+                    :class="$store.studio.sidebar ? '' : '!w-0'"
                     :aria-hidden="!$store.studio.sidebar"
                     :inert="!$store.studio.sidebar"
                 >
@@ -87,7 +87,8 @@
                 </aside>
             @endisset
 
-            <div class="flex min-w-0 flex-1 flex-col">
+            {{-- The workspace card: toolbar + canvas in one rounded surface, inset from the shell --}}
+            <div class="s-workspace">
                 @isset($topbar)
                     <header class="s-topbar">
                         {{ $topbar }}

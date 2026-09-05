@@ -624,10 +624,11 @@
     {{-- ============================================================ --}}
     {{-- Canvas                                                        --}}
     {{-- ============================================================ --}}
-    <div class="s-canvas h-full w-full overflow-auto" x-data>
-        <div class="flex h-full flex-col p-1 lg:p-2">
+    <div class="s-canvas h-full w-full overflow-auto" x-data :class="$store.studio.device !== 'desktop' && 'is-device'">
+        <div class="flex h-full flex-col" :class="$store.studio.device === 'desktop' ? 'p-0' : 'p-6'">
             <div
                 class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
+                :class="$store.studio.device === 'desktop' ? 'is-flush' : ''"
                 :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
             >
                 {{-- Live preview --}}
