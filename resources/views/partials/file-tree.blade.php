@@ -8,7 +8,7 @@
      view carries `canonical`, its designer/ identity — every action keys on
      that, so both views drive one buffer and one save path. --}}
 <div class="flex h-full min-h-0 flex-col">
-    {{-- Header — on the topbar line, like every other panel --}}
+    {{-- Header --}}
     <div class="flex h-11 shrink-0 items-center gap-1.5 px-3">
         <h2 class="flex-1 truncate text-[13px] font-semibold text-ink">Files</h2>
 
@@ -36,7 +36,7 @@
     </div>
 
     {{-- Which tree: just the design surface, or the whole application --}}
-    <div class="shrink-0 px-3 pb-2">
+    <div class="shrink-0 border-b border-line px-3 pb-2">
         <div class="s-seg !h-7 w-full">
             <button
                 type="button"

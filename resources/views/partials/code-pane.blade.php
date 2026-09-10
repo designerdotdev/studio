@@ -6,7 +6,7 @@
 <div
     x-show="$store.studio.mode === 'code'"
     x-cloak
-    class="flex min-h-0 min-w-0 flex-col"
+    class="s-frame min-h-0 min-w-0 bg-panel"
     :class="$store.studio.codeSplit ? 'shrink-0' : 'flex-1'"
     :style="$store.studio.codeSplit ? { width: $store.studio.codeSize + '%' } : { width: '' }"
     {{-- Register the Monaco host without loading Monaco: the bundle is

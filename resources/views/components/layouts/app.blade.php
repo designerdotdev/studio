@@ -44,14 +44,21 @@
             </button>
         </div>
 
-        <div class="flex h-dvh">
-            {{-- The rail: the menu at the top, then one icon per panel. Full height, no top border. --}}
-            <nav class="s-rail" x-data aria-label="Panels">
-                @isset($menu)
-                    {{ $menu }}
-                @endisset
+        <div class="flex h-dvh flex-col">
+            {{-- The topbar spans the full width: menu first, then the page's own chrome --}}
+            @isset($topbar)
+                <header class="s-topbar">
+                    @isset($menu)
+                        {{ $menu }}
+                    @endisset
+                    {{ $topbar }}
+                </header>
+            @endisset
+
+            <div class="flex min-h-0 flex-1 items-stretch">
                 @isset($sidebar)
-                    <div class="s-rail-gap"></div>
+                {{-- The rail: one icon per panel. Always visible, even with the panel collapsed. --}}
+                <nav class="s-rail" x-data aria-label="Panels">
                     @if(\Designer\Studio\Support\DevMode::enabled())
                         <button type="button" class="s-rail-btn" :class="$store.studio.rail === 'assistant' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('assistant')" title="Assistant" aria-label="Assistant">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
@@ -75,31 +82,19 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.25 12.75V12a2.25 2.25 0 0 1 2.25-2.25h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>
                         </button>
                     @endif
-                @endisset
-            </nav>
+                </nav>
 
-            @isset($sidebar)
-                {{-- The panel column. Its header row is 48px so it lines up with the topbar. --}}
                 <aside
                     x-data
-                    class="flex w-[320px] shrink-0 flex-col overflow-hidden bg-shell transition-[width] duration-200 ease-out"
-                    :class="$store.studio.sidebar ? '' : '!w-0'"
+                    class="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-line bg-panel transition-[width] duration-200 ease-out"
+                    :class="$store.studio.sidebar ? '' : '!w-0 !border-r-0'"
                     :aria-hidden="!$store.studio.sidebar"
                     :inert="!$store.studio.sidebar"
                 >
-                    {{-- pt-2 lines the 48px header row up with the topbar inside the inset workspace card --}}
-                    <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden pt-2">
+                    <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden">
                         {{ $sidebar }}
                     </div>
                 </aside>
-            @endisset
-
-            {{-- The workspace card: toolbar + canvas in one rounded surface, inset from the shell --}}
-            <div class="s-workspace">
-                @isset($topbar)
-                    <header class="s-topbar">
-                        {{ $topbar }}
-                    </header>
                 @endisset
 
                 <main class="relative min-w-0 flex-1 overflow-hidden">
