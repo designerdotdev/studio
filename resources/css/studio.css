@@ -9,15 +9,15 @@
     --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    /* Surfaces: a near-black shell behind a graphite workspace card */
-    --color-shell: #0c0c0e;
-    --color-panel: #18181b;
-    --color-raised: #222226;
-    --color-overlay: #202024;
+    /* Surfaces (cool near-black family) */
+    --color-shell: #0b0b0d;
+    --color-panel: #121215;
+    --color-raised: #1a1a1f;
+    --color-overlay: #1e1e24;
 
     /* Hairlines */
-    --color-line: rgba(255, 255, 255, 0.08);
-    --color-line-strong: rgba(255, 255, 255, 0.13);
+    --color-line: rgba(255, 255, 255, 0.11);
+    --color-line-strong: rgba(255, 255, 255, 0.14);
 
     /* Text */
     --color-ink: #f4f4f6;
@@ -34,7 +34,7 @@
     --color-danger: #f37272;
 
     /* Canvas */
-    --color-canvas: #101012;
+    --color-canvas: #101014;
 
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
@@ -334,19 +334,14 @@ html.studio-light {
 
     /* --- the rail (panel switcher beside the sidebar) ---------------- */
 
-    /* 44px wide, and the 15px top padding puts the 30px menu button's
-       centre at y=30 — the centre of the 44px topbar inside the workspace
-       card (my-2 = 8px + 22px). The menu reads as one line with the header. */
+    /* 48px wide under the topbar; the topbar's 8px left padding centres the
+       32px menu button over the rail's buttons */
     .s-rail {
-        @apply flex w-11 shrink-0 flex-col items-center gap-1 bg-shell pb-2 pt-[15px];
-    }
-
-    .s-rail-gap {
-        @apply my-1 h-px w-5 shrink-0 bg-line-strong;
+        @apply flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-shell py-2;
     }
 
     .s-rail-btn {
-        @apply flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
+        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
     }
 
     .s-rail-btn:hover {
@@ -452,7 +447,7 @@ html.studio-light {
     /* --- topbar ----------------------------------------------------- */
 
     .s-topbar {
-        @apply relative z-40 flex h-11 shrink-0 items-center gap-1.5 border-b border-line bg-panel px-2.5;
+        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-shell pl-2 pr-3;
     }
 
     /* Assistant suggestion — a wrapping outline button */
@@ -465,14 +460,13 @@ html.studio-light {
         @apply text-ink bg-wash;
     }
 
-    /* Flat square button (menu, sidebar toggle) — same rest/hover
-       treatment as the browser nav buttons: no chrome until hovered */
+    /* Boxed square button (menu, sidebar toggle) */
     .s-box-btn {
-        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-all duration-150;
+        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line bg-raised text-soft transition-all duration-150;
     }
 
     .s-box-btn:hover {
-        @apply text-ink bg-wash;
+        @apply text-ink border-line-strong;
     }
 
     .s-box-btn:active {
@@ -494,7 +488,7 @@ html.studio-light {
     }
 
     .s-logo-btn .s-logo-btn-logo {
-        opacity: 1;
+        opacity: 0.55;
     }
 
     .s-logo-btn .s-logo-btn-menu {
@@ -502,9 +496,10 @@ html.studio-light {
         scale: 0.72;
     }
 
-    /* Menu open (no hover needed): keep the hover state */
+    /* Menu open (no hover needed): full-strength icon + border */
     .s-logo-btn.is-open {
-        @apply text-ink bg-wash;
+        color: var(--color-ink);
+        border-color: var(--color-line-strong);
     }
 
     .s-logo-btn:hover .s-logo-btn-logo,
@@ -557,33 +552,23 @@ html.studio-light {
         transform: scale(0.94);
     }
 
-    /* Device toggle: one nav button that cycles desktop → tablet → mobile.
-       Tinted while a narrow preview is active so the state reads at a glance */
-    .s-device-btn.is-narrow {
-        color: var(--color-accent);
-    }
-
-    .s-device-btn.is-narrow:hover {
-        color: var(--color-accent);
-        filter: brightness(1.15);
-    }
-
-    /* Centered page pill — borderless, clicking it opens the page switcher */
+    /* Full-width browser URL bar — clicking it opens the page switcher */
     .s-urlbar {
-        @apply flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-lg bg-raised px-1 transition-colors duration-150;
+        @apply flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border border-line bg-raised pl-3 pr-1.5 transition-colors duration-150;
     }
 
     .s-urlbar:hover,
     .s-urlbar.is-open {
-        @apply bg-wash-strong;
+        border-color: var(--color-line-strong);
     }
 
     .s-urlbar:focus-visible {
         outline: none;
+        border-color: var(--color-accent);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
     }
 
-    /* Hover-reveal actions at either edge of the pill */
+    /* Hover-reveal actions at the right edge of the URL bar */
     .s-urlbar-action {
         @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-soft;
         opacity: 0;
@@ -594,13 +579,6 @@ html.studio-light {
     .s-urlbar.is-open .s-urlbar-action,
     .s-urlbar-action:focus-visible {
         opacity: 1;
-    }
-
-    /* The rest-state element in a hover slot (the status dot) hides while
-       its action is shown */
-    .s-urlbar:hover .s-urlbar-rest,
-    .s-urlbar.is-open .s-urlbar-rest {
-        opacity: 0;
     }
 
     .s-urlbar-action:hover,
@@ -627,33 +605,20 @@ html.studio-light {
 
     /* --- canvas ----------------------------------------------------- */
 
-    /* The workspace card: toolbar + canvas as one surface inset from the shell */
-    .s-workspace {
-        @apply my-2 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel;
-        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 48px -24px rgba(0, 0, 0, 0.7);
-    }
-
-    /* Desktop preview fills the card; narrower devices sit on a dotted canvas */
+    /* The preview (and Code mode's editor) sit inset on a dotted surface */
     .s-canvas {
-        background-color: var(--color-panel);
-    }
-
-    .s-canvas.is-device {
         background-color: var(--color-canvas);
-        background-image: radial-gradient(circle, var(--color-line-strong) 1px, transparent 1px);
-        background-size: 22px 22px;
+        background-image:
+            radial-gradient(ellipse 80% 50% at 50% -10%, rgba(76, 125, 250, 0.05), transparent),
+            radial-gradient(circle, var(--color-wash) 1px, transparent 1px);
+        background-size: 100% 100%, 22px 22px;
     }
 
     .s-frame {
         @apply flex h-full flex-col overflow-hidden rounded-xl;
         box-shadow:
-            0 0 0 1px var(--color-line-strong),
-            0 24px 64px -16px rgba(0, 0, 0, 0.45);
-    }
-
-    .s-frame.is-flush {
-        @apply rounded-none;
-        box-shadow: none;
+            0 0 0 1px rgba(255, 255, 255, 0.09),
+            0 24px 64px -16px rgba(0, 0, 0, 0.65);
     }
 
     .s-frame iframe {
@@ -922,21 +887,23 @@ html.studio-light {
         background: var(--color-accent);
     }
 
-    /* The drag seam between Code mode's editor and the live preview */
+    /* The drag seam in the gap between Code mode's editor and the live
+       preview frames — invisible until hovered, then an accent line */
     .s-code-seam {
-        @apply relative w-1 shrink-0 cursor-col-resize bg-line transition-colors duration-150;
+        @apply relative w-2 shrink-0 cursor-col-resize;
     }
 
-    .s-code-seam:hover,
-    .s-code-seam:active {
-        background: var(--color-accent);
-    }
-
-    /* A wider invisible grab area than the 4px the seam actually paints */
-    .s-code-seam::after {
+    .s-code-seam::before {
         content: '';
         position: absolute;
-        inset: 0 -4px;
+        inset: 0 3px;
+        border-radius: 1px;
+        transition: background-color 150ms ease;
+    }
+
+    .s-code-seam:hover::before,
+    .s-code-seam:active::before {
+        background: var(--color-accent);
     }
 
     /* Empty-state dashed tile */
@@ -963,23 +930,6 @@ html.studio-light .s-frame {
     box-shadow: 0 1px 2px rgba(17, 17, 20, 0.06), 0 12px 32px -12px rgba(17, 17, 20, 0.18), 0 0 0 1px rgba(17, 17, 20, 0.08);
 }
 
-html.studio-light .s-frame.is-flush {
-    box-shadow: none;
-}
-
-/* The page pill needs a fill on the white card */
-html.studio-light .s-urlbar {
-    background: var(--color-shell);
-}
-
-html.studio-light .s-urlbar:hover,
-html.studio-light .s-urlbar.is-open {
-    background: color-mix(in srgb, var(--color-shell) 60%, var(--color-wash-strong));
-}
-
-html.studio-light .s-workspace {
-    box-shadow: 0 1px 2px rgba(17, 17, 20, 0.04), 0 8px 24px -16px rgba(17, 17, 20, 0.12);
-}
 
 /* ------------------------------------------------------------------ */
 /*  Inverse popover — the main menu flips against the chrome           */

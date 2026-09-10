@@ -10,7 +10,7 @@
 
     {{-- ============================ List ============================ --}}
     @if($view === 'list')
-        <div class="flex h-11 shrink-0 items-center gap-1 px-3">
+        <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3">
             <p class="s-microlabel flex-1">Content</p>
             <button type="button" class="s-icon-btn" title="New collection" aria-label="New collection" wire:click="startCreate">
                 <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
@@ -41,7 +41,7 @@
 
     {{-- ============================ Create ============================ --}}
     @if($view === 'create')
-        <div class="flex h-11 shrink-0 items-center gap-1 px-2">
+        <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
             <button type="button" class="s-icon-btn" wire:click="back" title="Back"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg></button>
             <p class="flex-1 truncate text-[13px] font-semibold text-ink">New collection</p>
         </div>
@@ -57,7 +57,7 @@
 
     {{-- ============================ Table ============================ --}}
     @if($view === 'table' && $doc)
-        <div class="flex h-11 shrink-0 items-center gap-1 px-2">
+        <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
             <button type="button" class="s-icon-btn" wire:click="back" title="All collections"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg></button>
             <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{{ $doc['title'] }}</p>
             <button type="button" class="s-icon-btn" wire:click="startSchema" title="Manage fields"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg></button>
@@ -108,7 +108,7 @@
 
     {{-- ============================ Entry ============================ --}}
     @if($view === 'entry' && $doc)
-        <div class="flex h-11 shrink-0 items-center gap-1 px-2">
+        <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
             <button type="button" class="s-icon-btn" wire:click="back" title="Back to {{ $doc['title'] }}"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg></button>
             <div class="min-w-0 flex-1">
                 <p class="truncate text-[13px] font-semibold text-ink">{{ $rowId ? 'Edit row' : 'New row' }}</p>
@@ -137,7 +137,7 @@
 
     {{-- ============================ Schema ============================ --}}
     @if($view === 'schema' && $doc)
-        <div class="flex h-11 shrink-0 items-center gap-1 px-2">
+        <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
             <button type="button" class="s-icon-btn" wire:click="back" title="Back"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg></button>
             <p class="flex-1 truncate text-[13px] font-semibold text-ink">Fields</p>
             <button type="button" class="s-icon-btn hover:!text-danger" wire:click="deleteCollection" wire:confirm="Delete “{{ $doc['title'] }}” and all of its rows? Sections bound to it will show nothing." title="Delete collection"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Z" clip-rule="evenodd"/></svg></button>

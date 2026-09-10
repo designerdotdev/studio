@@ -29,10 +29,6 @@
                 Alpine.store('studio', {
                     device: 'desktop',
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
-                    // One device button: each click steps desktop → tablet → mobile → desktop.
-                    cycleDevice() {
-                        this.device = { desktop: 'tablet', tablet: 'mobile', mobile: 'desktop' }[this.device] || 'desktop';
-                    },
                     sidebar: localStorage.getItem('studio.sidebar') !== '0',
                     toggleSidebar() {
                         this.sidebar = !this.sidebar;
@@ -134,7 +130,7 @@
             });
         </script>
 
-        {{-- Sidebar toggle — first thing in the topbar, aligned with the canvas edge --}}
+        {{-- Sidebar toggle — always visible beside the menu button --}}
         <div x-data class="shrink-0">
             <button
                 @click="$store.studio.toggleSidebar()"
@@ -151,16 +147,28 @@
             </button>
         </div>
 
-        {{-- Page pill — centered, doubles as the page switcher. Hovering
-             reveals a reload button on the left in place of the status dot. --}}
+        {{-- Browser navigation --}}
+        <div x-data class="flex shrink-0 items-center">
+            <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+            </button>
+            <button class="s-nav-btn" title="Forward" aria-label="Forward" @click="history.forward()">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+            </button>
+            <button class="s-nav-btn" title="Reload preview" aria-label="Reload preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
+            </button>
+        </div>
+
+        {{-- URL bar — centered, capped width, doubles as the page switcher --}}
+        @php $displayHost = parse_url(url('/'), PHP_URL_HOST); @endphp
         <div class="flex min-w-0 flex-1 justify-center px-1">
         <div
-            class="relative w-full min-w-0 max-w-xs"
+            class="relative w-full min-w-0 max-w-xl"
             x-data="{
                 state: 'idle',
                 pagesOpen: false,
                 slug: @js($page->slug),
-                title: @js($page->title),
                 homeSlug: @js($homeSlug),
                 get path() { return this.slug === this.homeSlug ? '' : this.slug },
                 get liveUrl() { return @js(rtrim(url('/'), '/')) + '/' + this.path },
@@ -174,7 +182,6 @@
             }"
             @studio:status.window="state = $event.detail.state"
             @studio:page-meta-updated.window="
-                if ($event.detail.title) title = $event.detail.title;
                 if ($event.detail.slug && $event.detail.slug !== slug) {
                     slug = $event.detail.slug;
                     history.replaceState({}, '', '{{ route('studio.index') }}?page=' + slug);
@@ -195,35 +202,40 @@
                 @keydown.enter.prevent="pagesOpen = !pagesOpen"
                 @keydown.space.prevent="pagesOpen = !pagesOpen"
             >
-                {{-- Left slot: save-status dot at rest, reload button on hover --}}
-                <span class="relative flex h-6 w-6 shrink-0 items-center justify-center">
-                    <span
-                        class="s-status-dot s-urlbar-rest transition-colors duration-300"
-                        :class="{
-                            'bg-ok': state === 'idle' || state === 'saved',
-                            'bg-warn animate-pulse': state === 'saving',
-                            'bg-danger': state === 'error',
-                        }"
-                    ></span>
-                    <button
-                        type="button"
-                        class="s-urlbar-action absolute inset-0"
-                        title="Reload preview"
-                        aria-label="Reload preview"
-                        @click.stop="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))"
-                    >
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
-                    </button>
+                <span
+                    class="s-status-dot shrink-0 transition-colors duration-300"
+                    :class="{
+                        'bg-ok': state === 'idle' || state === 'saved',
+                        'bg-warn animate-pulse': state === 'saving',
+                        'bg-danger': state === 'error',
+                    }"
+                ></span>
+                <span class="min-w-0 flex-1 truncate text-[12.5px]">
+                    <span class="text-soft">{{ $displayHost }}</span>
+                    <span class="mx-1 text-faint">/</span><span class="font-mono text-xs text-ink" x-text="path">{{ $page->slug === $homeSlug ? '' : $page->slug }}</span>
                 </span>
-                <span class="min-w-0 flex-1 truncate text-center text-[12.5px] font-medium text-ink">
-                    <span x-text="title">{{ $page->title }}</span>
-                    <span class="ml-1 text-[11px] font-normal text-faint">
+                <span class="flex shrink-0 items-center gap-1">
+                    <span class="mr-1 text-[11px] text-faint">
                         <span x-show="state === 'saving'" x-cloak>Saving…</span>
+                        <span x-show="state === 'saved'" x-cloak class="text-ok/80">Saved</span>
                         <span x-show="state === 'error'" x-cloak class="text-danger">Offline</span>
                     </span>
-                </span>
-                <span class="s-urlbar-action shrink-0" :class="pagesOpen && 'is-active'">
-                    <svg class="h-3.5 w-3.5 transition-transform duration-150" :class="pagesOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                    <span class="s-urlbar-action" :class="pagesOpen && 'is-active'">
+                        <svg class="h-3.5 w-3.5 transition-transform duration-150" :class="pagesOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                    </span>
+                    @if($liveUrl || $draftMode)
+                        <a
+                            :href="openUrl"
+                            href="{{ $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl }}"
+                            target="_blank"
+                            class="s-urlbar-action"
+                            title="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
+                            aria-label="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
+                            @click.stop
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        </a>
+                    @endif
                 </span>
             </div>
 
@@ -312,7 +324,7 @@
             <button
                 type="button"
                 class="s-nav-btn"
-                :class="$store.studio.codeSplit && 'is-narrow'"
+                :class="$store.studio.codeSplit && '!bg-wash-strong !text-ink'"
                 @click="$store.studio.toggleCodeSplit()"
                 :title="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
                 :aria-label="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
@@ -321,53 +333,41 @@
             </button>
         </div>
 
-        {{-- Device toggle — one button that cycles desktop → tablet → mobile.
-             The icon is the CURRENT device; the title names the next one. --}}
+        {{-- Device switcher --}}
         <div x-data x-show="$store.studio.canvasVisible" class="shrink-0">
-            <button
-                type="button"
-                class="s-nav-btn s-device-btn"
-                :class="$store.studio.device !== 'desktop' && 'is-narrow'"
-                @click="$store.studio.cycleDevice()"
-                :title="{ desktop: 'Desktop — switch to tablet', tablet: 'Tablet · 768px — switch to mobile', mobile: 'Mobile · 390px — switch to desktop' }[$store.studio.device]"
-                :aria-label="'Preview size: ' + $store.studio.device"
-            >
-                <svg x-show="$store.studio.device === 'desktop'" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25"/></svg>
-                <svg x-show="$store.studio.device === 'tablet'" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5h3m-6.75 2.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-15a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v15a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
-                <svg x-show="$store.studio.device === 'mobile'" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3"/></svg>
-            </button>
-        </div>
-
-        {{-- Open the draft preview / live page in a new tab --}}
-        @if($liveUrl || $draftMode)
-            <div
-                class="shrink-0"
-                x-data="{
-                    slug: @js($page->slug),
-                    homeSlug: @js($homeSlug),
-                    get path() { return this.slug === this.homeSlug ? '' : this.slug },
-                    get openUrl() {
-                        @if($draftMode)
-                        return @js(route('studio.preview.home')) + (this.path ? '/' + this.path : '');
-                        @else
-                        return @js(rtrim(url('/'), '/')) + '/' + this.path;
-                        @endif
-                    },
-                }"
-                @studio:page-meta-updated.window="if ($event.detail.slug) slug = $event.detail.slug"
-            >
-                <a
-                    :href="openUrl"
-                    href="{{ $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl }}"
-                    target="_blank"
-                    class="s-nav-btn"
-                    title="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
-                    aria-label="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
+            <div class="s-seg">
+                <button
+                    type="button"
+                    class="s-seg-btn"
+                    :class="$store.studio.device === 'desktop' && 'is-active'"
+                    @click="$store.studio.device = 'desktop'"
+                    title="Desktop preview"
+                    aria-label="Desktop preview"
                 >
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
-                </a>
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v8.5A2.25 2.25 0 0 1 15.75 15h-3.105a3.501 3.501 0 0 0 1.1 1.677A.75.75 0 0 1 13.26 18H6.74a.75.75 0 0 1-.484-1.323A3.501 3.501 0 0 0 7.355 15H4.25A2.25 2.25 0 0 1 2 12.75v-8.5Zm1.5 0a.75.75 0 0 1 .75-.75h11.5a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-.75.75H4.25a.75.75 0 0 1-.75-.75v-7.5Z" clip-rule="evenodd"/></svg>
+                </button>
+                <button
+                    type="button"
+                    class="s-seg-btn"
+                    :class="$store.studio.device === 'tablet' && 'is-active'"
+                    @click="$store.studio.device = 'tablet'"
+                    title="Tablet preview — 768px"
+                    aria-label="Tablet preview"
+                >
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 1a2.5 2.5 0 0 0-2.5 2.5v13A2.5 2.5 0 0 0 5 19h10a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 15 1H5ZM4 3.5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13Zm5 11.75a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5H9Z" clip-rule="evenodd"/></svg>
+                </button>
+                <button
+                    type="button"
+                    class="s-seg-btn"
+                    :class="$store.studio.device === 'mobile' && 'is-active'"
+                    @click="$store.studio.device = 'mobile'"
+                    title="Mobile preview — 390px"
+                    aria-label="Mobile preview"
+                >
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7 1a2.5 2.5 0 0 0-2.5 2.5v13A2.5 2.5 0 0 0 7 19h6a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 13 1H7ZM6 3.5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-13Zm3 11.75a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5H9Z" clip-rule="evenodd"/></svg>
+                </button>
             </div>
-        @endif
+        </div>
 
         {{-- Publish --}}
         <div class="relative" x-data="{
@@ -582,10 +582,9 @@
     </x-slot:topbar>
 
     {{-- ============================================================ --}}
-    {{-- Sidebar — Livewire editor panel                               --}}
+    {{-- Menu — the layout renders it first in the topbar             --}}
     {{-- ============================================================ --}}
     <x-slot:menu>
-        {{-- Menu --}}
         <div
             class="relative"
             x-data="{
@@ -620,7 +619,7 @@
             @click.outside="open = false"
             @keydown.escape.window="open = false"
         >
-            <button @click="open = !open" class="s-rail-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
+            <button @click="open = !open" class="s-box-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
                 <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
                 <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
@@ -688,6 +687,9 @@
         </div>
     </x-slot:menu>
 
+    {{-- ============================================================ --}}
+    {{-- Sidebar — one panel per rail item                             --}}
+    {{-- ============================================================ --}}
     <x-slot:sidebar>
         <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'sections'">
             <livewire:studio::editor-panel :page-slug="$page->slug" />
@@ -887,8 +889,9 @@
     {{-- ============================================================ --}}
     {{-- Canvas                                                        --}}
     {{-- ============================================================ --}}
-    {{-- Code mode takes the canvas's slot; the split gives half of it back. --}}
-    <div class="flex h-full w-full min-w-0" x-data>
+    {{-- Code mode takes the canvas's slot; the split gives half of it back.
+         Both sit inset on the canvas surface as rounded frames. --}}
+    <div class="s-canvas flex h-full w-full min-w-0 p-1 lg:p-2" x-data>
         @if($devModeAvailable)
             @include('studio::partials.code-pane')
 
@@ -918,14 +921,12 @@
         @endif
 
         <div
-            class="s-canvas min-w-0 flex-1 overflow-auto"
+            class="min-w-0 flex-1 overflow-auto"
             x-show="$store.studio.canvasVisible"
-            :class="$store.studio.device !== 'desktop' && 'is-device'"
         >
-            <div class="flex h-full flex-col" :class="$store.studio.device === 'desktop' ? 'p-0' : 'p-6'">
+            <div class="flex h-full flex-col">
                 <div
                     class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
-                    :class="$store.studio.device === 'desktop' ? 'is-flush' : ''"
                     :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
                 >
                     {{-- Live preview --}}

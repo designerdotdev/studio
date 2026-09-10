@@ -129,7 +129,7 @@
     }"
 >
     {{-- Header --}}
-    <div class="flex h-11 shrink-0 items-center gap-1 px-3">
+    <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3">
         <p class="s-microlabel flex-1">Assistant</p>
         <div class="relative" x-data="{ open: false }" @click.outside="open = false">
             <button type="button" class="s-icon-btn" title="Conversation history" aria-label="Conversation history" @click="open = !open">
