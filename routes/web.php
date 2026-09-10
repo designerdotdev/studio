@@ -71,6 +71,15 @@ Route::group([
         Route::post('/generate', [StudioController::class, 'generate'])->middleware('throttle:12,1')->name('api.generate');
         Route::post('/generate/{slug}', [StudioController::class, 'generatePage'])->where('slug', '[a-z0-9-]+')->middleware('throttle:12,1')->name('api.generate.page');
 
+        // Code mode — the workspace file tree and its editor (404s unless
+        // the dev-mode gate passes). Paths travel in the query/body, not the
+        // URL, so the route itself needs no slug constraint.
+        Route::get('/code/tree', [\Designer\Studio\Http\Controllers\CodeController::class, 'tree'])->name('api.code.tree');
+        Route::get('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'show'])->name('api.code.show');
+        Route::put('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'update'])->middleware('throttle:60,1')->name('api.code.update');
+        Route::post('/code/section', [\Designer\Studio\Http\Controllers\CodeController::class, 'store'])->middleware('throttle:20,1')->name('api.code.store');
+        Route::delete('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'destroy'])->middleware('throttle:20,1')->name('api.code.destroy');
+
         // Dev mode — section source editing (404s unless the gate passes)
         Route::get('/dev/components/{name}', [\Designer\Studio\Http\Controllers\DevModeController::class, 'show'])->where('name', '[a-z0-9-]+')->name('api.dev.components.show');
         Route::put('/dev/components/{name}', [\Designer\Studio\Http\Controllers\DevModeController::class, 'update'])->where('name', '[a-z0-9-]+')->middleware('throttle:30,1')->name('api.dev.components.update');

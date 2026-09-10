@@ -19,6 +19,8 @@ class StudioAssets
         'studio-monaco.css',
         'monaco-editor-worker.js',
         'monaco-html-worker.js',
+        'monaco-css-worker.js',
+        'monaco-json-worker.js',
         'codicon.ttf',
     ];
 

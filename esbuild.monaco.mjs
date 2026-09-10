@@ -16,6 +16,8 @@ export const MONACO_FILES = [
     'studio-monaco.css',
     'monaco-editor-worker.js',
     'monaco-html-worker.js',
+    'monaco-css-worker.js',
+    'monaco-json-worker.js',
     'codicon.ttf',
 ];
 
@@ -24,6 +26,8 @@ await esbuild.build({
         'studio-monaco': 'resources/js/monaco/studio-monaco.js',
         'monaco-editor-worker': 'resources/js/monaco/editor-worker.js',
         'monaco-html-worker': 'resources/js/monaco/html-worker.js',
+        'monaco-css-worker': 'resources/js/monaco/css-worker.js',
+        'monaco-json-worker': 'resources/js/monaco/json-worker.js',
     },
     outdir: outDir,
     bundle: true,

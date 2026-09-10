@@ -407,6 +407,26 @@
                 display: flex !important;
             }
 
+            /* ---- Preview mode ----
+               The canvas as a visitor sees it: no outlines, chips, toolbars
+               or insert affordances, and links navigate. Editing chrome is
+               only suppressed visually here — Studio.preview also refuses to
+               select or add while the mode is on. */
+            html.studio-preview .studio-chip,
+            html.studio-preview .studio-toolbar,
+            html.studio-preview .studio-insert,
+            html.studio-preview .studio-region {
+                display: none !important;
+            }
+
+            html.studio-preview .studio-section::after {
+                display: none !important;
+            }
+
+            html.studio-preview .studio-section {
+                cursor: auto;
+            }
+
             /* ---- Context menu — dark, Linear-grade, elastic ---- */
             .studio-menu {
                 position: fixed;

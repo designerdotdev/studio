@@ -14,6 +14,8 @@ class AssetController
         'studio-monaco.css' => 'text/css',
         'monaco-editor-worker.js' => 'application/javascript',
         'monaco-html-worker.js' => 'application/javascript',
+        'monaco-css-worker.js' => 'application/javascript',
+        'monaco-json-worker.js' => 'application/javascript',
         'codicon.ttf' => 'font/ttf',
     ];
 

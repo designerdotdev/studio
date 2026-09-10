@@ -3,6 +3,8 @@
     $routingEnabled = config('studio.page_routing.enabled', true);
     $liveUrl = $routingEnabled ? \Designer\Studio\Support\SiteUrls::pageUrl($page->slug) : null;
     $totalComponents = $library->flatten(1)->count();
+    // The server-side gate. Code mode needs this AND the user's dev-mode toggle.
+    $devModeAvailable = \Designer\Studio\Support\DevMode::enabled();
 @endphp
 
 <x-studio::layouts.app>
@@ -13,6 +15,16 @@
     {{-- ============================================================ --}}
     <x-slot:topbar>
         <script>
+            // Preview mode follows links inside the canvas. The editor is
+            // bound to one page, so StudioEditor.navigate() resolves a clicked
+            // path against this list and moves the window to that page.
+            window.__studioEditorUrl = @js(route('studio.index'));
+            window.__studioPageSlug = @js($page->slug);
+            window.__studioPages = @js($pages->map(fn ($p) => [
+                'slug' => $p->slug,
+                'path' => $p->slug === $homeSlug ? '' : $p->slug,
+            ])->values());
+
             document.addEventListener('alpine:init', () => {
                 Alpine.store('studio', {
                     device: 'desktop',
@@ -28,7 +40,9 @@
                     },
                     // The rail: which panel the sidebar shows. Clicking the active
                     // rail item again collapses the panel; anything else opens it.
-                    rail: localStorage.getItem('studio.rail') || 'sections',
+                    // 'files' belongs to Code mode and is never restored on
+                    // its own — entering Code mode selects it.
+                    rail: (s => s === 'files' ? 'sections' : s)(localStorage.getItem('studio.rail') || 'sections'),
                     setRail(name, force = false) {
                         if (!force && this.rail === name && this.sidebar) {
                             this.toggleSidebar();
@@ -45,6 +59,8 @@
                         this.theme = this.theme === 'light' ? 'dark' : 'light';
                         localStorage.setItem('studio.theme', this.theme);
                         document.documentElement.classList.toggle('studio-light', this.theme === 'light');
+                        // Monaco themes are global and set in JS, not CSS
+                        window.StudioMonaco?.syncTheme();
                     },
                     devMode: localStorage.getItem('studio.devmode') !== '0',
                     toggleDevMode() {
@@ -53,6 +69,52 @@
                         window.dispatchEvent(new CustomEvent('studio:to-iframe', {
                             detail: { type: 'studio:devmode', on: this.devMode },
                         }));
+                        // Code mode is a developer surface — turning dev mode
+                        // off can't leave the canvas hidden behind an editor.
+                        if (!this.devMode && this.mode === 'code') this.setMode('edit');
+                    },
+
+                    /* --- Preview / Edit / Code ------------------------------
+                       Preview is the canvas as the visitor sees it (links
+                       navigate, no overlay); Edit is the selectable canvas;
+                       Code is the file tree + editor, and only exists when the
+                       server gate AND the dev-mode toggle are both on. */
+                    devModeAvailable: @js($devModeAvailable),
+                    get codeAvailable() { return this.devModeAvailable && this.devMode },
+                    mode: (() => {
+                        const saved = localStorage.getItem('studio.mode');
+                        const codeOk = @js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0';
+                        if (saved === 'edit' || saved === 'preview') return saved;
+                        if (saved === 'code' && codeOk) return 'code';
+                        return 'preview';
+                    })(),
+                    setMode(name) {
+                        if (name === 'code' && !this.codeAvailable) return;
+                        // The Files panel belongs to Code mode; leaving it
+                        // hands the sidebar back to the sections list.
+                        if (name !== 'code' && this.rail === 'files') this.setRail('sections', true);
+                        this.mode = name;
+                        localStorage.setItem('studio.mode', name);
+                        window.dispatchEvent(new CustomEvent('studio:to-iframe', {
+                            detail: { type: 'studio:mode', mode: name },
+                        }));
+                        window.dispatchEvent(new CustomEvent('studio:mode', { detail: { mode: name } }));
+                    },
+                    // Whether the canvas is on screen at all: Code mode hides it
+                    // unless the split is open.
+                    get canvasVisible() { return this.mode !== 'code' || this.codeSplit },
+
+                    // Code mode is full-width by default; the split brings the
+                    // live preview back beside the editor.
+                    codeSplit: localStorage.getItem('studio.code-split') === '1',
+                    toggleCodeSplit() {
+                        this.codeSplit = !this.codeSplit;
+                        localStorage.setItem('studio.code-split', this.codeSplit ? '1' : '0');
+                    },
+                    codeSize: (n => (n >= 20 && n <= 80) ? n : 50)(parseFloat(localStorage.getItem('studio.code-size'))),
+                    setCodeSize(percent) {
+                        this.codeSize = Math.min(80, Math.max(20, percent));
+                        localStorage.setItem('studio.code-size', String(this.codeSize));
                     },
                 });
             });
@@ -208,9 +270,60 @@
         </div>
         </div>
 
+        {{-- Mode switch — Preview / Edit, plus Code while dev mode is on.
+             Preview is the default: the canvas behaves like the real site. --}}
+        <div x-data class="s-seg shrink-0">
+            <button
+                type="button"
+                class="s-seg-btn"
+                :class="$store.studio.mode === 'preview' && 'is-active'"
+                @click="$store.studio.setMode('preview')"
+                title="Preview — browse the site as a visitor"
+                aria-label="Preview mode"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M2.9 12h18.2M12 2.75c2.2 2.5 3.3 5.6 3.3 9.25S14.2 18.75 12 21.25C9.8 18.75 8.7 15.65 8.7 12S9.8 5.25 12 2.75Z"/></svg>
+            </button>
+            <button
+                type="button"
+                class="s-seg-btn"
+                :class="$store.studio.mode === 'edit' && 'is-active'"
+                @click="$store.studio.setMode('edit')"
+                title="Edit — select and change sections"
+                aria-label="Edit mode"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.86 4.49l1.69-1.69a1.875 1.875 0 1 1 2.65 2.65L6.83 19.82a4.5 4.5 0 0 1-1.9 1.13l-2.68.8.8-2.69a4.5 4.5 0 0 1 1.13-1.9L16.86 4.49Z"/></svg>
+            </button>
+            <button
+                x-show="$store.studio.codeAvailable"
+                x-cloak
+                type="button"
+                class="s-seg-btn"
+                :class="$store.studio.mode === 'code' && 'is-active'"
+                @click="$store.studio.setMode('code')"
+                title="Code — edit the section and site source files"
+                aria-label="Code mode"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
+            </button>
+        </div>
+
+        {{-- Split the code pane with the live preview (Code mode only) --}}
+        <div x-data x-show="$store.studio.mode === 'code'" x-cloak class="shrink-0">
+            <button
+                type="button"
+                class="s-nav-btn"
+                :class="$store.studio.codeSplit && 'is-narrow'"
+                @click="$store.studio.toggleCodeSplit()"
+                :title="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
+                :aria-label="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M12 4.75v14.5"/></svg>
+            </button>
+        </div>
+
         {{-- Device toggle — one button that cycles desktop → tablet → mobile.
              The icon is the CURRENT device; the title names the next one. --}}
-        <div x-data class="shrink-0">
+        <div x-data x-show="$store.studio.canvasVisible" class="shrink-0">
             <button
                 type="button"
                 class="s-nav-btn s-device-btn"
@@ -357,6 +470,7 @@
         @click.outside="open = false"
         @keydown.escape.window="open = false"
         @studio:status.window="if ($event.detail.state === 'saved' && status) status.dirty = true"
+        @studio:open-publish.window="open = true; refreshStatus()"
         >
             <button @click="open = !open; if (open) refreshStatus()" class="s-btn-primary relative">
                 Publish
@@ -507,8 +621,8 @@
             @keydown.escape.window="open = false"
         >
             <button @click="open = !open" class="s-rail-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
-                <svg class="s-logo-btn-logo h-[17px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
-                <svg class="s-logo-btn-menu h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+                <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
+                <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
         
             <div
@@ -592,7 +706,156 @@
         <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'media'" x-cloak>
             <livewire:studio::media-panel />
         </div>
+        @if($devModeAvailable)
+            {{-- Code mode's file tree. It owns the sidebar while Code mode is
+                 on, and is unreachable otherwise. --}}
+            <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'files'" x-cloak>
+                @include('studio::partials.file-tree')
+            </div>
+        @endif
     </x-slot:sidebar>
+
+    {{-- ============================================================ --}}
+    {{-- Command palette (⌘K)                                          --}}
+    {{-- ============================================================ --}}
+    <div
+        x-data="{
+            open: false,
+            query: '',
+            cursor: 0,
+
+            /* Every command the chrome can run, filtered by `query`. Entries
+               with `when` only appear where they make sense. */
+            get commands() {
+                const studio = $store.studio;
+                const all = [
+                    { label: 'Add section…', hint: 'Insert', run: () => window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} })) },
+                    { label: 'New page…', hint: 'Create', run: () => window.dispatchEvent(new CustomEvent('studio:open-create-page')) },
+                    { label: 'New layout…', hint: 'Create', run: () => window.Livewire?.dispatch('studio:new-layout') },
+                    { label: 'Preview mode', hint: 'Mode', when: studio.mode !== 'preview', run: () => studio.setMode('preview') },
+                    { label: 'Edit mode', hint: 'Mode', when: studio.mode !== 'edit', run: () => studio.setMode('edit') },
+                    { label: 'Code mode', hint: 'Mode', when: studio.codeAvailable && studio.mode !== 'code', run: () => studio.setMode('code') },
+                    { label: studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleCodeSplit() },
+                    @if($draftMode)
+                    { label: 'Publish…', hint: 'Site', run: () => window.dispatchEvent(new CustomEvent('studio:open-publish')) },
+                    @endif
+                    { label: 'Refresh the preview', hint: 'Canvas', run: () => window.dispatchEvent(new CustomEvent('studio:refresh-preview')) },
+                    { label: 'Open in a new tab', hint: 'Canvas', run: () => window.open(@js($draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : ($liveUrl ?? url('/'))), '_blank', 'noopener') },
+                    { label: 'Sections panel', hint: 'Panel', run: () => studio.setRail('sections', true) },
+                    { label: 'Pages panel', hint: 'Panel', run: () => studio.setRail('pages', true) },
+                    { label: 'Content panel', hint: 'Panel', run: () => studio.setRail('content', true) },
+                    { label: 'Media panel', hint: 'Panel', run: () => studio.setRail('media', true) },
+                    @if($devModeAvailable)
+                    { label: 'Assistant panel', hint: 'Panel', run: () => studio.setRail('assistant', true) },
+                    { label: 'Files panel', hint: 'Panel', when: studio.mode === 'code', run: () => studio.setRail('files', true) },
+                    @endif
+                    { label: studio.sidebar ? 'Hide the sidebar' : 'Show the sidebar', hint: 'Layout', run: () => studio.toggleSidebar() },
+                    { label: 'Preview: desktop', hint: 'Device', run: () => studio.device = 'desktop' },
+                    { label: 'Preview: tablet', hint: 'Device', run: () => studio.device = 'tablet' },
+                    { label: 'Preview: mobile', hint: 'Device', run: () => studio.device = 'mobile' },
+                    { label: studio.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', hint: 'Appearance', run: () => studio.toggleTheme() },
+                    @if($devModeAvailable)
+                    { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Developer', run: () => studio.toggleDevMode() },
+                    @endif
+                ].filter((command) => command.when !== false);
+
+                @if($devModeAvailable)
+                // Quick-open: while Code mode is on, the workspace files join
+                // the list so ⌘K doubles as a file switcher.
+                if (studio.mode === 'code') {
+                    ($store.code.nodes || []).filter((node) => node.type === 'file').forEach((node) => {
+                        const path = node.canonical || node.path;
+                        all.push({ label: node.path, hint: 'File', run: () => $store.code.openFile(path) });
+                    });
+                }
+                @endif
+
+                const needle = this.query.trim().toLowerCase();
+                // The Laravel tree can contribute a thousand files — render a
+                // window of them, never the whole list.
+                if (!needle) return all.slice(0, 50);
+                return all.filter((command) => command.label.toLowerCase().includes(needle)).slice(0, 50);
+            },
+
+            show() {
+                this.query = '';
+                this.cursor = 0;
+                this.open = true;
+                this.$nextTick(() => this.$refs.input?.focus());
+            },
+
+            move(delta) {
+                const count = this.commands.length;
+                if (!count) return;
+                this.cursor = (this.cursor + delta + count) % count;
+                this.$nextTick(() => this.$refs.list?.querySelector('[data-active]')?.scrollIntoView({ block: 'nearest' }));
+            },
+
+            choose(index = null) {
+                const command = this.commands[index ?? this.cursor];
+                if (!command) return;
+                this.open = false;
+                command.run();
+            },
+        }"
+        @studio:open-palette.window="show()"
+        @keydown.escape.window="open = false"
+        x-show="open"
+        x-cloak
+        class="fixed inset-0 z-[95] flex items-start justify-center p-4 pt-[14vh]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+    >
+        <div class="s-modal-backdrop" x-show="open" x-transition.opacity.duration.150ms @click="open = false"></div>
+
+        <div
+            x-show="open"
+            x-transition:enter="transition ease-out duration-150"
+            x-transition:enter-start="opacity-0 scale-[0.98] -translate-y-1"
+            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0 scale-[0.99]"
+            class="s-modal flex max-h-[60vh] w-[520px] max-w-full flex-col overflow-hidden"
+        >
+            <div class="flex shrink-0 items-center gap-2.5 border-b border-line px-3.5 py-3">
+                <svg class="h-4 w-4 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/></svg>
+                <input
+                    x-ref="input"
+                    x-model="query"
+                    @input="cursor = 0"
+                    @keydown.down.prevent="move(1)"
+                    @keydown.up.prevent="move(-1)"
+                    @keydown.enter.prevent="choose()"
+                    class="min-w-0 flex-1 border-0 bg-transparent text-[13.5px] text-ink placeholder:text-faint focus:outline-none"
+                    placeholder="Search commands…"
+                    aria-label="Search commands"
+                >
+                <span class="s-kbd">Esc</span>
+            </div>
+
+            <div x-ref="list" class="min-h-0 flex-1 overflow-y-auto p-1.5">
+                <template x-for="(command, index) in commands" :key="command.label">
+                    <button
+                        type="button"
+                        class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors"
+                        :class="index === cursor ? 'bg-wash-strong text-ink' : 'text-soft hover:bg-wash'"
+                        :data-active="index === cursor ? '' : null"
+                        @mouseenter="cursor = index"
+                        @click="choose(index)"
+                    >
+                        <span class="min-w-0 flex-1 truncate text-[13px]" x-text="command.label"></span>
+                        <span class="shrink-0 text-[10.5px] uppercase tracking-wide text-faint" x-text="command.hint"></span>
+                    </button>
+                </template>
+
+                <p x-show="!commands.length" x-cloak class="px-2.5 py-6 text-center text-[12.5px] text-faint">
+                    No matching command.
+                </p>
+            </div>
+        </div>
+    </div>
 
     {{-- ============================================================ --}}
     {{-- Editor notices (security / storage warnings)                  --}}
@@ -624,20 +887,55 @@
     {{-- ============================================================ --}}
     {{-- Canvas                                                        --}}
     {{-- ============================================================ --}}
-    <div class="s-canvas h-full w-full overflow-auto" x-data :class="$store.studio.device !== 'desktop' && 'is-device'">
-        <div class="flex h-full flex-col" :class="$store.studio.device === 'desktop' ? 'p-0' : 'p-6'">
+    {{-- Code mode takes the canvas's slot; the split gives half of it back. --}}
+    <div class="flex h-full w-full min-w-0" x-data>
+        @if($devModeAvailable)
+            @include('studio::partials.code-pane')
+
+            {{-- Drag seam between the code pane and the preview --}}
             <div
-                class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
-                :class="$store.studio.device === 'desktop' ? 'is-flush' : ''"
-                :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
-            >
-                {{-- Live preview --}}
-                <iframe
-                    id="studio-canvas-frame"
-                    class="w-full flex-1 border-0 bg-white"
-                    src="{{ route('studio.page.iframe', ['slug' => $page->slug]) }}"
-                    title="Page preview"
-                ></iframe>
+                x-show="$store.studio.mode === 'code' && $store.studio.codeSplit"
+                x-cloak
+                class="s-code-seam"
+                @mousedown.prevent="
+                    const surface = $el.parentElement;
+                    const move = (event) => {
+                        const box = surface.getBoundingClientRect();
+                        $store.studio.setCodeSize(((event.clientX - box.left) / box.width) * 100);
+                    };
+                    const stop = () => {
+                        document.removeEventListener('mousemove', move);
+                        document.removeEventListener('mouseup', stop);
+                        document.body.classList.remove('select-none');
+                    };
+                    document.body.classList.add('select-none');
+                    document.addEventListener('mousemove', move);
+                    document.addEventListener('mouseup', stop);
+                "
+                role="separator"
+                aria-label="Resize the code pane"
+            ></div>
+        @endif
+
+        <div
+            class="s-canvas min-w-0 flex-1 overflow-auto"
+            x-show="$store.studio.canvasVisible"
+            :class="$store.studio.device !== 'desktop' && 'is-device'"
+        >
+            <div class="flex h-full flex-col" :class="$store.studio.device === 'desktop' ? 'p-0' : 'p-6'">
+                <div
+                    class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
+                    :class="$store.studio.device === 'desktop' ? 'is-flush' : ''"
+                    :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
+                >
+                    {{-- Live preview --}}
+                    <iframe
+                        id="studio-canvas-frame"
+                        class="w-full flex-1 border-0 bg-white"
+                        src="{{ route('studio.page.iframe', ['slug' => $page->slug]) }}"
+                        title="Page preview"
+                    ></iframe>
+                </div>
             </div>
         </div>
     </div>
@@ -992,8 +1290,301 @@
             workers: {
                 editor: @js(\Designer\Studio\Support\StudioAssets::url('monaco-editor-worker.js')),
                 html: @js(\Designer\Studio\Support\StudioAssets::url('monaco-html-worker.js')),
+                css: @js(\Designer\Studio\Support\StudioAssets::url('monaco-css-worker.js')),
+                json: @js(\Designer\Studio\Support\StudioAssets::url('monaco-json-worker.js')),
             },
         };
+
+        /* ------------------------------------------------------------------
+           Code mode's workspace: the file tree in the sidebar and the editor
+           pane both read and write this store. Monaco itself is not loaded
+           until the first file is opened.
+           ------------------------------------------------------------------ */
+        /* Monaco's editor and models are large object graphs full of getters.
+           Alpine deep-proxies anything it stores, which mangles (and can hang
+           on) them — so the buffers live out here, and only plain, printable
+           state goes in the store. */
+        const studioCodeBuffers = { editor: null, models: {}, saved: {}, mounting: null };
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('code', {
+                base: @js(url(trim(config('studio.path', 'studio'), '/') . '/api/code')),
+
+                host: null,          // the Monaco container, registered by the pane
+                dirty: {},
+                tabs: [],
+                active: null,
+
+                nodes: [],
+                // 'design' — just the surfaces Studio renders; 'laravel' —
+                // the host app's own directories, design folders tinted.
+                view: localStorage.getItem('studio.code-view') === 'laravel' ? 'laravel' : 'design',
+                openFolders: (() => {
+                    try { return JSON.parse(localStorage.getItem('studio.code-folders') || '{}') } catch (e) { return {} }
+                })(),
+
+                booted: false,
+                loading: false,
+                saving: false,
+                creating: false,
+                error: '',
+                confirmDelete: null,
+                newSectionOpen: false,
+                newName: '',
+                newCategory: '',
+
+                /** Entering Code mode: show the tree and take the sidebar. */
+                boot() {
+                    Alpine.store('studio').setRail('files', true);
+                    if (!this.booted) {
+                        this.booted = true;
+                        this.loadTree();
+                    }
+                },
+
+                setView(view) {
+                    if (this.view === view) return;
+                    this.view = view;
+                    localStorage.setItem('studio.code-view', view);
+                    this.loadTree();
+                },
+
+                async loadTree() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch(`${this.base}/tree?view=${this.view}`, { headers: { 'Accept': 'application/json' } });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not read the workspace.');
+                        this.nodes = data.nodes;
+                        // The design view is small enough to open outright; the
+                        // Laravel view starts collapsed, like any file explorer.
+                        if (this.view === 'design') {
+                            this.nodes.filter((n) => n.depth === 0).forEach((n) => {
+                                if (!(n.path in this.openFolders)) this.openFolders[n.path] = true;
+                            });
+                            this.persistFolders();
+                        }
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+                    this.loading = false;
+                },
+
+                /** Flat list → tree: a node shows when every ancestor is open. */
+                get visibleNodes() {
+                    const shown = {};
+                    return this.nodes.filter((node) => {
+                        const visible = node.depth === 0 || (shown[node.parent] && !!this.openFolders[node.parent]);
+                        if (node.type === 'dir') shown[node.path] = visible;
+                        return visible;
+                    });
+                },
+
+                toggleFolder(path) {
+                    this.openFolders = { ...this.openFolders, [path]: !this.openFolders[path] };
+                    this.persistFolders();
+                },
+
+                persistFolders() {
+                    try { localStorage.setItem('studio.code-folders', JSON.stringify(this.openFolders)) } catch (e) { /* private mode */ }
+                },
+
+                /** Load Monaco on demand and keep one editor for every tab. */
+                async mount() {
+                    if (!this.host) throw new Error('The code editor is not ready yet.');
+
+                    if (!studioCodeBuffers.mounting) {
+                        studioCodeBuffers.mounting = (async () => {
+                            const wrapper = await window.Studio.codeEditor(this.host, { language: 'html' });
+                            studioCodeBuffers.editor = wrapper.editor;
+                            wrapper.editor.onDidChangeModelContent(() => this.track());
+                        })().catch((error) => {
+                            studioCodeBuffers.mounting = null; // let the next open retry
+                            throw error;
+                        });
+                    }
+
+                    await studioCodeBuffers.mounting;
+                    studioCodeBuffers.editor.layout();
+                    return studioCodeBuffers.editor;
+                },
+
+                async openFile(path) {
+                    this.error = '';
+                    this.confirmDelete = null;
+
+                    // An open buffer wins over disk — unsaved edits survive
+                    // closing and reopening a tab.
+                    if (studioCodeBuffers.models[path]) {
+                        this.addTab(path);
+                        this.activate(path);
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`${this.base}/file?path=${encodeURIComponent(path)}`, { headers: { 'Accept': 'application/json' } });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not open that file.');
+
+                        await this.mount();
+
+                        // The server answers with the file's canonical path,
+                        // which is what everything keys on — open the same
+                        // section through designer/ or through the Laravel
+                        // view and you land on one buffer, not two.
+                        const key = data.path || path;
+
+                        if (!studioCodeBuffers.models[key]) {
+                            studioCodeBuffers.models[key] = window.StudioMonaco.model(key, data.language, data.contents);
+                            studioCodeBuffers.saved[key] = data.contents;
+                            this.dirty = { ...this.dirty, [key]: false };
+                        }
+
+                        this.addTab(key, data.display);
+                        this.activate(key);
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+                },
+
+                addTab(path, display = null) {
+                    if (this.tabs.some((tab) => tab.path === path)) return;
+                    this.tabs = [...this.tabs, { path, name: path.split('/').pop(), display: display || path }];
+                },
+
+                activate(path) {
+                    this.active = path;
+                    const model = studioCodeBuffers.models[path];
+                    if (studioCodeBuffers.editor && model) {
+                        studioCodeBuffers.editor.setModel(model);
+                        studioCodeBuffers.editor.layout();
+                        studioCodeBuffers.editor.focus();
+                    }
+                },
+
+                closeTab(path) {
+                    this.tabs = this.tabs.filter((tab) => tab.path !== path);
+                    if (this.active !== path) return;
+                    const next = this.tabs[this.tabs.length - 1];
+                    if (next) {
+                        this.activate(next.path);
+                    } else {
+                        this.active = null;
+                        studioCodeBuffers.editor?.setModel(null);
+                    }
+                },
+
+                track() {
+                    const path = this.active;
+                    const model = studioCodeBuffers.models[path];
+                    if (!path || !model) return;
+                    this.dirty = { ...this.dirty, [path]: model.getValue() !== studioCodeBuffers.saved[path] };
+                },
+
+                async save() {
+                    const path = this.active;
+                    if (!path || this.saving || !studioCodeBuffers.models[path]) return;
+
+                    this.saving = true;
+                    this.error = '';
+
+                    try {
+                        const contents = studioCodeBuffers.models[path].getValue();
+                        const response = await fetch(`${this.base}/file`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ path, contents }),
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not save that file.');
+
+                        studioCodeBuffers.saved[path] = contents;
+                        this.dirty = { ...this.dirty, [path]: false };
+
+                        window.Studio.toast(data.synced
+                            ? 'Saved — every page using this section is updated'
+                            : 'Saved');
+                        window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
+                        if (data.synced) window.Livewire?.dispatch('studio:code-saved');
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+
+                    this.saving = false;
+                },
+
+                async createSection() {
+                    if (this.creating) return;
+                    this.creating = true;
+                    this.error = '';
+
+                    try {
+                        const response = await fetch(`${this.base}/section`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                name: this.newName,
+                                category: this.newCategory || 'content',
+                                label: '',
+                            }),
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not create that section.');
+
+                        this.newSectionOpen = false;
+                        this.newName = '';
+                        this.newCategory = '';
+                        await this.loadTree();
+                        await this.openFile(data.path);
+                        window.Studio.toast(`Created ${data.name} — it is in the section library now`);
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+
+                    this.creating = false;
+                },
+
+                async deleteFile(path) {
+                    this.confirmDelete = null;
+                    this.error = '';
+
+                    try {
+                        const response = await fetch(`${this.base}/file`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ path }),
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not delete that file.');
+
+                        // A section is a pair — both halves leave together
+                        (data.removed || [path]).forEach((gone) => {
+                            studioCodeBuffers.models[gone]?.dispose?.();
+                            delete studioCodeBuffers.models[gone];
+                            delete studioCodeBuffers.saved[gone];
+                            this.closeTab(gone);
+                        });
+
+                        await this.loadTree();
+                        window.Studio.toast('Deleted');
+                    } catch (e) {
+                        this.error = e.message;
+                    }
+                },
+            });
+        });
     </script>
     <div
             x-data="{
