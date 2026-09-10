@@ -334,16 +334,19 @@ html.studio-light {
 
     /* --- the rail (panel switcher beside the sidebar) ---------------- */
 
+    /* 44px wide, and the 15px top padding puts the 30px menu button's
+       centre at y=30 — the centre of the 44px topbar inside the workspace
+       card (my-2 = 8px + 22px). The menu reads as one line with the header. */
     .s-rail {
-        @apply flex w-14 shrink-0 flex-col items-center gap-2 bg-shell pb-2 pt-2.5;
+        @apply flex w-11 shrink-0 flex-col items-center gap-1 bg-shell pb-2 pt-[15px];
     }
 
     .s-rail-gap {
-        @apply my-0.5 h-px w-7 shrink-0 bg-line-strong;
+        @apply my-1 h-px w-5 shrink-0 bg-line-strong;
     }
 
     .s-rail-btn {
-        @apply flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
+        @apply flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
     }
 
     .s-rail-btn:hover {
@@ -910,6 +913,30 @@ html.studio-light {
 
     .s-code-pane .monaco-editor {
         outline: none;
+    }
+
+    /* The accent pip on the Design tree toggle — the same colour that tints
+       design folders in the Laravel tree, so the two read as one idea */
+    .s-tree-dot {
+        @apply h-1.5 w-1.5 shrink-0 rounded-[2px];
+        background: var(--color-accent);
+    }
+
+    /* The drag seam between Code mode's editor and the live preview */
+    .s-code-seam {
+        @apply relative w-1 shrink-0 cursor-col-resize bg-line transition-colors duration-150;
+    }
+
+    .s-code-seam:hover,
+    .s-code-seam:active {
+        background: var(--color-accent);
+    }
+
+    /* A wider invisible grab area than the 4px the seam actually paints */
+    .s-code-seam::after {
+        content: '';
+        position: absolute;
+        inset: 0 -4px;
     }
 
     /* Empty-state dashed tile */

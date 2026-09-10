@@ -127,6 +127,10 @@ const StudioEditor = {
                     window.dispatchEvent(new CustomEvent('studio:element-selected', { detail: data }));
                     break;
 
+                case 'studio:navigate':
+                    this.navigate(data.path);
+                    break;
+
                 case 'studio:key':
                     this.handleShortcut(data);
                     break;
@@ -151,6 +155,31 @@ const StudioEditor = {
         window.addEventListener('studio:selection-changed', (event) => {
             this.selectedId = event.detail?.id ?? null;
         });
+    },
+
+    /**
+     * A link followed in Preview mode. The editor is bound to one page, so
+     * moving to another means moving the whole window to that page's editor
+     * URL — which keeps the panel, the page pill and the canvas in step for
+     * free. Paths Studio doesn't own are opened in a new tab instead.
+     */
+    navigate(path) {
+        const pages = window.__studioPages || [];
+        const slug = (path || '/').replace(/^\/+|\/+$/g, '');
+        const match = pages.find((page) => page.path === slug);
+
+        if (!match) {
+            window.open(path, '_blank', 'noopener');
+            return;
+        }
+
+        if (match.slug === window.__studioPageSlug) {
+            // Already here — a link back to the current page just scrolls up
+            try { this.iframe.contentWindow.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* ignore */ }
+            return;
+        }
+
+        window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(match.slug);
     },
 
     refreshPreview() {
@@ -194,17 +223,20 @@ const StudioEditor = {
         // window-level handlers run after this document-level one)
         if (window.Studio?.codeModalOpen) return;
 
-        // Cmd/Ctrl+S — everything autosaves; reassure instead of a browser dialog
+        // Cmd/Ctrl+S — everything autosaves, so this is only reassurance.
+        // Code mode is the exception: files there save explicitly, and the
+        // code pane's own handler owns the key.
         if (meta && (key === 's' || key === 'S')) {
+            if (window.Alpine?.store('studio')?.mode === 'code') return;
             preventDefault();
             toast('All changes save automatically', 'info', 2200);
             return;
         }
 
-        // Cmd/Ctrl+K — open the section library
+        // Cmd/Ctrl+K — the command palette (Add Section is its first entry)
         if (meta && (key === 'k' || key === 'K')) {
             preventDefault();
-            window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} }));
+            window.dispatchEvent(new CustomEvent('studio:open-palette'));
             return;
         }
 
@@ -300,6 +332,21 @@ const StudioPreview = {
     renderTimer: null,
     renderPending: new Set(),
 
+    // 'preview' | 'edit' | 'code' — mirrors $store.studio.mode in the editor
+    // window. The canvas document is rebuilt on every refresh, so the mode is
+    // read straight from localStorage at boot rather than waited on.
+    mode: 'edit',
+
+    setMode(mode) {
+        this.mode = mode;
+        document.documentElement.classList.toggle('studio-preview', mode === 'preview');
+
+        if (mode === 'preview') {
+            this.closeMenu();
+            this.clearSelection();
+        }
+    },
+
     init({ variables, bindings, refs, blocks, renderUrl, csrf }) {
         this.variables = variables || {};
         // Per-section {field: 'collections.<name>'} — sent with every render
@@ -316,6 +363,12 @@ const StudioPreview = {
             'studio-devmode',
             localStorage.getItem('studio.devmode') !== '0'
         );
+
+        // Preview is the default, matching the editor window's own fallback.
+        // Code mode hides the canvas, so as far as this document is concerned
+        // it behaves exactly like Edit.
+        const savedMode = localStorage.getItem('studio.mode');
+        this.setMode(savedMode === 'preview' || savedMode === null ? 'preview' : 'edit');
 
         this.setupContextMenu();
 
@@ -354,22 +407,54 @@ const StudioPreview = {
                     document.documentElement.classList.toggle('studio-devmode', !!data.on);
                     break;
 
+                case 'studio:mode':
+                    // Code hides the canvas entirely; while it is on screen at
+                    // all (the split) it stays selectable, like Edit.
+                    this.setMode(data.mode === 'preview' ? 'preview' : 'edit');
+                    break;
+
                 case 'studio:menu-close':
                     this.closeMenu();
                     break;
             }
         });
 
-        // Editing mode: links and forms inside sections must never navigate
+        // A link inside the canvas never navigates the iframe itself: in Edit
+        // it does nothing, and in Preview it asks the editor to move to that
+        // page (the editor is bound to one page, so the whole window goes).
         document.addEventListener('click', (event) => {
             const link = event.target.closest ? event.target.closest('a') : null;
-            if (link) event.preventDefault();
+            if (!link) return;
+
+            event.preventDefault();
+
+            if (this.mode !== 'preview') return;
+
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('#')) return;
+
+            let url;
+            try {
+                url = new URL(href, window.location.href);
+            } catch (e) {
+                return;
+            }
+
+            // Anything off-site opens where it belongs — a new tab
+            if (url.origin !== window.location.origin) {
+                window.open(url.href, '_blank', 'noopener');
+                return;
+            }
+
+            this.post('studio:navigate', { path: url.pathname });
         }, true);
 
         document.addEventListener('submit', (event) => event.preventDefault(), true);
 
         // Click on empty canvas space deselects (and closes the context menu)
         document.addEventListener('click', () => {
+            if (this.mode === 'preview') return;
+
             this.closeMenu();
             this.clearSelection();
             this.post('studio:deselected');
@@ -411,6 +496,10 @@ const StudioPreview = {
 
     select(sectionId, event) {
         if (event) event.stopPropagation();
+
+        // Preview mode has no selection — the chrome is hidden, and the
+        // inline onclick handlers must not reach past it.
+        if (this.mode === 'preview') return;
 
         this.applySelection(sectionId, false);
         this.post('studio:section-selected', { sectionId });
@@ -461,6 +550,7 @@ const StudioPreview = {
 
     addAt(scope, index, event) {
         if (event) event.stopPropagation();
+        if (this.mode === 'preview') return;
         this.post('studio:add-section', { scope, index });
     },
 
@@ -501,6 +591,9 @@ const StudioPreview = {
         window.addEventListener('blur', () => this.closeMenu());
 
         document.addEventListener('contextmenu', (event) => {
+            // In Preview the page is the page — leave the browser's own menu
+            if (this.mode === 'preview') return;
+
             // Right-clicking the menu itself keeps it open
             if (event.target.closest && event.target.closest('.studio-menu')) {
                 event.preventDefault();
