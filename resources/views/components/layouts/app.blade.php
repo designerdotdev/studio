@@ -55,52 +55,48 @@
                 </header>
             @endisset
 
-            <div class="flex min-h-0 flex-1 items-stretch">
-                @isset($sidebar)
-                {{-- The rail: one icon per panel. Always visible, even with the panel collapsed. --}}
-                <nav class="s-rail" x-data aria-label="Panels">
-                    @if(\Designer\Studio\Support\DevMode::enabled())
-                        <button type="button" class="s-rail-btn" :class="$store.studio.rail === 'assistant' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('assistant')" title="Assistant" aria-label="Assistant">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
-                        </button>
-                    @endif
-                    <button type="button" class="s-rail-btn" :class="$store.studio.rail === 'sections' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('sections')" title="Sections" aria-label="Sections">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/></svg>
-                    </button>
-                    <button type="button" class="s-rail-btn" :class="$store.studio.rail === 'pages' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('pages')" title="Pages" aria-label="Pages">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
-                    </button>
-                    <button type="button" class="s-rail-btn" :class="$store.studio.rail === 'content' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('content')" title="Content" aria-label="Content">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75m16.5 3.75v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75"/></svg>
-                    </button>
-                    <button type="button" class="s-rail-btn" :class="$store.studio.rail === 'media' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('media')" title="Media" aria-label="Media">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
-                    </button>
-                    @if(\Designer\Studio\Support\DevMode::enabled())
-                        {{-- Files belongs to Code mode; it appears with it --}}
-                        <button type="button" x-show="$store.studio.mode === 'code'" x-cloak class="s-rail-btn" :class="$store.studio.rail === 'files' && $store.studio.sidebar && 'is-active'" @click="$store.studio.setRail('files')" title="Files" aria-label="Files">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.25 12.75V12a2.25 2.25 0 0 1 2.25-2.25h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>
-                        </button>
-                    @endif
-                </nav>
+            @isset($sidebar)
+                {{-- The workspace: the sidebar and the canvas are rounded cards
+                     inset on the shell, so the topbar flows around them. The
+                     activity bar (panel switcher) sits where the user put it:
+                     across the sidebar's top (default) or bottom — both collapse
+                     with it for a full-page canvas — as a strip to its left,
+                     or hidden. --}}
+                <div class="s-workspace" x-data>
+                    <template x-if="$store.studio.activityBar === 'left'">
+                        @include('studio::partials.activity-bar', ['orientation' => 'vertical'])
+                    </template>
 
-                <aside
-                    x-data
-                    class="flex w-[320px] shrink-0 flex-col overflow-hidden border-r border-line bg-panel transition-[width] duration-200 ease-out"
-                    :class="$store.studio.sidebar ? '' : '!w-0 !border-r-0'"
-                    :aria-hidden="!$store.studio.sidebar"
-                    :inert="!$store.studio.sidebar"
-                >
-                    <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden">
-                        {{ $sidebar }}
-                    </div>
-                </aside>
-                @endisset
+                    <aside
+                        class="s-card s-sidebar"
+                        :class="!$store.studio.sidebar && 'is-collapsed'"
+                        :aria-hidden="!$store.studio.sidebar"
+                        :inert="!$store.studio.sidebar"
+                    >
+                        <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden">
+                            <template x-if="$store.studio.activityBar === 'top'">
+                                @include('studio::partials.activity-bar', ['orientation' => 'horizontal', 'class' => 'is-top'])
+                            </template>
 
-                <main class="relative min-w-0 flex-1 overflow-hidden">
+                            <div class="flex min-h-0 flex-1 flex-col">
+                                {{ $sidebar }}
+                            </div>
+
+                            <template x-if="$store.studio.activityBar === 'bottom'">
+                                @include('studio::partials.activity-bar', ['orientation' => 'horizontal', 'class' => 'is-bottom'])
+                            </template>
+                        </div>
+                    </aside>
+
+                    <main class="s-card s-stage">
+                        {{ $slot }}
+                    </main>
+                </div>
+            @else
+                <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
                     {{ $slot }}
                 </main>
-            </div>
+            @endisset
         </div>
 
         @livewireScripts
