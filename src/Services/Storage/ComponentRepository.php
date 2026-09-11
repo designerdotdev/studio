@@ -95,6 +95,8 @@ class ComponentRepository
             // Fixed-position sections (sticky headers) get special canvas
             // handling — pinned live, in-flow with a "Fixed" tag in the editor
             'fixed' => (bool) ($data['fixed'] ?? false),
+            'tag' => (string) ($data['tag'] ?? ''),
+            'path' => (string) ($data['path'] ?? ''),
         ];
 
         $this->storage->write("components/library/{$name}.json", $componentData);

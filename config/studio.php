@@ -62,9 +62,9 @@ return [
     | Dev Mode
     |--------------------------------------------------------------------------
     |
-    | Dev mode adds an "Edit code" button to the editor that opens the
-    | selected section's .html and .yml source files in a code editor and
-    | writes changes back to resources/views/designer. Because it edits
+    | Dev mode adds Code mode and an "Edit code" button to the editor: the
+    | site's source files (resources/designer — sections, layouts, data)
+    | open in a code editor and save straight back. Because it edits
     | application source files from the browser, it defaults to being
     | available only in the local environment. Set true/false to force it
     | on or off regardless of environment.
@@ -77,68 +77,14 @@ return [
     | Storage Path
     |--------------------------------------------------------------------------
     |
-    | Where Designer Studio stores its JSON data files. This is intentionally
-    | in the storage directory to keep it separate from your application code.
+    | Where the editor keeps its working data: the draft, the section
+    | library, and downloaded templates. The site itself is not here — it is
+    | installed into resources/designer and public/designer and served by
+    | app/Providers/DesignerServiceProvider.php, so it keeps working if
+    | Studio is removed. Deleting this folder loses only unpublished drafts.
     |
     */
     'storage_path' => storage_path('studio'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Output Path
-    |--------------------------------------------------------------------------
-    |
-    | Where generated Blade files will be placed. These are the final output
-    | that you can use in your Laravel application.
-    |
-    */
-    'output_path' => resource_path('views/designer'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Layout
-    |--------------------------------------------------------------------------
-    |
-    | The Blade component that exported pages are wrapped in. When null
-    | (the default), exports are fully standalone HTML documents that work
-    | in any application with zero setup. Set this to a component name to
-    | wrap exports instead — e.g. 'layout' becomes <x-layout>, and dot
-    | notation works too: 'layouts.app' becomes <x-layouts.app>.
-    |
-    */
-    'default_layout' => null,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Auto-Generate on Save
-    |--------------------------------------------------------------------------
-    |
-    | Automatically regenerate Blade files when pages are saved.
-    |
-    */
-    'auto_generate' => true,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Page Auto-Routing
-    |--------------------------------------------------------------------------
-    |
-    | When enabled, every Studio page automatically becomes a live public
-    | route in your app — no generation step needed. When the package is
-    | removed, all routes disappear and your app is unaffected.
-    |
-    | - enabled: toggle auto-routing on/off
-    | - middleware: middleware for public page routes (separate from editor)
-    | - home_slug: which page slug maps to "/" (default: "home")
-    |
-    */
-    'page_routing' => [
-        'enabled' => true,
-        'middleware' => ['web'],
-        'home_slug' => 'home',
-        // Serve /sitemap.xml listing all published, indexable pages
-        'sitemap' => true,
-    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -189,77 +135,33 @@ return [
     | Site templates
     |--------------------------------------------------------------------------
     |
-    | Whole starter sites, each living in its own git repository, so one
-    | template can be maintained in one place and installed into any app
-    | that runs Studio.
+    | Whole starter sites, each living in its own git repository in the
+    | DevDojo site-templates format. Picking one (in onboarding, or with
+    | `php artisan studio:templates:import pilot`) copies the files it uses
+    | into your app — its `files/resources` tree into resources/designer and
+    | its `files/public` tree into public/designer — and nothing else.
     |
-    |   php artisan studio:templates:sync          clone/pull every entry
-    |   php artisan studio:templates:import atlas  build a site from one
-    |
-    | `catalog` is the authority on which templates exist: slug => repo URL.
-    | Sync clones each into `path` (which ignores its own contents, so the
-    | clones never reach the host app's git history) and prunes folders that
-    | have left the catalog. The clones are real git checkouts — edit one in
-    | place, then commit and push from inside the folder.
-    |
-    | Templates are additive: the seven built into the package stay
-    | available whether or not anything is ever synced.
+    | `catalog` is the authority on which templates are offered: slug =>
+    | repository URL, or an array with a `repo` plus the `name` and
+    | `description` the picker shows before the template is downloaded.
+    | Repositories are cloned on first use into `path`, a cache inside
+    | Studio's storage (`php artisan studio:templates:sync` refreshes it).
     |
     */
     'templates' => [
-        'path' => resource_path('studio-templates'),
+        'path' => storage_path('studio/templates'),
 
-        // Where an imported template's support components are copied so the
-        // host app can render them without the clone being present.
-        'components_path' => resource_path('views/components/studio-templates'),
-
-        // Where an imported template's images, fonts, and scripts are
-        // published, relative to public/.
-        'assets_path' => 'studio-templates',
-
-        // Nothing is fetched until `studio:templates:sync` runs, and
-        // `--template=` limits a run to one. Trim this list, point it at
-        // your own repositories, or leave it be.
         'catalog' => [
-            'amber' => 'https://github.com/site-templates/amber',
-            'aria' => 'https://github.com/site-templates/aria',
-            'atlas' => 'https://github.com/site-templates/atlas',
-            'base' => 'https://github.com/site-templates/base',
-            'binary' => 'https://github.com/site-templates/binary',
-            'blank' => 'https://github.com/site-templates/blank',
-            'blog' => 'https://github.com/site-templates/blog',
-            'box' => 'https://github.com/site-templates/box',
-            'chrome' => 'https://github.com/site-templates/chrome',
-            'chronicle' => 'https://github.com/site-templates/chronicle',
-            'commodore' => 'https://github.com/site-templates/commodore',
-            'crema' => 'https://github.com/site-templates/crema',
-            'draft' => 'https://github.com/site-templates/draft',
-            'folio' => 'https://github.com/site-templates/folio',
-            'forge' => 'https://github.com/site-templates/forge',
-            'halo' => 'https://github.com/site-templates/halo',
-            'harlow' => 'https://github.com/site-templates/harlow',
-            'index' => 'https://github.com/site-templates/index',
-            'juno' => 'https://github.com/site-templates/juno',
-            'kernel' => 'https://github.com/site-templates/kernel',
-            'lumen' => 'https://github.com/site-templates/lumen',
-            'monarch' => 'https://github.com/site-templates/monarch',
-            'newspaper' => 'https://github.com/site-templates/newspaper',
-            'node' => 'https://github.com/site-templates/node',
-            'norden' => 'https://github.com/site-templates/norden',
-            'onyx' => 'https://github.com/site-templates/onyx',
-            'origin' => 'https://github.com/site-templates/origin',
-            'pilot' => 'https://github.com/site-templates/pilot',
-            'render' => 'https://github.com/site-templates/render',
-            'reply' => 'https://github.com/site-templates/reply',
-            'sand' => 'https://github.com/site-templates/sand',
-            'signal' => 'https://github.com/site-templates/signal',
-            'silver' => 'https://github.com/site-templates/silver',
-            'slate' => 'https://github.com/site-templates/slate',
-            'stack' => 'https://github.com/site-templates/stack',
-            'stone' => 'https://github.com/site-templates/stone',
-            'strata' => 'https://github.com/site-templates/strata',
-            'vale' => 'https://github.com/site-templates/vale',
-            'volt' => 'https://github.com/site-templates/volt',
+            'pilot' => [
+                'repo' => 'https://github.com/site-templates/pilot',
+                'name' => 'Pilot',
+                'description' => 'An off-white, monochrome site for an AI agent framework — dark dropdown menus, a three-pane agent console standing on a painted landscape, and a guides library.',
+            ],
+            'monarch' => [
+                'repo' => 'https://github.com/site-templates/monarch',
+                'name' => 'Monarch',
+                'description' => 'A bone-and-black product studio site built around an oversized menu capsule — split hero, services bento, a dark testimonial, a studio journal, and a dated changelog, lit by an electric lime accent.',
+            ],
         ],
     ],
 

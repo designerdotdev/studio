@@ -15,6 +15,13 @@ class StudioStorage
     /** '' = live, 'draft' = the working copy the editor operates on */
     protected string $workspace = '';
 
+    /**
+     * Set when a live site document was written this request. The live
+     * tree mirrors the site's files, so the provider flushes it back to them
+     * once the request is done (only happens with draft mode off).
+     */
+    protected bool $liveChanged = false;
+
     public function __construct()
     {
         $this->basePath = config('studio.storage_path', storage_path('studio'));
@@ -76,6 +83,30 @@ class StudioStorage
         return $path;
     }
 
+    /** Whether live site documents changed this request; resets the flag. */
+    public function consumeLiveChanges(): bool
+    {
+        $changed = $this->liveChanged;
+        $this->liveChanged = false;
+
+        return $changed;
+    }
+
+    protected function touch(string $path): void
+    {
+        if ($this->workspace !== '') {
+            return;
+        }
+
+        foreach (self::WORKSPACE_TREES as $tree) {
+            if ($path === $tree || str_starts_with($path, $tree . '/')) {
+                $this->liveChanged = true;
+
+                return;
+            }
+        }
+    }
+
     /* ------------------------------------------------------------ */
     /*  File I/O                                                     */
     /* ------------------------------------------------------------ */
@@ -113,6 +144,8 @@ class StudioStorage
             File::makeDirectory($directory, 0755, true);
         }
 
+        $this->touch($path);
+
         return File::put(
             $fullPath,
             json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
@@ -124,6 +157,8 @@ class StudioStorage
         $fullPath = $this->basePath . '/' . $this->prefixed($path);
 
         if (File::exists($fullPath)) {
+            $this->touch($path);
+
             return File::delete($fullPath);
         }
 
@@ -156,12 +191,29 @@ class StudioStorage
     }
 
     /**
-     * Remove all studio data (for clean uninstall)
+     * Remove all studio data (for clean uninstall). Top-level entries named
+     * in `$keep` survive (dev-reset keeps the template download cache).
      */
-    public function purge(): bool
+    public function purge(array $keep = []): bool
     {
-        if (File::isDirectory($this->basePath)) {
+        if (!File::isDirectory($this->basePath)) {
+            return true;
+        }
+
+        if ($keep === []) {
             return File::deleteDirectory($this->basePath);
+        }
+
+        foreach (File::directories($this->basePath) as $directory) {
+            if (!in_array(basename($directory), $keep, true)) {
+                File::deleteDirectory($directory);
+            }
+        }
+
+        foreach (File::files($this->basePath, true) as $file) {
+            if (!in_array($file->getFilename(), $keep, true)) {
+                File::delete($file->getPathname());
+            }
         }
 
         return true;

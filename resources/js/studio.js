@@ -993,34 +993,6 @@ window.Studio = {
         });
     },
 
-    /**
-     * Export the current page as a Blade file. Shows result toasts.
-     * Returns true on success.
-     */
-    async exportBlade(url) {
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content,
-                    'Accept': 'application/json',
-                },
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (response.ok && data.success) {
-                toast('Blade file exported to ' + (data.relative_path || data.path));
-                return true;
-            }
-
-            toast(data.error || 'Export failed', 'error');
-        } catch (e) {
-            toast('Export failed', 'error');
-        }
-
-        return false;
-    },
 
     /**
      * Upload an image through the Studio upload endpoint.

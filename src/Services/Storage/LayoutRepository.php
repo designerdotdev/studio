@@ -97,6 +97,25 @@ class LayoutRepository
         return $this->storage->delete("layouts/{$slug}.json");
     }
 
+    /**
+     * The layout new pages use: `main` when the site has one, else the
+     * layout the home page uses, else the first. Null for a site with none.
+     */
+    public function primary(): ?string
+    {
+        if ($this->find('main')) {
+            return 'main';
+        }
+
+        $home = app(PageRepository::class)->find(\Designer\Studio\Support\SiteUrls::homeSlug());
+
+        if ($home?->layout_ref && $this->find($home->layout_ref)) {
+            return $home->layout_ref;
+        }
+
+        return $this->all()->first()['slug'] ?? null;
+    }
+
     /* ------------------------------------------------------------ */
     /*  Regions                                                      */
     /* ------------------------------------------------------------ */
@@ -116,6 +135,27 @@ class LayoutRepository
 
         $components = collect($layout['components'] ?? [])->sortBy('order')->values();
         $slotIndex = $components->search(fn ($c) => $c['id'] === self::CONTENT_ID);
+
+        if ($slotIndex === false) {
+            return ['before' => $components->all(), 'after' => []];
+        }
+
+        return [
+            'before' => $components->slice(0, $slotIndex)->values()->all(),
+            'after' => $components->slice($slotIndex + 1)->values()->all(),
+        ];
+    }
+
+    /**
+     * A layout's components array split at the content slot (no slot entry
+     * in either half).
+     *
+     * @return array{before: array, after: array}
+     */
+    public function splitComponents(array $components): array
+    {
+        $components = collect($components)->sortBy('order')->values();
+        $slotIndex = $components->search(fn ($c) => ($c['id'] ?? null) === self::CONTENT_ID);
 
         if ($slotIndex === false) {
             return ['before' => $components->all(), 'after' => []];

@@ -43,7 +43,7 @@ class RenderController extends Controller
             'sections.*.ref' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9-]+$/'],
             'sections.*.variables' => ['sometimes', 'array'],
             'sections.*.bindings' => ['sometimes', 'array'],
-            'sections.*.bindings.*' => ['string', 'max:120'],
+            'sections.*.bindings.*' => ['string', 'max:2000'],
         ]);
 
         $html = [];
@@ -55,10 +55,18 @@ class RenderController extends Controller
                 continue;
             }
 
+            // The posted values are what the inspector holds right now — a
+            // field bound to site data shows what was just typed, not the
+            // copy saved a moment ago.
+            $given = array_keys($section['variables'] ?? []);
+
             $html[$section['id']] = $this->renderer->render(
                 $component,
-                $component->resolveVariables($section['variables'] ?? []),
-                $section['bindings'] ?? []
+                app(\Designer\Studio\Services\CollectionBinder::class)->apply(
+                    $component->resolveVariables($section['variables'] ?? []),
+                    $section['bindings'] ?? [],
+                    $given
+                )
             );
         }
 

@@ -2,12 +2,13 @@
 
 namespace Designer\Studio\Http\Controllers;
 
-use Designer\Studio\Services\BladeGenerator;
-use Designer\Studio\Services\DesignSyncService;
-use Designer\Studio\Services\SampleDataSeeder;
+use Designer\Studio\Services\Site\RuntimeInstaller;
+use Designer\Studio\Services\Site\SiteInstaller;
+use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\PageRepository;
-use Designer\Studio\Services\TemplateRegistry;
+use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\SiteUrls;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\File;
@@ -18,10 +19,7 @@ class StudioController extends Controller
     public function __construct(
         protected PageRepository $pages,
         protected ComponentRepository $components,
-        protected BladeGenerator $generator,
-        protected DesignSyncService $designSync,
-        protected SampleDataSeeder $seeder,
-        protected TemplateRegistry $templates
+        protected SiteMirror $mirror,
     ) {
         // The editor (and everything it calls) works on the draft site
         if (config('studio.draft_mode', true)) {
@@ -31,28 +29,43 @@ class StudioController extends Controller
 
     public function index(Request $request)
     {
-        // Always sync designs from resource files so edits are reflected
-        $this->designSync->syncAll();
-
-        // Self-heal: sites published while the stock welcome route still
-        // owned '/' (it blocks Studio's home route) get claimed here.
-        $homeClaimed = $this->pruner()->claimHome();
-
-        $homeSlugForSort = \Designer\Studio\Support\SiteUrls::homeSlug();
-        // Home first, then the Pages-panel order (PageRepository::all sorts by it)
-        $pages = $this->pages->all()
-            ->sortBy(fn($p, $i) => [$p->slug === $homeSlugForSort ? 0 : 1, $i])
-            ->values();
-
-        // Show onboarding when no pages exist
-        if ($pages->isEmpty()) {
+        // No site yet: pick a template to install
+        if (!SitePaths::installed()) {
             return view('studio::onboarding', [
                 'templates' => app(\Designer\Studio\Services\Templates\TemplateCatalog::class)->all(),
             ]);
         }
 
+        // The site is served by the runtime provider in the app. If it has
+        // gone missing (or was never registered), put it back.
+        $runtime = app(RuntimeInstaller::class);
+
+        if (!$runtime->installed()) {
+            $runtime->install();
+        }
+
+        // Pull in anything that changed in the site's files since the last
+        // visit (Code mode, the Assistant, the developer's own editor, a
+        // fresh deploy with empty storage) and re-sync the section library.
+        $this->mirror->sync();
+
+        // Self-heal: sites published while the stock welcome route still
+        // owned '/' get claimed here.
+        $homeClaimed = $this->pruner()->claimHome();
+
+        $homeSlug = SiteUrls::homeSlug();
+
+        // A site whose pages are all hand-written still needs one page to edit
+        if ($this->pages->all()->isEmpty()) {
+            $this->pages->create(['title' => 'Home', 'slug' => $homeSlug]);
+        }
+
+        // Home first, then the Pages-panel order (PageRepository::all sorts by it)
+        $pages = $this->pages->all()
+            ->sortBy(fn($p, $i) => [$p->slug === $homeSlug ? 0 : 1, $i])
+            ->values();
+
         // Load the requested page, preferring the home page as the default
-        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
         $defaultSlug = $pages->firstWhere('slug', $homeSlug)?->slug ?? $pages->first()?->slug;
 
         $slug = $request->query('page', $defaultSlug);
@@ -123,10 +136,9 @@ class StudioController extends Controller
         // route: the route collection still lists '/' for THIS request,
         // but the next one is clean.
         $pruner = $this->pruner();
-        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
+        $homeSlug = SiteUrls::homeSlug();
 
-        $rootBlocked = config('studio.page_routing.enabled', true)
-            && !$homeClaimed
+        $rootBlocked = !$homeClaimed
             && $pruner->liveHomePageExists()
             && $pruner->appDefinesRootRoute();
 
@@ -135,7 +147,7 @@ class StudioController extends Controller
                 'id' => 'app-owns-root',
                 'tone' => 'warn',
                 'dismissible' => true,
-                'text' => "Your app defines its own / route, so your homepage is served at /{$homeSlug} instead. Remove that route from routes/web.php to let Studio serve it at /.",
+                'text' => "Your app defines its own / route, so your homepage is served at /{$homeSlug} instead. Remove that route from routes/web.php to serve it at /.",
             ];
         }
 
@@ -257,11 +269,14 @@ class StudioController extends Controller
             abort(404);
         }
 
-        $html = $this->renderSection(
-            $component->html,
+        // Show the section with the data it would start bound to (a logo
+        // strip with the site's logos, not an empty one)
+        $variables = app(\Designer\Studio\Services\CollectionBinder::class)->apply(
             $component->resolveVariables([], usePreviewDefaults: true),
-            $component->name
+            PageRepository::defaultBindings($component->name)
         );
+
+        $html = $this->renderSection($component->html, $variables, $component->name);
 
         return response()
             ->view('studio::preview', ['title' => $component->title, 'sections' => [$html]])
@@ -282,7 +297,10 @@ class StudioController extends Controller
 
         $html = $this->renderSection(
             $component->html,
-            $component->resolveVariables($block['variables'] ?? []),
+            app(\Designer\Studio\Services\CollectionBinder::class)->apply(
+                $component->resolveVariables($block['variables'] ?? []),
+                $block['bindings'] ?? []
+            ),
             $component->name
         );
 
@@ -292,45 +310,9 @@ class StudioController extends Controller
     }
 
     /**
-     * Standalone rendered preview of an onboarding template's first page.
+     * Install the template picked in onboarding: its files are copied into
+     * resources/designer and public/designer, and the editor opens on it.
      */
-    public function templatePreview(string $name)
-    {
-        $template = $this->templates->find($name);
-
-        if (!$template) {
-            abort(404);
-        }
-
-        $sections = [];
-        $pageDef = $template['pages'][0] ?? null;
-
-        // Template previews show the composite: layout header + page + footer
-        $instances = [
-            ...($template['layout']['before'] ?? []),
-            ...($pageDef['components'] ?? []),
-            ...($template['layout']['after'] ?? []),
-        ];
-
-        foreach ($instances as $instance) {
-            $component = $this->components->find($instance['component_ref']);
-
-            if (!$component) {
-                continue;
-            }
-
-            $sections[] = $this->renderSection(
-                $component->html,
-                $component->resolveVariables($instance['variables'] ?? [], usePreviewDefaults: true),
-                $component->name
-            );
-        }
-
-        return response()
-            ->view('studio::preview', ['title' => $template['title'], 'sections' => $sections])
-            ->header('Cache-Control', 'private, max-age=30');
-    }
-
     public function applyTemplate(Request $request)
     {
         $validated = $request->validate([
@@ -338,40 +320,28 @@ class StudioController extends Controller
         ]);
 
         $name = $validated['template'];
-        $catalog = app(\Designer\Studio\Services\Templates\TemplateCatalog::class);
 
-        if ($catalog->sourceOf($name) === null) {
+        if (!app(\Designer\Studio\Services\Templates\TemplateCatalog::class)->has($name)) {
             return response()->json([
                 'success' => false,
                 'message' => "Template [{$name}] is not available.",
             ], 422);
         }
 
-        // A template synced from a repository is a whole site — sections,
-        // assets, and theme — so it is installed by the importer rather
-        // than composed out of the existing library.
-        if ($catalog->sourceOf($name) === 'repository') {
-            try {
-                $report = app(\Designer\Studio\Services\Templates\TemplateImporter::class)->import($name);
-            } catch (\Throwable $e) {
-                report($e);
+        try {
+            $report = app(SiteInstaller::class)->install($name);
+        } catch (\Throwable $e) {
+            report($e);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => $e->getMessage(),
-                ], 422);
-            }
-
-            $slug = $report['pages'][0] ?? null;
-        } else {
-            $pages = $this->seeder->seedFromTemplate($name);
-            $slug = ($pages[0] ?? null)?->slug;
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         }
 
-        // Land on the home page when the template has one, whichever
-        // installer built it.
-        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
-        $slug = $this->pages->find($homeSlug) ? $homeSlug : $slug;
+        // Land on the home page when the template has one
+        $homeSlug = SiteUrls::homeSlug();
+        $slug = in_array($homeSlug, $report['pages'], true) ? $homeSlug : ($report['pages'][0] ?? null);
 
         return response()->json([
             'success' => true,
@@ -382,68 +352,31 @@ class StudioController extends Controller
     }
 
     /**
-     * The picture a repository template ships of itself. Built-in templates
-     * are previewed live instead, since their sections are already in the
-     * library.
+     * The picture a template ships of itself: from the local copy once it
+     * has been downloaded, from its repository before that.
      */
     public function templateThumbnail(string $name)
     {
-        $path = app(\Designer\Studio\Services\Templates\TemplateCatalog::class)->thumbnailPath($name);
+        $catalog = app(\Designer\Studio\Services\Templates\TemplateCatalog::class);
+        $path = $catalog->thumbnailPath($name);
 
-        if (!$path) {
-            abort(404);
-        }
-
-        return response()->file($path, [
-            'Content-Type' => 'image/png',
-            'Cache-Control' => 'private, max-age=300',
-        ]);
-    }
-
-    public function generate()
-    {
-        // Exports always reflect the published site, not the draft
-        $generated = $this->storage()->inLive(fn () => $this->generator->generateAll());
-
-        return response()->json([
-            'success' => true,
-            'generated' => $generated,
-            'count' => count($generated),
-        ]);
-    }
-
-    public function generatePage(string $slug)
-    {
-        try {
-            $path = $this->storage()->inLive(fn () => $this->generator->generatePage($slug));
-
-            return response()->json([
-                'success' => true,
-                'path' => $path,
-                'relative_path' => str_replace(base_path() . '/', '', $path),
+        if ($path) {
+            return response()->file($path, [
+                'Content-Type' => 'image/png',
+                'Cache-Control' => 'private, max-age=300',
             ]);
-        } catch (\Exception $e) {
-            $message = $e->getMessage();
-
-            if (str_contains($message, 'Page not found') && config('studio.draft_mode', true)) {
-                $message = 'This page has not been published yet — publish the site first, then export.';
-            }
-
-            return response()->json([
-                'success' => false,
-                'error' => $message,
-            ], 500);
         }
+
+        $remote = $catalog->remoteThumbnail($name);
+
+        abort_unless($remote !== null, 404);
+
+        return redirect()->away($remote);
     }
 
     /* ------------------------------------------------------------ */
     /*  Draft mode — preview + publish                               */
     /* ------------------------------------------------------------ */
-
-    protected function storage(): \Designer\Studio\Services\Storage\StudioStorage
-    {
-        return app(\Designer\Studio\Services\Storage\StudioStorage::class);
-    }
 
     protected function publisher(): \Designer\Studio\Services\PublishService
     {
@@ -456,7 +389,7 @@ class StudioController extends Controller
      */
     public function previewPage(?string $slug = null)
     {
-        $slug = $slug ?: \Designer\Studio\Support\SiteUrls::homeSlug();
+        $slug = $slug ?: SiteUrls::homeSlug();
 
         $page = $this->pages->find($slug);
 
@@ -506,6 +439,9 @@ class StudioController extends Controller
 
     public function publishStatus()
     {
+        // Files edited outside the editor since it loaded count too
+        $this->mirror->refresh();
+
         return response()->json($this->publisher()->status());
     }
 
@@ -518,7 +454,7 @@ class StudioController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Publishing failed — check that storage/studio is writable.',
+                'message' => 'Publishing failed — check that storage/studio and resources/designer are writable.',
             ], 500);
         }
 
@@ -526,6 +462,9 @@ class StudioController extends Controller
             'success' => true,
             'published' => $published['items'],
             'count' => count($published['items']),
+            // Anything the site's files could not take (a hand-written page
+            // sitting at the same URL, say)
+            'notes' => $published['notes'] ?? [],
             // Publishing is the moment the site goes live — take over '/'
             // from the stock Laravel welcome route if it's still there.
             'home_claimed' => $this->pruner()->claimHome(),
@@ -617,8 +556,9 @@ class StudioController extends Controller
     }
 
     /**
-     * Image uploads for image fields. Files are stored in
-     * public/studio-uploads so they work without a storage symlink.
+     * Image uploads for image fields. Files are stored with the rest of the
+     * site's public files, in public/designer/uploads, so they work without
+     * a storage symlink and stay with the site if Studio is removed.
      */
     public function upload(Request $request)
     {
@@ -637,7 +577,7 @@ class StudioController extends Controller
 
         $file = $request->file('file');
 
-        $directory = public_path('studio-uploads');
+        $directory = SitePaths::public(SitePaths::UPLOADS);
 
         if (!File::isDirectory($directory)) {
             File::makeDirectory($directory, 0755, true);
@@ -648,7 +588,8 @@ class StudioController extends Controller
 
         return response()->json([
             'success' => true,
-            'url' => url('studio-uploads/' . $filename),
+            // Root-relative, so the page file works on any host
+            'url' => SitePaths::url(SitePaths::UPLOADS . '/' . $filename),
         ]);
     }
 

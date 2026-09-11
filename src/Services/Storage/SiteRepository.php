@@ -3,16 +3,16 @@
 namespace Designer\Studio\Services\Storage;
 
 /**
- * Site-wide settings: the one document that isn't a page, a layout, or a
- * block.
+ * The site document: site-wide settings that belong to no one page.
  *
- * An imported template brings more than sections with it — a palette, a
- * font pairing, the scripts its motion depends on, and a bag of site-level
- * content (company name, nav links, social handles) that its sections read
- * as `$site`. All of that lands here, and every render path reads it back:
- * the canvas iframe, the public page, the draft preview, and Blade exports.
+ *   data       the `$site` bag every section reads — company name, menus,
+ *              social links (resources/designer/data/site.json)
+ *   home_slug  which page is served at "/" (designer.json `home`)
+ *   template   the template the site was installed from
  *
- * Stored at `site/data.json`, so it publishes and discards alongside pages.
+ * Stored at `site/data.json`, so it is drafted, published, and discarded
+ * alongside pages. Fonts, stylesheets, and scripts are not settings here:
+ * they live in the site's own layout and CSS files (see SiteChrome).
  */
 class SiteRepository
 {
@@ -24,7 +24,7 @@ class SiteRepository
 
     public function get(): array
     {
-        return $this->storage->read(self::PATH) ?? $this->blank();
+        return ($this->storage->read(self::PATH) ?? []) + $this->blank();
     }
 
     public function save(array $data): array
@@ -38,57 +38,31 @@ class SiteRepository
         return $merged;
     }
 
-    /** Wipe the site doc back to defaults (a fresh import starts clean). */
+    /** Wipe the site doc back to defaults. */
     public function reset(): void
     {
         $this->storage->delete(self::PATH);
     }
 
-    /**
-     * The `$site` bag sections read — company name, nav links, socials.
-     * Kept separate from the chrome keys so a template's own shape passes
-     * through untouched.
-     */
+    /** The `$site` bag sections read. */
     public function data(): array
     {
         return $this->get()['data'] ?? [];
     }
 
-    /** Tailwind-compatible CSS injected into every render of this site. */
-    public function themeCss(): string
-    {
-        return (string) ($this->get()['theme_css'] ?? '');
-    }
-
     /**
-     * Font links, preconnects, and anything else the template's own layout
-     * carried in its <head>. Trusted markup — it only ever arrives from a
-     * template import or an explicit edit, never from page content.
+     * Set one key of the `$site` bag by dot path (`menu_primary`,
+     * `theme.fonts_url`) — how a section field bound to site data saves.
      */
-    public function headHtml(): string
+    public function setData(string $path, mixed $value): array
     {
-        return (string) ($this->get()['head_html'] ?? '');
+        $data = $this->data();
+        data_set($data, $path, $value);
+
+        return $this->save(['data' => $data]);
     }
 
-    /** <script src> URLs the template's sections rely on, in order. */
-    public function scripts(): array
-    {
-        return array_values((array) ($this->get()['scripts'] ?? []));
-    }
-
-    /** Classes the template puts on <body>, so type and colour inherit. */
-    public function bodyClass(): string
-    {
-        return (string) ($this->get()['body_class'] ?? '');
-    }
-
-    /** Classes the template puts on <html> (dark-mode switches live here). */
-    public function htmlClass(): string
-    {
-        return (string) ($this->get()['html_class'] ?? '');
-    }
-
-    /** Slug of the template this site was imported from, if any. */
+    /** Slug of the template this site was installed from, if any. */
     public function template(): ?string
     {
         return $this->get()['template'] ?? null;
@@ -99,11 +73,6 @@ class SiteRepository
         return [
             'template' => null,
             'data' => [],
-            'theme_css' => '',
-            'head_html' => '',
-            'scripts' => [],
-            'body_class' => '',
-            'html_class' => '',
         ];
     }
 }

@@ -2,66 +2,66 @@
 
 namespace Designer\Studio\Console\Commands;
 
-use Designer\Studio\Services\Templates\TemplateImporter;
+use Designer\Studio\Services\Site\SiteInstaller;
 use Designer\Studio\Services\Templates\TemplateSync;
+use Designer\Studio\Support\SitePaths;
 use Illuminate\Console\Command;
 
 class TemplatesImport extends Command
 {
     protected $signature = 'studio:templates:import
-        {template : Slug of a synced template}
-        {--keep : Import alongside the current site instead of replacing it}';
+        {template : Slug of a template in studio.templates.catalog}
+        {--force : Replace the site already installed in resources/designer}';
 
-    protected $description = 'Build a Studio site from a synced template repository';
+    protected $description = 'Install a site template into resources/designer and public/designer';
 
-    public function handle(TemplateSync $sync, TemplateImporter $importer): int
+    public function handle(TemplateSync $sync, SiteInstaller $installer): int
     {
         $slug = $this->argument('template');
 
-        if (!$sync->directory($slug)) {
-            $this->error("Template [{$slug}] is not synced.");
-            $this->line('  Run: php artisan studio:templates:sync --template=' . $slug);
+        if (!isset($sync->catalog()[$slug])) {
+            $this->error("Template [{$slug}] is not in studio.templates.catalog.");
+            $this->line('  Available: ' . (implode(', ', array_keys($sync->catalog())) ?: 'none'));
 
             return self::FAILURE;
         }
 
-        $fresh = !$this->option('keep');
+        $replace = (bool) $this->option('force');
 
-        if ($fresh && !$this->confirmReplacement($slug)) {
+        if (SitePaths::installed() && !$replace) {
+            $this->error('A site is already installed in ' . SitePaths::relative(SitePaths::resources()) . '.');
+            $this->line('  Pass --force to replace it (its pages, sections, data, and public files are deleted).');
+
+            return self::FAILURE;
+        }
+
+        if ($replace && SitePaths::installed() && !$this->confirmReplacement($slug)) {
             return self::SUCCESS;
         }
 
         try {
-            $report = $importer->import($slug, fresh: $fresh);
+            $report = $installer->install($slug, $replace);
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;
         }
 
-        $this->info("Imported {$slug}.");
+        $this->info("Installed {$slug}.");
         $this->newLine();
+        $this->line(sprintf('  %d files into %s and %s.', $report['files'], SitePaths::relative(SitePaths::resources()), SitePaths::relative(SitePaths::public())));
+        $this->line(sprintf('  %d sections, %d pages the editor manages: %s', $report['sections'], count($report['pages']), implode(', ', array_map(fn ($p) => '/' . $p, $report['pages']))));
 
-        $this->line(sprintf('  %d sections, %d pages, %d asset folders.',
-            $report['sections'],
-            count($report['pages']),
-            $report['assets'],
-        ));
-
-        if ($report['layout']) {
-            $this->line("  Shared layout: {$report['layout']}");
+        if ($report['code_pages'] !== []) {
+            $this->line('  Hand-written pages (edit in Code mode): ' . implode(', ', $report['code_pages']));
         }
 
-        if ($report['pages'] !== []) {
-            $this->line('  Pages: ' . implode(', ', array_map(fn ($p) => '/' . $p, $report['pages'])));
+        if ($report['runtime']['written']) {
+            $this->line('  Added app/Providers/DesignerServiceProvider.php — it serves the site, with or without Studio.');
         }
 
-        foreach ($report['notes'] as $note) {
-            $this->line("  · {$note}");
-        }
-
-        foreach ($report['skipped'] as $page => $reason) {
-            $this->warn("  • {$page} skipped — {$reason}");
+        if (!$report['runtime']['registered']) {
+            $this->warn('  Register App\\Providers\\DesignerServiceProvider in bootstrap/providers.php so the app serves the site.');
         }
 
         $this->newLine();
@@ -71,7 +71,7 @@ class TemplatesImport extends Command
     }
 
     /**
-     * Importing replaces the whole site, so make the cost of that explicit
+     * Installing over a site deletes it, so make the cost of that explicit
      * unless the caller has already opted out of prompts.
      */
     protected function confirmReplacement(string $slug): bool
@@ -81,8 +81,8 @@ class TemplatesImport extends Command
         }
 
         return $this->confirm(
-            "Importing {$slug} replaces every existing page, layout, and block. Continue?",
-            true
+            "Installing {$slug} deletes the site in resources/designer and public/designer, including any edits. Continue?",
+            false
         );
     }
 }

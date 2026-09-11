@@ -5,32 +5,36 @@ namespace Designer\Studio\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Designer\Studio\Support\SitePaths;
 use InvalidArgumentException;
 
 /**
- * The site's asset library: everything under public/studio-uploads.
+ * The site's asset library: everything under public/designer — the images
+ * and scripts the template shipped, and whatever has been uploaded since
+ * (image fields upload into public/designer/uploads).
  *
- * Paths handed in and out are relative to that root ("hero/valley.jpg",
+ * Paths handed in and out are relative to that root ("images/hero.jpg",
  * "" for the root itself) and are normalised and fenced — a path that
- * tries to escape the root, or to touch the template-managed `designer/`
- * folder, throws an InvalidArgumentException (the controller answers 422).
+ * tries to escape the root throws an InvalidArgumentException (the
+ * controller answers 422). URLs are root-relative ("/designer/images/…"),
+ * so a page that stores one works on any host.
  */
 final class MediaLibrary
 {
-    /** Folders written by the package itself — listed, never modified here */
-    protected const READ_ONLY = ['designer'];
+    /** Folders listed but never modified here (none — the site owns them all) */
+    protected const READ_ONLY = [];
 
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'];
 
     public function root(): string
     {
-        return public_path('studio-uploads');
+        return SitePaths::public();
     }
 
     /** Public URL for a relative path */
     public function url(string $path): string
     {
-        return url('studio-uploads/' . ltrim(str_replace('\\', '/', $path), '/'));
+        return SitePaths::url($path);
     }
 
     /**
@@ -59,17 +63,17 @@ final class MediaLibrary
             $folders[] = [
                 'name' => $name,
                 'path' => $relative,
-                'count' => count(File::files($folder)),
+                'count' => count(array_filter(File::files($folder), fn ($file) => $this->isMedia($file->getFilename()))),
                 'readonly' => $this->isReadOnly($relative),
             ];
         }
 
+        // Only images: the folder also holds the site's scripts and text
+        // files, which belong to Code mode, not to an image picker.
         foreach (File::files($absolute) as $file) {
-            if (str_starts_with($file->getFilename(), '.')) {
-                continue;
+            if ($this->isMedia($file->getFilename())) {
+                $files[] = $this->entry(ltrim($dir . '/' . $file->getFilename(), '/'));
             }
-
-            $files[] = $this->entry(ltrim($dir . '/' . $file->getFilename(), '/'));
         }
 
         usort($folders, fn ($a, $b) => strcasecmp($a['name'], $b['name']));
@@ -268,6 +272,12 @@ final class MediaLibrary
         }
 
         return $out;
+    }
+
+    protected function isMedia(string $filename): bool
+    {
+        return !str_starts_with($filename, '.')
+            && in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), self::IMAGE_EXTENSIONS, true);
     }
 
     protected function entry(string $relative): array

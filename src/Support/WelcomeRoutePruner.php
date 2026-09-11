@@ -2,17 +2,15 @@
 
 namespace Designer\Studio\Support;
 
-use Designer\Studio\Services\Storage\StudioStorage;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Route;
 
 /**
- * Removes the stock Laravel welcome route from the host app so Studio's
- * home route can serve the published homepage at '/'.
+ * Removes the stock Laravel welcome route from the host app so the site's
+ * runtime can serve the home page at '/'.
  *
- * Studio never shadows app routes, so a fresh Laravel app — whose
- * routes/web.php always defines '/' — would otherwise serve the welcome
- * page forever while publishes silently succeed. The pruner edits
+ * The runtime never shadows app routes (it answers from Route::fallback),
+ * so a fresh Laravel app — whose routes/web.php always defines '/' — would
+ * otherwise serve the welcome page forever. The pruner edits
  * routes/web.php ONLY when the root route is byte-for-byte stock
  * boilerplate (whitespace aside); anything customized is never touched.
  */
@@ -25,10 +23,6 @@ class WelcomeRoutePruner
      */
     protected const STOCK_PATTERN = '/Route::get\(\s*[\'"]\/[\'"]\s*,\s*function\s*\(\s*\)\s*\{\s*return\s+view\(\s*[\'"]welcome[\'"]\s*\)\s*;\s*\}\s*\)\s*;[^\S\n]*\n?/';
 
-    public function __construct(
-        protected StudioStorage $storage
-    ) {}
-
     /**
      * Remove the stock welcome route if (and only if) it is safe to.
      * Idempotent and cheap once claimed. Returns true when a route was
@@ -36,10 +30,6 @@ class WelcomeRoutePruner
      */
     public function claimHome(): bool
     {
-        if (!config('studio.page_routing.enabled', true)) {
-            return false;
-        }
-
         // Without a live home page, '/' would 404 — leaving the welcome
         // page in place is the better failure mode.
         if (!$this->liveHomePageExists()) {
@@ -81,31 +71,16 @@ class WelcomeRoutePruner
             && preg_match(self::STOCK_PATTERN, (string) file_get_contents($path)) === 1;
     }
 
-    /**
-     * Does the app (anything but Studio) define a GET '/' route? Studio's
-     * own home route must be ignored — after Studio claims the root, a
-     * '/' route always exists, and it's ours.
-     */
+    /** Does the app define a GET '/' route of its own? */
     public function appDefinesRootRoute(): bool
     {
-        foreach (Route::getRoutes()->get('GET') as $route) {
-            if ($route->uri() === '/' && $route->getName() !== 'studio.page.home') {
-                return true;
-            }
-        }
-
-        return false;
+        return SiteUrls::appDefinesRootRoute();
     }
 
-    /**
-     * Live-tree check on raw paths (workspace-immune), mirroring how
-     * PublishService reads the live site.
-     */
+    /** The live home page is the installed site's index.blade.php. */
     public function liveHomePageExists(): bool
     {
-        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
-
-        return is_file($this->storage->getBasePath() . '/pages/' . $homeSlug . '.json');
+        return is_file(SitePaths::pages('index.blade.php'));
     }
 
     protected function routesFile(): string

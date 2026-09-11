@@ -12,8 +12,11 @@ use Symfony\Component\Process\Process;
  * Each entry in `studio.templates.catalog` is a git repository holding one
  * whole starter site. Sync clones the ones that are missing, fast-forwards
  * the ones that are present, and deletes folders that have left the
- * catalog. The clones are ordinary checkouts, so a template can be edited
- * in place and pushed from inside its own folder.
+ * catalog. The clones are a cache inside Studio's storage — installing a
+ * template copies what the site uses into resources/designer and
+ * public/designer, so nothing else from them reaches the app. They are
+ * ordinary checkouts, so a template can still be edited in place and pushed
+ * from inside its own folder.
  *
  * Protection beats convenience: a clone carrying uncommitted or unpushed
  * work is left exactly as it is and reported, never reset. `--force` is the
@@ -26,13 +29,52 @@ class TemplateSync
 
     public function path(): string
     {
-        return (string) config('studio.templates.path', resource_path('studio-templates'));
+        return (string) (config('studio.templates.path') ?: storage_path('studio/templates'));
     }
 
-    /** @return array<string, string> slug => repository URL */
+    /**
+     * Catalog entries are either a repository URL or an array carrying one
+     * under `repo` (plus a name and description for the picker).
+     *
+     * @return array<string, string> slug => repository URL
+     */
     public function catalog(): array
     {
-        return (array) config('studio.templates.catalog', []);
+        $catalog = [];
+
+        foreach ((array) config('studio.templates.catalog', []) as $slug => $entry) {
+            $url = is_array($entry) ? ($entry['repo'] ?? null) : $entry;
+
+            if (is_string($slug) && is_string($url) && $url !== '') {
+                $catalog[$slug] = $url;
+            }
+        }
+
+        return $catalog;
+    }
+
+    /** The picker metadata a catalog entry declares (name, description). */
+    public function catalogEntry(string $slug): array
+    {
+        $entry = config('studio.templates.catalog.' . $slug);
+
+        return is_array($entry) ? $entry : [];
+    }
+
+    /**
+     * Make sure a catalogued template is on disk and current, cloning it on
+     * first use. An existing clone that cannot be updated (offline, local
+     * work in it) is used as it is. Returns its directory.
+     */
+    public function ensure(string $slug): string
+    {
+        $result = $this->sync($slug, false, false);
+
+        if ($dir = $this->directory($slug)) {
+            return $dir;
+        }
+
+        throw new RuntimeException($result['failed'][$slug] ?? $result['skipped'][$slug] ?? "Template [{$slug}] could not be downloaded.");
     }
 
     /**

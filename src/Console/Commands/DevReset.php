@@ -2,76 +2,77 @@
 
 namespace Designer\Studio\Console\Commands;
 
-use Designer\Studio\Services\BladeGenerator;
-use Designer\Studio\Services\DesignSyncService;
+use Designer\Studio\Services\Site\RuntimeInstaller;
 use Designer\Studio\Services\Storage\StudioStorage;
+use Designer\Studio\Support\SitePaths;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 
 class DevReset extends Command
 {
     protected $signature = 'studio:dev-reset
-                            {--seed : Also seed the starter template so you skip onboarding}';
+                            {--template= : Install this template afterwards, skipping onboarding}
+                            {--force : Skip the confirmation prompt}';
 
-    protected $description = 'Reset studio to a fresh install state (dev only)';
+    protected $description = 'Reset Studio to a fresh install: delete the site, its runtime, and all editor data (dev only)';
 
-    public function handle(
-        StudioStorage $storage,
-        BladeGenerator $generator,
-        DesignSyncService $designSync
-    ): int {
-        $this->info('Resetting Designer Studio to fresh install state...');
-        $this->line('');
+    public function handle(StudioStorage $storage, RuntimeInstaller $runtime): int
+    {
+        if (!$this->option('force') && !$this->confirm('This deletes resources/designer, public/designer, app/Providers/DesignerServiceProvider.php, and the editor data in ' . SitePaths::relative($storage->getBasePath()) . '. Continue?')) {
+            return self::SUCCESS;
+        }
 
-        // 1. Remove generated Blade files
-        $this->line('  Removing generated Blade files...');
-        $generator->purge();
-        $this->info('  Done.');
+        $this->info('Resetting Designer Studio to a fresh install...');
 
-        // 2. Purge all JSON data (pages + components)
-        $this->line('  Purging all stored data...');
-        $storage->purge();
-        $this->info('  Done.');
+        $this->line('  Removing the installed site...');
+        File::deleteDirectory(SitePaths::resources());
+        File::deleteDirectory(SitePaths::public());
 
-        // 2b. Files a template import wrote outside the storage tree —
-        // published assets and the supporting components copied into the app
-        $this->line('  Removing imported template files...');
-        app(\Designer\Studio\Services\Templates\TemplateImporter::class)->purgeInstalled();
-        $this->info('  Done.');
+        $this->line('  Removing the site runtime...');
+        $this->removeRuntime($runtime);
 
-        // 3. Re-create storage directories
-        $this->line('  Re-creating storage directories...');
+        // Folders earlier versions of Studio generated in the app (never the
+        // old template clones in resources/studio-templates — those are git
+        // checkouts that may hold someone's unpushed work)
+        foreach ([public_path('studio-templates'), resource_path('views/components/studio-templates')] as $legacy) {
+            if (is_dir($legacy)) {
+                $this->line('  Removing ' . SitePaths::relative($legacy) . ' (left by an earlier Studio)...');
+                File::deleteDirectory($legacy);
+            }
+        }
+
+        $this->line('  Purging editor data (keeping downloaded templates)...');
+        $storage->purge(keep: ['templates']);
         $storage->ensureDirectoryExists();
-        $storage->ensureDirectoryExists('pages');
-        $storage->ensureDirectoryExists('layouts');
-        $storage->ensureDirectoryExists('blocks');
-        $storage->ensureDirectoryExists('collections');
-        $storage->ensureDirectoryExists('site');
         $storage->ensureDirectoryExists('components/library');
 
-        if (config('studio.draft_mode', true)) {
-            app(\Designer\Studio\Services\PublishService::class)->ensureDraftSeeded();
-        }
-        $this->info('  Done.');
+        $this->info('Done.');
 
-        // 4. Sync component designs from source YAML/HTML files
-        $this->line('  Syncing component designs...');
-        $result = $designSync->syncAll();
-        $this->info("  Done. ({$result['created']} created, {$result['updated']} updated)");
-
-        // 5. Optionally seed starter data (skips onboarding)
-        if ($this->option('seed')) {
-            $this->line('  Seeding starter template...');
-            $this->call('studio:seed');
+        if ($template = $this->option('template')) {
+            return $this->call('studio:templates:import', ['template' => $template]);
         }
 
-        $this->line('');
-        $this->info('Studio has been reset to a fresh state.');
+        $this->line('Visit /' . trim(config('studio.path', 'studio'), '/') . ' to see the onboarding flow.');
 
-        if (!$this->option('seed')) {
-            $this->line('Visit /studio to see the onboarding flow.');
-            $this->line('Use --seed to pre-populate with the starter template.');
+        return self::SUCCESS;
+    }
+
+    /** Delete the provider file and take it out of the provider list. */
+    protected function removeRuntime(RuntimeInstaller $runtime): void
+    {
+        File::delete($runtime->path());
+
+        foreach ([base_path('bootstrap/providers.php'), config_path('app.php')] as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            $contents = (string) file_get_contents($file);
+            $cleaned = preg_replace('/^[ \t]*\\\\?' . preg_quote($runtime->providerClass(), '/') . '::class,?[ \t]*\R/m', '', $contents);
+
+            if ($cleaned !== null && $cleaned !== $contents) {
+                File::put($file, $cleaned);
+            }
         }
-
-        return 0;
     }
 }

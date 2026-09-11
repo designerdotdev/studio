@@ -63,7 +63,10 @@ class EditorPanel extends Component
     /** Resolved variables per section instance id (page + layout) */
     public array $variables = [];
 
-    /** Per-section {field: 'collections.<name>'} — repeaters bound to a collection */
+    /**
+     * Per-section bindings: {field: 'collections.<name>' | 'site.<key>' |
+     * 'php:…' | 'blade:…'} — values the page file takes from elsewhere.
+     */
     public array $bindings = [];
 
     public ?string $selectedId = null;
@@ -256,11 +259,30 @@ class EditorPanel extends Component
             ];
 
             $this->fieldsByRef[$component->name] = $component->fields;
-            $this->variables[$instance['id']] = $component->resolveVariables($instance['variables'] ?? []);
+            $this->variables[$instance['id']] = $this->withSiteValues(
+                $component->resolveVariables($instance['variables'] ?? []),
+                $instance['bindings'] ?? []
+            );
             $this->bindings[$instance['id']] = $instance['bindings'] ?? [];
         }
 
         return $rows;
+    }
+
+    /**
+     * A field bound to site data (`site.menu_primary`) is edited in place:
+     * the inspector shows — and saves back into — the site document, so the
+     * nav and the footer that read the same menu stay in step.
+     */
+    protected function withSiteValues(array $variables, array $bindings): array
+    {
+        foreach ($bindings as $key => $source) {
+            if (($path = \Designer\Studio\Services\CollectionBinder::sitePath($source)) !== null) {
+                $variables[$key] = data_get(app(\Designer\Studio\Services\Storage\SiteRepository::class)->data(), $path);
+            }
+        }
+
+        return $variables;
     }
 
     public function getSelectedSectionProperty(): ?array
@@ -307,6 +329,9 @@ class EditorPanel extends Component
     #[On('studio:code-saved')]
     public function refreshAfterCodeSave(): void
     {
+        // A saved page, layout, or data file is the live site — bring it
+        // into the documents (and the draft, where it has no edits of its own)
+        app(\Designer\Studio\Services\Site\SiteMirror::class)->sync();
         $this->loadPage();
     }
 
@@ -656,18 +681,35 @@ class EditorPanel extends Component
     /** Detach a repeater from its collection, keeping the current rows as plain values */
     public function unbindRepeater(string $sectionId, string $key): void
     {
+        $this->unbindField($sectionId, $key);
+    }
+
+    /**
+     * Replace any binding with the value it currently resolves to, so the
+     * field becomes this section's own to edit. Other sections keep reading
+     * the collection, the site data, or the expression.
+     */
+    public function unbindField(string $sectionId, string $key): void
+    {
         $bindings = $this->bindings[$sectionId] ?? [];
         $source = $bindings[$key] ?? null;
-        unset($bindings[$key]);
 
-        $rows = null;
-
-        if ($name = \Designer\Studio\Services\CollectionBinder::collectionName($source)) {
-            $rows = app(\Designer\Studio\Services\Storage\CollectionRepository::class)->rows($name);
-            $this->variables[$sectionId][$key] = $rows;
+        if (!is_string($source)) {
+            return;
         }
 
-        $this->persistBindings($sectionId, $bindings, $rows === null ? null : [$key => $rows]);
+        unset($bindings[$key]);
+
+        $value = app(\Designer\Studio\Services\CollectionBinder::class)->resolve($source);
+        $value = json_decode(json_encode($value), true);
+
+        if (\Designer\Studio\Services\CollectionBinder::collectionName($source) !== null) {
+            // Rows keep their shape but lose the collection's row ids
+            $value = array_map(fn ($row) => is_array($row) ? array_diff_key($row, ['id' => true]) : $row, (array) $value);
+        }
+
+        $this->variables[$sectionId][$key] = $value;
+        $this->persistBindings($sectionId, $bindings, [$key => $value]);
     }
 
     protected function persistBindings(string $sectionId, array $bindings, ?array $variables = null): void
@@ -698,9 +740,19 @@ class EditorPanel extends Component
             return;
         }
 
+        // Bound fields are not the instance's to store: site-bound ones save
+        // into the site document, the rest come from their source.
+        $bindings = $this->bindings[$sectionId] ?? [];
+        $variables = array_diff_key($this->variables[$sectionId], $bindings);
+
+        if ($this->saveSiteValues($sectionId, $bindings)) {
+            // Another section (the footer, say) may read the same data
+            $this->dispatch('studio:refresh-preview');
+        }
+
         // Global block placements write to the shared block, wherever they live
         if ($block = $this->blockFor($sectionId)) {
-            $this->blockRepo()->updateVariables($block, $this->variables[$sectionId]);
+            $this->blockRepo()->updateVariables($block, $variables);
 
             return;
         }
@@ -713,7 +765,7 @@ class EditorPanel extends Component
             $updated = $this->layoutRepo()->updateComponentVariables(
                 $this->layoutSlug,
                 $sectionId,
-                $this->variables[$sectionId]
+                $variables
             );
             $this->docVersions['layout'] = $updated['updated_at'] ?? $this->docVersions['layout'] ?? null;
 
@@ -723,12 +775,36 @@ class EditorPanel extends Component
         $updated = $this->pages()->updateComponentVariables(
             $this->pageSlug,
             $sectionId,
-            $this->variables[$sectionId]
+            $variables
         );
 
         if ($updated) {
             $this->docVersions['page'] = $updated->updated_at;
         }
+    }
+
+    /** Write site-bound fields into the site document. True when any changed. */
+    protected function saveSiteValues(string $sectionId, array $bindings): bool
+    {
+        $site = app(\Designer\Studio\Services\Storage\SiteRepository::class);
+        $changed = false;
+
+        foreach ($bindings as $key => $source) {
+            $path = \Designer\Studio\Services\CollectionBinder::sitePath($source);
+
+            if ($path === null || !array_key_exists($key, $this->variables[$sectionId])) {
+                continue;
+            }
+
+            $value = $this->variables[$sectionId][$key];
+
+            if (data_get($site->data(), $path) !== $value) {
+                $site->setData($path, $value);
+                $changed = true;
+            }
+        }
+
+        return $changed;
     }
 
     /** Toggle fields persist + push their state to the preview in one round trip */
@@ -990,6 +1066,11 @@ class EditorPanel extends Component
                     $comp['variables'] ?? []
                 );
 
+                // A bound field stays bound in the block
+                if (!empty($comp['bindings'])) {
+                    $block = $this->blockRepo()->updateBindings($block['slug'], $comp['bindings']) ?? $block;
+                }
+
                 $comp = array_filter([
                     'id' => $comp['id'],
                     'block_ref' => $block['slug'],
@@ -1047,7 +1128,9 @@ class EditorPanel extends Component
                     'component_ref' => $block['component_ref'],
                     'order' => $comp['order'],
                     'variables' => $block['variables'] ?? [],
-                ] + (isset($comp['hidden']) ? ['hidden' => $comp['hidden']] : []);
+                ]
+                    + (!empty($block['bindings']) ? ['bindings' => $block['bindings']] : [])
+                    + (isset($comp['hidden']) ? ['hidden' => $comp['hidden']] : []);
                 break;
             }
         }
@@ -1129,6 +1212,12 @@ class EditorPanel extends Component
             return;
         }
 
+        // Every page file is written inside a layout (it supplies the
+        // <head>), so "none" is only possible on a site without layouts.
+        if ($slug === null && $this->layoutRepo()->all()->isNotEmpty()) {
+            return;
+        }
+
         $this->pages()->update($this->pageSlug, ['layout_ref' => $slug]);
         $this->loadPage();
         $this->dispatch('studio:refresh-preview');
@@ -1186,9 +1275,22 @@ class EditorPanel extends Component
             return;
         }
 
-        // Detach from every page that uses it, then remove the layout doc
+        $replacement = $this->layoutRepo()->all()
+            ->pluck('slug')
+            ->reject(fn ($slug) => $slug === $this->layoutSlug)
+            ->sortBy(fn ($slug) => $slug === 'main' ? 0 : 1)
+            ->first();
+
+        // A page needs a layout for its <head>; the last one can't go
+        if ($replacement === null) {
+            $this->dispatch('studio:toast', message: 'A site needs at least one layout — create another before deleting this one.', type: 'error');
+
+            return;
+        }
+
+        // Move every page that uses it onto another layout, then remove it
         foreach ($this->layoutRepo()->pagesUsing($this->layoutSlug) as $pageSlug) {
-            $this->pages()->update($pageSlug, ['layout_ref' => null]);
+            $this->pages()->update($pageSlug, ['layout_ref' => $replacement]);
         }
 
         $this->layoutRepo()->delete($this->layoutSlug);
@@ -1196,7 +1298,7 @@ class EditorPanel extends Component
         $this->selectedId = null;
         $this->loadPage();
         $this->dispatch('studio:refresh-preview');
-        $this->dispatch('studio:toast', message: 'Layout deleted');
+        $this->dispatch('studio:toast', message: 'Layout deleted — its pages now use “' . ($this->layouts[$replacement] ?? $replacement) . '”');
     }
 
     public function getLayoutUsageCountProperty(): int
