@@ -5,7 +5,7 @@ namespace Designer\Studio\Services;
 use Designer\Studio\Services\Storage\CollectionRepository;
 use Designer\Studio\Services\Storage\SiteRepository;
 use Designer\Studio\Support\DataBag;
-use Illuminate\Support\Facades\Blade;
+use Designer\Studio\Support\NestedBlade;
 
 /**
  * Resolves a section instance's `bindings` — values its page file takes
@@ -113,7 +113,7 @@ class CollectionBinder
 
         try {
             if (str_starts_with($source, 'blade:')) {
-                return Blade::render(substr($source, 6), $context, deleteCachedView: true);
+                return NestedBlade::render(substr($source, 6), $context, deleteCachedView: true);
             }
 
             $captured = null;
@@ -121,7 +121,7 @@ class CollectionBinder
                 $captured = $value;
             };
 
-            Blade::render('<?php $__studioCapture(' . substr($source, 4) . '); ?>', $context, deleteCachedView: true);
+            NestedBlade::render('<?php $__studioCapture(' . substr($source, 4) . '); ?>', $context, deleteCachedView: true);
 
             return $captured instanceof DataBag ? $captured->all() : $captured;
         } catch (\Throwable) {

@@ -460,13 +460,14 @@ html.studio-light {
         @apply text-ink bg-wash;
     }
 
-    /* Boxed square button (menu, sidebar toggle) */
+    /* Flat square button (menu, sidebar toggle) — same rest/hover
+       treatment as the browser nav buttons: no chrome until hovered */
     .s-box-btn {
-        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line bg-raised text-soft transition-all duration-150;
+        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-soft transition-all duration-150;
     }
 
     .s-box-btn:hover {
-        @apply text-ink border-line-strong;
+        @apply text-ink bg-wash;
     }
 
     .s-box-btn:active {
@@ -496,10 +497,9 @@ html.studio-light {
         scale: 0.72;
     }
 
-    /* Menu open (no hover needed): full-strength icon + border */
+    /* Menu open (no hover needed): keep the hover state */
     .s-logo-btn.is-open {
-        color: var(--color-ink);
-        border-color: var(--color-line-strong);
+        @apply text-ink bg-wash;
     }
 
     .s-logo-btn:hover .s-logo-btn-logo,
@@ -605,7 +605,8 @@ html.studio-light {
 
     /* --- canvas ----------------------------------------------------- */
 
-    /* The preview (and Code mode's editor) sit inset on a dotted surface */
+    /* The dotted surface behind the preview — it fills the canvas edge to
+       edge, so the dots only show beside a narrow (tablet/mobile) preview */
     .s-canvas {
         background-color: var(--color-canvas);
         background-image:
@@ -614,11 +615,14 @@ html.studio-light {
         background-size: 100% 100%, 22px 22px;
     }
 
+    /* Square, flush frame for the preview and Code mode's editor */
     .s-frame {
-        @apply flex h-full flex-col overflow-hidden rounded-xl;
-        box-shadow:
-            0 0 0 1px rgba(255, 255, 255, 0.09),
-            0 24px 64px -16px rgba(0, 0, 0, 0.65);
+        @apply flex h-full flex-col overflow-hidden;
+    }
+
+    /* A narrow preview gets hairline edges against the dots */
+    .s-frame.is-narrow {
+        @apply border-x border-line;
     }
 
     .s-frame iframe {
@@ -887,22 +891,21 @@ html.studio-light {
         background: var(--color-accent);
     }
 
-    /* The drag seam in the gap between Code mode's editor and the live
-       preview frames — invisible until hovered, then an accent line */
+    /* The drag seam between Code mode's editor and the live preview — a
+       hairline with an 8px grab area, accent-coloured while hovered */
     .s-code-seam {
-        @apply relative w-2 shrink-0 cursor-col-resize;
+        @apply relative z-10 w-px shrink-0 cursor-col-resize bg-line;
+        transition: background-color 150ms ease;
     }
 
     .s-code-seam::before {
         content: '';
         position: absolute;
-        inset: 0 3px;
-        border-radius: 1px;
-        transition: background-color 150ms ease;
+        inset: 0 -4px;
     }
 
-    .s-code-seam:hover::before,
-    .s-code-seam:active::before {
+    .s-code-seam:hover,
+    .s-code-seam:active {
         background: var(--color-accent);
     }
 
@@ -924,10 +927,6 @@ html.studio-light {
 
 html.studio-light .s-pop {
     box-shadow: 0 10px 30px rgba(17, 17, 20, 0.12), 0 0 0 1px rgba(17, 17, 20, 0.06);
-}
-
-html.studio-light .s-frame {
-    box-shadow: 0 1px 2px rgba(17, 17, 20, 0.06), 0 12px 32px -12px rgba(17, 17, 20, 0.18), 0 0 0 1px rgba(17, 17, 20, 0.08);
 }
 
 

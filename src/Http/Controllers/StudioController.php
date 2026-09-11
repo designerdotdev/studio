@@ -31,8 +31,11 @@ class StudioController extends Controller
     {
         // No site yet: pick a template to install
         if (!SitePaths::installed()) {
+            $catalog = app(\Designer\Studio\Services\Templates\TemplateCatalog::class);
+
             return view('studio::onboarding', [
-                'templates' => app(\Designer\Studio\Services\Templates\TemplateCatalog::class)->all(),
+                'templates' => $catalog->all(),
+                'categories' => $catalog->categories(),
             ]);
         }
 

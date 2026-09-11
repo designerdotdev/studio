@@ -127,7 +127,7 @@
                     type="button"
                     class="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1.5 text-left"
                     :style="`padding-left: ${20 + node.depth * 12}px`"
-                    @click="$store.code.openFilenode.path"
+                    @click="$store.code.openFile(node.path)"
                 >
                     <span class="truncate font-mono text-[11.5px]" :class="node.design && 'text-ink/90'" x-text="node.name"></span>
                     <span x-show="$store.code.dirty[node.path]" x-cloak class="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Unsaved changes"></span>
@@ -135,7 +135,7 @@
 
                 {{-- Two-step delete keeps destructive intent inside the row --}}
                 <div x-show="node.type === 'file' && $store.code.confirmDelete === node.path" x-cloak class="flex shrink-0 items-center gap-1 pr-1.5" @click.stop>
-                    <button class="rounded bg-danger px-1.5 py-0.5 text-[10px] font-semibold text-white" @click="$store.code.deleteFilenode.path">Delete</button>
+                    <button class="rounded bg-danger px-1.5 py-0.5 text-[10px] font-semibold text-white" @click="$store.code.deleteFile(node.path)">Delete</button>
                     <button class="rounded px-1.5 py-0.5 text-[10px] font-medium hover:bg-wash" @click="$store.code.confirmDelete = null">Cancel</button>
                 </div>
 
