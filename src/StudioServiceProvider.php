@@ -4,25 +4,29 @@ namespace Designer\Studio;
 
 use Designer\Studio\Console\Commands\DevReset;
 use Designer\Studio\Console\Commands\PublishAssets;
-use Designer\Studio\Console\Commands\SeedSampleData;
 use Designer\Studio\Console\Commands\SyncDesigns;
 use Designer\Studio\Console\Commands\TemplatesImport;
 use Designer\Studio\Console\Commands\TemplatesSync;
 use Designer\Studio\Console\Commands\Uninstall;
 use Designer\Studio\Livewire\EditorPanel;
-use Designer\Studio\Services\BladeGenerator;
+use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\StudioStorage;
+use Designer\Studio\Support\SitePaths;
 use Designer\Studio\Support\StudioAssets;
 use Designer\Studio\View\Components\Layouts\App;
 use Designer\Studio\View\Components\Layouts\Iframe;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
+/**
+ * The editor. The site itself is served by the runtime provider installed
+ * into the app (app/Providers/DesignerServiceProvider.php), which is why
+ * nothing here registers a public route: remove this package and the site
+ * keeps working.
+ */
 class StudioServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -35,19 +39,22 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(\Designer\Studio\Services\Storage\LayoutRepository::class);
         $this->app->singleton(\Designer\Studio\Services\Storage\BlockRepository::class);
         $this->app->singleton(ComponentRepository::class);
-        $this->app->singleton(BladeGenerator::class);
         $this->app->singleton(\Designer\Studio\Services\PublishService::class);
-        $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
         $this->app->singleton(\Designer\Studio\Services\Storage\SiteRepository::class);
         $this->app->singleton(\Designer\Studio\Services\SectionRenderer::class);
+        $this->app->singleton(\Designer\Studio\Services\RenderContext::class);
         $this->app->singleton(\Designer\Studio\Services\Storage\CollectionRepository::class);
         $this->app->singleton(\Designer\Studio\Services\CollectionBinder::class);
         $this->app->singleton(\Designer\Studio\Services\MediaLibrary::class);
         $this->app->singleton(\Designer\Studio\Support\SiteChrome::class);
         $this->app->singleton(\Designer\Studio\Services\Templates\TemplateSync::class);
         $this->app->singleton(\Designer\Studio\Services\Templates\TemplateCatalog::class);
-        $this->app->singleton(\Designer\Studio\Services\Templates\SectionTagParser::class);
         $this->app->singleton(\Designer\Studio\Services\Templates\TemplateChrome::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\SiteReader::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\SiteWriter::class);
+        $this->app->singleton(SiteMirror::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\SiteInstaller::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\RuntimeInstaller::class);
         $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
     }
 
@@ -56,17 +63,12 @@ class StudioServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
 
-        // Register the page catch-all in a booted callback so it lands AFTER
-        // every app route (package boot() runs before app routes load — the
-        // app's own routes must always win over Studio pages). When routes
-        // are cached the cached copy already contains these static routes,
-        // so re-registering is skipped — pages are resolved from storage at
-        // request time, making the whole thing route:cache-safe.
-        $this->app->booted(function () {
-            if (!$this->app->routesAreCached()) {
-                $this->registerPageRoutes();
-            }
-        });
+        // Sections compose the site's other components (<x-nav>, an icon…).
+        // The runtime provider registers the same path for the live site;
+        // Studio needs it for the canvas even before that provider exists.
+        if (is_dir(SitePaths::components())) {
+            Blade::anonymousComponentPath(SitePaths::components());
+        }
 
         // NOTE: No migrations - we use JSON file storage!
 
@@ -88,7 +90,6 @@ class StudioServiceProvider extends ServiceProvider
             $this->commands([
                 DevReset::class,
                 PublishAssets::class,
-                SeedSampleData::class,
                 SyncDesigns::class,
                 TemplatesImport::class,
                 TemplatesSync::class,
@@ -108,10 +109,6 @@ class StudioServiceProvider extends ServiceProvider
                     => resource_path('views/vendor/studio/components/layouts/iframe.blade.php'),
             ], 'studio-iframe-layout');
 
-            $this->publishes([
-                __DIR__ . '/../resources/views/designer' => resource_path('views/designer'),
-            ], 'studio-designs');
-
             $publishableAssets = [];
             foreach (StudioAssets::FILES as $file) {
                 $publishableAssets[__DIR__ . '/../dist/' . $file] = public_path(StudioAssets::PUBLISH_PATH . '/' . $file);
@@ -119,18 +116,11 @@ class StudioServiceProvider extends ServiceProvider
             $this->publishes($publishableAssets, 'studio-assets');
         }
 
-        // Auto-publish design files on first boot if not already present
-        $this->publishDesignsOnInstall();
-
         // Initialize storage directories on first request
         $this->app->booted(function () {
             if (!$this->app->runningInConsole()) {
                 $storage = $this->app->make(StudioStorage::class);
                 $storage->ensureDirectoryExists();
-                $storage->ensureDirectoryExists('pages');
-                $storage->ensureDirectoryExists('layouts');
-                $storage->ensureDirectoryExists('blocks');
-                $storage->ensureDirectoryExists('collections');
                 $storage->ensureDirectoryExists('components/library');
 
                 if (config('studio.draft_mode', true)) {
@@ -138,63 +128,15 @@ class StudioServiceProvider extends ServiceProvider
                 }
             }
         });
-    }
 
-    /**
-     * Copy the packaged design files into resources/views/designer.
-     *
-     * Existing files are never overwritten (they belong to the app once
-     * published), but new sections shipped in package updates are added.
-     * Runs only for studio requests to keep application boot free of
-     * filesystem scans.
-     */
-    protected function publishDesignsOnInstall(): void
-    {
-        if ($this->app->runningInConsole()) {
-            return;
-        }
-
-        $prefix = trim(config('studio.path', 'studio'), '/');
-        $request = $this->app['request'] ?? null;
-
-        if (!$request || (!$request->is($prefix) && !$request->is($prefix . '/*'))) {
-            return;
-        }
-
-        $destination = resource_path('views/designer');
-        $source = __DIR__ . '/../resources/views/designer';
-
-        if (!is_dir($source)) {
-            return;
-        }
-
-        $filesystem = new Filesystem;
-
-        if (!is_dir($destination)) {
-            $filesystem->ensureDirectoryExists($destination);
-            $filesystem->copyDirectory($source, $destination);
-
-            return;
-        }
-
-        // Merge-copy: add files that don't exist locally yet
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS)
-        );
-
-        foreach ($iterator as $file) {
-            if ($file->isDir()) {
-                continue;
+        // With draft mode off, edits go straight to the live documents —
+        // which mirror the site's files, so write them back once the
+        // request is done.
+        $this->app->terminating(function () {
+            if ($this->app->resolved(StudioStorage::class) && $this->app->make(StudioStorage::class)->consumeLiveChanges()) {
+                $this->app->make(SiteMirror::class)->flush();
             }
-
-            $relative = substr($file->getPathname(), strlen($source) + 1);
-            $target = $destination . '/' . $relative;
-
-            if (!file_exists($target)) {
-                $filesystem->ensureDirectoryExists(dirname($target));
-                $filesystem->copy($file->getPathname(), $target);
-            }
-        }
+        });
     }
 
     protected function registerAssetDirectives(): void
@@ -209,47 +151,6 @@ class StudioServiceProvider extends ServiceProvider
 
         Blade::directive('studioIframeCore', function () {
             return '<?php echo \'<script src="\' . \Designer\Studio\Support\StudioAssets::url("studio.js") . \'" defer></script>\'; ?>';
-        });
-    }
-
-    /**
-     * Two STATIC routes serve every published page — which pages exist is
-     * decided at request time by looking in storage, never at registration
-     * time. Route definitions that don't depend on content survive
-     * `route:cache` and pick up newly published pages instantly.
-     */
-    protected function registerPageRoutes(): void
-    {
-        if (!config('studio.page_routing.enabled', true)) {
-            return;
-        }
-
-        $middleware = config('studio.page_routing.middleware', ['web']);
-        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
-
-        $pruner = $this->app->make(\Designer\Studio\Support\WelcomeRoutePruner::class);
-
-        Route::middleware($middleware)->group(function () use ($homeSlug, $pruner) {
-            // The home page — only when the app hasn't claimed '/' itself.
-            // (The stock welcome route is auto-removed by WelcomeRoutePruner
-            // when the site is seeded, published, or the editor loads.)
-            if (!$pruner->appDefinesRootRoute()) {
-                Route::get('/', [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
-                    ->defaults('slug', $homeSlug)
-                    ->name('studio.page.home');
-            }
-
-            if (config('studio.page_routing.sitemap', true)) {
-                Route::get('/sitemap.xml', [\Designer\Studio\Http\Controllers\PageController::class, 'sitemap'])
-                    ->name('studio.sitemap');
-            }
-
-            // Every other page: a single-segment catch-all, registered after
-            // all app routes so it can never shadow them. Unknown slugs 404
-            // in the controller.
-            Route::get('/{slug}', [\Designer\Studio\Http\Controllers\PageController::class, 'show'])
-                ->where('slug', '[a-z0-9-]+')
-                ->name('studio.page.show');
         });
     }
 }

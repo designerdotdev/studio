@@ -7,6 +7,7 @@ use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\LayoutRepository;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\StudioStorage;
+use Designer\Studio\Support\SitePaths;
 use Designer\Studio\Support\SiteUrls;
 
 /**
@@ -34,25 +35,24 @@ class SystemPrompt
         $base = base_path();
         $storageRel = $this->relative($this->storage->getBasePath());
         $workspace = $this->storage->workspace() === 'draft' ? $storageRel . '/draft' : $storageRel;
-        $designs = $this->relative(resource_path('views/designer'));
+        $site = $this->relative(SitePaths::resources());
+        $public = $this->relative(SitePaths::public());
 
         $lines = [
-            'You are the Assistant inside Designer Studio, a visual page builder that stores its site as JSON files and renders sections written as Blade templates. You are running from the Laravel application at ' . $base . '. Make the change the user asks for directly by editing files, then reply with one or two sentences saying what you changed. Do not ask for confirmation for ordinary edits.',
+            'You are the Assistant inside Designer Studio, a visual page builder for the Blade site installed in this Laravel application at ' . $base . '. Make the change the user asks for directly by editing files, then reply with one or two sentences saying what you changed. Do not ask for confirmation for ordinary edits.',
             '',
             '## Where things live',
-            "- Site data (JSON): `{$workspace}/` — the EDITOR WORKS IN THIS TREE. `pages/<slug>.json` (a page: `title`, `slug`, `meta`, `layout_ref`, and `components`, an ordered list of section instances `{id, component_ref, order, variables, bindings?, hidden?}`), `layouts/<slug>.json` (shared header/footer sections around a `@content` slot with id `__content__`), `blocks/<slug>.json` (global sections placed on several pages), `collections/<name>.json` (`fields` schema + `rows`), `site/data.json` (site-wide values sections read as `\$site`, plus theme CSS and fonts).",
-            "- The live tree is `{$storageRel}/` (no `draft/`). Never edit it directly — the user publishes drafts from the editor.",
-            "- Packaged section templates: `{$designs}/<category>/<name>.html` + `<name>.yml` (the yml declares `name`, `title`, `category` and `fields`: text, textarea, url, select, toggle, colorpicker, image, repeater with `sub_fields`). The `name` key is the identity; `component_ref` in page JSON refers to it.",
-            "- Imported site-template sections (names starting `tpl-`) have no files in that folder: each lives in the component library at `{$storageRel}/components/library/<name>.json`, with its Blade in the `html` key (JSON-escaped) and its fields in `fields`. Edit that JSON to change the section; keep it valid JSON. They may use `\$item->key` and `@props`.",
-            "- Supporting Blade components for imported templates: `resources/views/components/studio-templates/<template>/`.",
-            "- Uploaded images: `public/studio-uploads/` (URL `/studio-uploads/<path>`).",
+            "- The site's source: `{$site}/` — `views/pages/*.blade.php` (one page per URL, `index.blade.php` is `/`; a page is `<x-layouts.main title=\"…\">` wrapping section tags like `<x-sections.hero heading=\"…\" :items=\"\$posts\"/>`), `views/components/` (anonymous Blade components: `sections/<name>.blade.php` + a `<name>.yml` declaring the section's editable `fields`, `layouts/*.blade.php` document shells with `{{ \$slot }}`, supporting components like `nav`/`footer`), `data/site.json` (read everywhere as `\$site`), `data/collections/<name>.json` (read everywhere as `\$<name>`), `css/*.css` (Tailwind v4 with `@theme` tokens), `designer.json` (page titles, SEO, order).",
+            "- The site's public files: `{$public}/` (URL `/designer/<path>`) — images, scripts, uploads.",
+            "- These files ARE the live site: `app/Providers/DesignerServiceProvider.php` serves them. Sections, layouts, CSS, and data edited here are live immediately.",
+            "- The editor's unpublished draft of the pages: `{$workspace}/` — `pages/<slug>.json` (`components` is the ordered list of section instances `{id, component_ref, order, variables, bindings?, hidden?}`), `layouts/`, `blocks/`, `collections/`, `site/data.json`. The user edits these in the canvas and publishes them into the page files.",
             '',
             '## How to make changes',
-            '- To change copy or settings of a section on a page, edit that instance\'s `variables` in the page JSON (keys are the field keys from the section yml). Keep `id`, `order` and `component_ref` intact and keep the JSON valid.',
-            '- A repeater with an entry in `bindings` (e.g. `{"items": "collections.posts"}`) takes its rows from that collection — edit `collections/<name>.json` rows instead of the instance.',
-            '- To change how a section looks, edit its `.html` (and `.yml` when adding or renaming fields). Sections render with Laravel Blade: `{{ $var }}`, `@if`, `@foreach($items as $item)` with `$item[\'key\']` or `$item->key`, Alpine attributes for behaviour. Never put Blade echoes inside Alpine attributes. Use Tailwind utility classes; keep the section\'s existing palette and spacing.',
-            '- To add a section to a page, append an instance to `components` with a new UUID `id`, the next `order`, and `variables` for the fields you want to set (unset fields fall back to the yml defaults).',
-            '- After editing files nothing else is required — the editor re-reads storage and re-syncs section files automatically.',
+            '- To change copy or settings of a section on the page the user is looking at, edit that instance\'s `variables` in the DRAFT page JSON (keys are the field keys from the section\'s `.yml`), keeping `id`, `order`, and `component_ref` intact and the JSON valid — the canvas shows it at once and it goes live when the user publishes. Never edit the live tree `' . $storageRel . '/pages/` directly.',
+            '- A field with an entry in `bindings` takes its value from elsewhere: `collections.<name>` → edit the draft `collections/<name>.json` rows; `site.<key>` → edit the draft `site/data.json` `data`.',
+            '- To change how a section looks, edit its `.blade.php` (and its `.yml` when adding or renaming fields; keep each field\'s key equal to the `@props` name). Sections render with Laravel Blade: `@props`, `{{ $var }}`, `@foreach($items as $item)` with `$item->key`, Alpine attributes for behaviour. Never put Blade echoes inside Alpine attributes. Use Tailwind utility classes and the site\'s own theme tokens.',
+            '- To add a section to a page, append an instance to the draft page\'s `components` with a new UUID `id`, the next `order`, the section\'s `component_ref` (its library name, e.g. `sections-hero` for `sections/hero`), and `variables` for the fields you want to set (unset fields fall back to the yml defaults).',
+            '- After editing files nothing else is required — the editor re-reads the site and re-syncs sections automatically.',
             '- Do not run the dev server, build tools, or git commands unless asked. Do not touch `vendor/` or `node_modules/`.',
             '',
         ];
@@ -74,7 +74,7 @@ class SystemPrompt
         $home = SiteUrls::homeSlug();
         $lines = [
             '## The page open in the editor',
-            "- `{$page->title}` — file `pages/{$page->slug}.json`, URL " . ($page->slug === $home ? '/' : "/{$page->slug}"),
+            "- `{$page->title}` — draft `pages/{$page->slug}.json`, published as `views/pages/" . ($page->slug === $home ? 'index' : $page->slug) . ".blade.php`, URL " . ($page->slug === $home ? '/' : "/{$page->slug}"),
         ];
 
         $instances = collect($page->components)->sortBy('order')->values();
@@ -124,10 +124,8 @@ class SystemPrompt
             $lines[] = '- Section `' . ($section['ref'] ?? '?') . '`' . ($component ? " ({$component->title})" : '') . ' on ' . $where . ', instance id `' . ($section['id'] ?? '?') . '`.';
 
             if ($component) {
-                $where = str_starts_with($component->source, 'template:')
-                    ? '`' . $this->relative($this->storage->getBasePath()) . '/components/library/' . $component->name . '.json` (its Blade is the `html` key)'
-                    : '`' . $this->relative(resource_path('views/designer')) . '/' . $component->category . '/' . $component->name . '.html` + `.yml`';
-                $lines[] = '  Its template: ' . $where . '. Fields: ' . implode(', ', array_keys($component->fields)) . '.';
+                $where = '`' . $this->relative(SitePaths::components($component->path)) . '.blade.php` + `.yml`';
+                $lines[] = '  Its source: ' . $where . ' (tag `<x-' . $component->tag . '>`). Fields: ' . implode(', ', array_keys($component->fields)) . '.';
             }
         }
 

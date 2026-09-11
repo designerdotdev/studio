@@ -19,6 +19,10 @@ class ComponentData
         public readonly array $preview_variables,
         public readonly string $source,
         public readonly bool $fixed = false,
+        /** The Blade tag a page writes for it, e.g. `sections.hero` for <x-sections.hero> */
+        public readonly string $tag = '',
+        /** Source file, relative to resources/designer/views/components (no extension) */
+        public readonly string $path = '',
     ) {}
 
     public static function fromArray(array $data): self
@@ -38,6 +42,8 @@ class ComponentData
             preview_variables: $data['preview_variables'] ?? [],
             source: $data['source'] ?? 'local',
             fixed: (bool) ($data['fixed'] ?? false),
+            tag: (string) ($data['tag'] ?? ''),
+            path: (string) ($data['path'] ?? ''),
         );
     }
 
@@ -113,6 +119,8 @@ class ComponentData
             'preview_variables' => $this->preview_variables,
             'source' => $this->source,
             'fixed' => $this->fixed,
+            'tag' => $this->tag,
+            'path' => $this->path,
         ];
     }
 }

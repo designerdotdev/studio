@@ -17,20 +17,11 @@
         class="s-canvas relative h-full w-full overflow-y-auto"
         x-data="{
             step: 1,
-            selected: 'atlas',
+            selected: @js(array_key_first($templates)),
             applying: false,
 
             showTemplates() {
                 this.step = 2;
-                this.$nextTick(() => {
-                    this.$root.querySelectorAll('[data-template-preview]').forEach((el) => {
-                        const frame = el.querySelector('iframe');
-                        if (!frame) return;
-                        const scale = el.offsetWidth / 1280;
-                        frame.style.transform = `scale(${scale})`;
-                        frame.style.height = `${Math.ceil(el.offsetHeight / scale)}px`;
-                    });
-                });
             },
 
             async apply() {
@@ -51,6 +42,7 @@
                         window.location.href = data.redirect;
                         return;
                     }
+                    window.Studio?.toast(data.message || 'The template could not be installed', 'error', 8000);
                 } catch (e) {
                     window.Studio?.toast('Something went wrong — please try again', 'error');
                 }
@@ -86,12 +78,12 @@
         </div>
 
         {{-- Step 2 — Template picker --}}
-        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
+        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-4xl px-6 py-12 lg:py-16">
             <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                     <p class="s-microlabel">Step 2 of 2</p>
                     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-ink">Pick a starting point</h1>
-                    <p class="mt-1.5 text-[13.5px] text-soft">Whole sites, ready to edit. You can add, remove, and rewrite everything.</p>
+                    <p class="mt-1.5 text-[13.5px] text-soft">Whole sites, ready to edit. Its files are added to your app in <span class="font-mono text-[12px] text-ink/80">resources/designer</span> and <span class="font-mono text-[12px] text-ink/80">public/designer</span> — yours to keep, with or without Studio.</p>
                 </div>
                 <button @click="step = 1" class="s-btn-ghost shrink-0">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>
@@ -99,7 +91,7 @@
                 </button>
             </div>
 
-            <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
                 @foreach($templates as $key => $template)
                     <button
                         type="button"
@@ -116,35 +108,14 @@
                             class="pointer-events-none relative block w-full overflow-hidden bg-white"
                             style="aspect-ratio: 16/11"
                         >
-                            @if($template['preview'] === 'none')
-                                <span class="absolute inset-0 flex items-center justify-center bg-[#fafafa]">
-                                    <span class="flex h-full w-full items-center justify-center" style="background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px); background-size: 18px 18px;">
-                                        <span class="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 text-neutral-300">
-                                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                                        </span>
-                                    </span>
-                                </span>
-                            @elseif($template['preview'] === 'thumbnail')
-                                {{-- A repository template ships its own picture; rendering it
-                                     live would mean installing it first. --}}
-                                <img
-                                    src="{{ route('studio.preview.thumbnail', ['name' => $key]) }}"
-                                    loading="lazy"
-                                    alt="{{ $template['title'] }} preview"
-                                    class="absolute inset-0 h-full w-full object-cover object-top"
-                                >
-                                <span class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/5 to-transparent"></span>
-                            @else
-                                <iframe
-                                    src="{{ route('studio.preview.template', ['name' => $key]) }}"
-                                    loading="lazy"
-                                    tabindex="-1"
-                                    title="{{ $template['title'] }} preview"
-                                    class="absolute left-0 top-0 origin-top-left border-0 bg-white"
-                                    style="width: 1280px; height: 880px; transform: scale(0.264)"
-                                ></iframe>
-                                <span class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/5 to-transparent"></span>
-                            @endif
+                            {{-- Each template ships a picture of itself --}}
+                            <img
+                                src="{{ route('studio.preview.thumbnail', ['name' => $key]) }}"
+                                loading="lazy"
+                                alt="{{ $template['title'] }} preview"
+                                class="absolute inset-0 h-full w-full object-cover object-top"
+                            >
+                            <span class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/5 to-transparent"></span>
 
                             {{-- Selected check --}}
                             <span
@@ -181,7 +152,7 @@
             x-cloak
             class="sticky bottom-0 z-20 border-t border-line bg-shell/85 shadow-[0_-16px_40px_-16px_rgba(0,0,0,0.65)] backdrop-blur-xl"
         >
-            <div class="mx-auto flex w-full max-w-6xl items-center gap-4 px-6 py-3.5">
+            <div class="mx-auto flex w-full max-w-4xl items-center gap-4 px-6 py-3.5">
                 <p class="hidden text-xs text-faint sm:block">Tip: double-click a template to jump straight in.</p>
 
                 <div class="ml-auto flex items-center gap-3">

@@ -3,7 +3,7 @@
 namespace Designer\Studio\Console\Commands;
 
 use Designer\Studio\Services\Storage\StudioStorage;
-use Designer\Studio\Services\BladeGenerator;
+use Designer\Studio\Support\SitePaths;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 
@@ -11,48 +11,37 @@ class Uninstall extends Command
 {
     protected $signature = 'studio:uninstall
                             {--force : Skip confirmation prompts}
-                            {--keep-generated : Keep generated Blade files}
-                            {--keep-data : Keep JSON data files}';
+                            {--keep-data : Keep the editor\'s data (drafts, the section library, template downloads)}';
 
-    protected $description = 'Cleanly remove Designer Studio from your application';
+    protected $description = 'Remove Designer Studio from your application — your site keeps working';
 
-    public function handle(StudioStorage $storage, BladeGenerator $generator): int
+    public function handle(StudioStorage $storage): int
     {
         $this->info('Designer Studio Uninstall');
         $this->line('');
 
-        if (!$this->option('force')) {
-            if (!$this->confirm('This will remove Designer Studio data. Continue?')) {
-                $this->line('Uninstall cancelled.');
-
-                return 0;
-            }
+        if (SitePaths::installed()) {
+            $this->line('Your site stays: ' . SitePaths::relative(SitePaths::resources()) . ' and ' . SitePaths::relative(SitePaths::public()) . ',');
+            $this->line('served by app/Providers/DesignerServiceProvider.php, which does not need Studio.');
+            $this->comment('Anything still in the draft (unpublished) is not part of the site and will be lost.');
+            $this->line('');
         }
 
-        // 1. Remove generated Blade files
-        if (!$this->option('keep-generated')) {
-            $this->line('Removing generated Blade files...');
-            $generator->purge();
-            $this->info('  Done.');
-        } else {
-            $this->line('Keeping generated Blade files.');
+        if (!$this->option('force') && !$this->confirm('Remove Designer Studio\'s editor data?', true)) {
+            $this->line('Uninstall cancelled.');
+
+            return self::SUCCESS;
         }
 
-        // 2. Remove JSON data
         if (!$this->option('keep-data')) {
-            $this->line('Removing JSON data files...');
+            $this->line('Removing editor data (' . SitePaths::relative($storage->getBasePath()) . ')...');
             $storage->purge();
             $this->info('  Done.');
-
-            // Template imports also write outside the storage tree
-            $this->line('Removing imported template files...');
-            app(\Designer\Studio\Services\Templates\TemplateImporter::class)->purgeInstalled();
-            $this->info('  Done.');
         } else {
-            $this->line('Keeping JSON data files.');
+            $this->line('Keeping editor data.');
         }
 
-        // 3. Drop legacy database tables if they exist
+        // Drop legacy database tables if they exist
         if (Schema::hasTable('template_settings')) {
             if ($this->option('force') || $this->confirm('Drop legacy template_settings table?', true)) {
                 Schema::dropIfExists('template_settings');
@@ -64,10 +53,10 @@ class Uninstall extends Command
         $this->info('Designer Studio has been uninstalled.');
         $this->line('');
         $this->comment('To complete removal:');
-        $this->line('1. Remove from composer.json: composer remove designer/studio');
-        $this->line('2. Remove published config: rm config/studio.php');
-        $this->line('3. Remove published views (if any): rm -rf resources/views/vendor/studio');
+        $this->line('1. Remove the package: composer remove designer/studio');
+        $this->line('2. Remove published config (if any): rm config/studio.php');
+        $this->line('3. Remove published views and assets (if any): rm -rf resources/views/vendor/studio public/vendor/studio');
 
-        return 0;
+        return self::SUCCESS;
     }
 }

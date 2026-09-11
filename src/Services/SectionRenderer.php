@@ -4,35 +4,31 @@ namespace Designer\Studio\Services;
 
 use Designer\Studio\DataTransferObjects\ComponentData;
 use Designer\Studio\Services\Storage\ComponentRepository;
-use Designer\Studio\Services\Storage\SiteRepository;
 use Designer\Studio\Support\DataBag;
 use Illuminate\Support\Facades\Blade;
 
 /**
  * The one place a section turns into HTML.
  *
- * Studio used to render sections three ways — real Blade on the server, a
- * hand-written JavaScript subset for live canvas edits, and a static
- * evaluator for Blade exports — which meant a section could only use the
- * syntax all three understood. Every path now comes through here, so a
- * section may use anything Laravel's own compiler accepts: `@props`,
- * `$loop`, comparisons, nested conditionals, `@php`, and nested
- * `<x-…>` components.
+ * Every Studio render path comes through here — the canvas, live edits, the
+ * draft preview, and the library thumbnails — and it compiles the section's
+ * own Blade source (resources/designer/views/components/…) with Laravel's
+ * compiler, so a section may use anything Blade accepts: `@props`, `$loop`,
+ * nested conditionals, and nested `<x-…>` components.
  *
- * Two things are added to the variables on the way in:
+ * The variables a section sees match what the site's runtime gives it:
  *
- *  - arrays become {@see DataBag}s, so `$item['title']` and `$item->title`
- *    both resolve (Studio's own sections use the first, the site-templates
- *    repos use the second);
- *  - `$site` is injected from the site document, which is how an imported
- *    template's sections reach shared content like the company name.
+ *  - its own values, with arrays wrapped as {@see DataBag}s so both
+ *    `$item['title']` and `$item->title` resolve;
+ *  - `$site` and every collection by its file name (`$posts`), shared the
+ *    way the runtime shares them — see {@see RenderContext}.
  */
 class SectionRenderer
 {
     public function __construct(
         protected ComponentRepository $components,
-        protected SiteRepository $site,
         protected CollectionBinder $binder,
+        protected RenderContext $globals,
     ) {}
 
     /**
@@ -81,20 +77,15 @@ class SectionRenderer
     }
 
     /**
-     * The variable set a section actually sees: its own fields (arrays
-     * wrapped for dual access) plus `$site`, unless the section declares a
-     * field of its own by that name.
+     * The variable set a section actually sees: its own values (arrays
+     * wrapped for dual access) over the site-wide globals.
      */
     public function context(array $variables): array
     {
-        $context = [];
+        $context = $this->globals->globals();
 
         foreach ($variables as $key => $value) {
             $context[$key] = DataBag::wrap($value);
-        }
-
-        if (!array_key_exists('site', $context)) {
-            $context['site'] = new DataBag($this->site->data());
         }
 
         return $context;

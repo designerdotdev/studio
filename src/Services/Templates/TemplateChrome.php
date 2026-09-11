@@ -6,31 +6,32 @@ use Designer\Studio\Support\DataBag;
 use Illuminate\Support\Facades\Blade;
 
 /**
- * Reads a template's page layout for everything that isn't a section.
+ * Reads a site's page layout for everything that isn't a section.
  *
- * `components/layouts/main.blade.php` is where a template keeps the parts
- * every page shares: the font links, the stylesheet it compiles with Vite,
- * the script its motion depends on, and the classes on `<html>` and
- * `<body>` that set the page's colour and type. Studio has no Vite build
- * and no layout file of its own, so those are lifted out here and stored on
- * the site document instead.
+ * `components/layouts/main.blade.php` is where a site keeps the parts every
+ * page shares: the font links, the stylesheets it hands to `@vite`, the
+ * script its motion depends on, and the classes on `<html>` and `<body>`
+ * that set the page's colour and type. Studio's canvas renders sections one
+ * by one rather than through that layout, so those parts are lifted out
+ * here and stamped onto the canvas document instead.
  *
- * Head fragments are compiled against the template's site data first, since
- * a font URL is often written as `{{ $site->theme->fonts_url ?? '…' }}`.
+ * Head fragments are compiled against the site data first, since a font
+ * URL is often written as `{{ $site->theme->fonts_url ?? '…' }}`.
  */
 class TemplateChrome
 {
     /**
+     * @param  callable(string): ?string  $stylesheet  path of a `@vite` entry, or null
      * @return array{head_html: string, scripts: string[], theme_css: string, body_class: string, html_class: string}
      */
-    public function extract(string $layoutSource, string $templateDir, array $siteData, TemplateAssets $assets): array
+    public function extract(string $layoutSource, array $siteData, callable $stylesheet): array
     {
         $head = $this->section($layoutSource, 'head');
 
         return [
-            'head_html' => $assets->rewrite($this->headHtml($head, $siteData)),
-            'scripts' => array_map(fn ($src) => $assets->rewrite($src), $this->scripts($head)),
-            'theme_css' => $assets->rewrite($this->themeCss($head, $templateDir)),
+            'head_html' => $this->headHtml($head, $siteData),
+            'scripts' => $this->scripts($head),
+            'theme_css' => $this->themeCss($head, $stylesheet),
             'body_class' => $this->bodyClass($layoutSource, $siteData),
             'html_class' => $this->attributeClass($layoutSource, 'html', $siteData),
         ];
@@ -82,9 +83,9 @@ class TemplateChrome
      * The stylesheets the layout hands to Vite, concatenated in the order it
      * lists them — tokens first, then the rules that use them.
      */
-    protected function themeCss(string $head, string $templateDir): string
+    protected function themeCss(string $head, callable $stylesheet): string
     {
-        if (!preg_match('/@vite\s*\(\s*\[(.*?)\]\s*\)/s', $head, $match)) {
+        if (!preg_match('/@vite\s*\(\s*\[?(.*?)\]?\s*\)/s', $head, $match)) {
             return '';
         }
 
@@ -92,9 +93,9 @@ class TemplateChrome
 
         if (preg_match_all('/["\']([^"\']+\.css)["\']/', $match[1], $paths)) {
             foreach ($paths[1] as $relative) {
-                $file = $templateDir . '/files/' . ltrim($relative, '/');
+                $file = $stylesheet($relative);
 
-                if (is_file($file)) {
+                if ($file !== null && is_file($file)) {
                     $parts[] = "/* {$relative} */\n" . file_get_contents($file);
                 }
             }

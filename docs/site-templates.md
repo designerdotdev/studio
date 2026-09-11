@@ -1,26 +1,39 @@
-# Site templates
+# Site templates and the installed site
 
 A site template is a whole starter site — pages, sections, a palette, and its own assets —
-living in its own git repository. One template is maintained in one place and installed into
-any app that runs Studio.
+living in its own git repository in the DevDojo `site-templates` format. Studio installs one
+into your Laravel app, and from then on **the site is a set of ordinary files in your app**:
 
-The format is the one the DevDojo `site-templates` organisation already publishes, so the
-repositories are shared rather than duplicated.
-
-## Using one
-
-```bash
-php artisan studio:templates:sync --list          # what is catalogued, what is on disk
-php artisan studio:templates:sync                 # clone or fast-forward every entry
-php artisan studio:templates:sync --template=monarch
-php artisan studio:templates:import monarch       # build a site from it
+```
+resources/designer/        the site's source (the template's files/resources)
+public/designer/           the site's public files (the template's files/public)
+app/Providers/DesignerServiceProvider.php   the runtime that serves the site
 ```
 
-Synced templates also appear in the first-run picker at `/studio`, alongside the templates
-built into the package. Picking one there runs the same import.
+Studio is the editor for those files. Remove it (`composer remove designer/studio`) and the
+site keeps working, because nothing it serves comes from the package.
 
-Importing **replaces** the current site — every page, layout, and block. Pass `--keep` to
-import alongside what is already there instead.
+## Installing one
+
+Pick a template on the first visit to `/studio`, or from the console:
+
+```bash
+php artisan studio:templates:import pilot            # install into an app with no site yet
+php artisan studio:templates:import monarch --force  # replace the installed site
+php artisan studio:templates:sync --list             # what is catalogued and downloaded
+```
+
+Installing:
+
+1. downloads the repository (a shallow git clone, cached in `storage/studio/templates`);
+2. copies `files/resources/**` to `resources/designer/**` and `files/public/**` to
+   `public/designer/**` — only those files, nothing else from the repository;
+3. moves every URL that points at a public file (`/images/hero.jpg` →
+   `/designer/images/hero.jpg`) and points the layout's `@vite([...])` entries at
+   `resources/designer/css/…`;
+4. writes `app/Providers/DesignerServiceProvider.php` (if it is not there already) and
+   registers it in `bootstrap/providers.php`;
+5. reads the new site into the editor.
 
 ## The catalog
 
@@ -28,69 +41,95 @@ import alongside what is already there instead.
 
 ```php
 'templates' => [
-    'path' => resource_path('studio-templates'),
+    'path' => storage_path('studio/templates'),
     'catalog' => [
+        'pilot' => [
+            'repo' => 'https://github.com/site-templates/pilot',
+            'name' => 'Pilot',
+            'description' => '…',
+        ],
         'monarch' => 'https://github.com/site-templates/monarch',
     ],
 ],
 ```
 
-The catalog is the authority on which templates exist. Sync clones each entry into `path`
-and prunes folders that have left the list. That folder ignores its own contents, so the
-clones never reach the host app's git history.
+The catalog decides which templates the picker offers. An entry is a repository URL, or an
+array with a `repo` plus the `name`/`description` shown before it is downloaded (the picture
+comes from the repository's `thumbnail.png`).
 
-The clones are ordinary git checkouts: edit one in place, then commit and push from inside
-its folder. A clone holding uncommitted or unpushed work is never reset — sync reports it
-and moves on, and only `--force` discards it.
+A downloaded clone is an ordinary checkout; one holding uncommitted or unpushed work is never
+reset — sync reports it and moves on, and only `--force` discards it.
 
-## What a repository looks like
+## What the installed site looks like
 
 ```
-template.json                       name, description, page list
-thumbnail.png                       the picture shown in the picker
-files/
-  public/                           images, js, favicon
-  resources/
-    css/*.css                       @theme tokens and the site's own rules
-    data/site.json                  site-wide content, read as $site
-    data/collections/*.json         repeating rows, bound to sections
-    views/pages/*.blade.php         one file per page
-    views/components/
-      layouts/main.blade.php        fonts, stylesheet, scripts, nav, footer
-      sections/*.blade.php + .yml   the sections
-      *.blade.php                   supporting components (no .yml)
+resources/designer/
+  designer.json                       page titles, SEO settings, order, renamed-page redirects
+  css/*.css                           Tailwind v4 with @theme tokens
+  data/site.json                      $site, in every page and component
+  data/collections/<name>.json (+yml) $<name>, likewise; the .yml types the Content panel's columns
+  views/pages/*.blade.php             one page per URL; index.blade.php is "/"
+  views/pages/<dir>/[posts.slug].blade.php   one page per row of the posts collection
+  views/components/layouts/*.blade.php       document shells: <head> + {{ $slot }}
+  views/components/sections/*.blade.php + .yml   the sections (see authoring-sections.md)
+  views/components/blocks/*.blade.php         global blocks (created in the editor)
+public/designer/
+  images/, js/, favicon.svg, …        served as static files at /designer/…
+  uploads/                            images uploaded from the editor
 ```
 
-A component counts as a **section** when it ships a `.yml` beside it. That file is the
-template's own contract for what an editor may change, which is exactly what Studio's
-inspector needs. Everything else is a supporting component.
+It is the same shape a Pocketknife site has — the files are portable Blade.
 
-## What the import does
+## The runtime
 
-| From | To |
-| --- | --- |
-| `sections/*.blade.php` + `.yml` | library components, named `<template>-<section>` |
-| supporting components | `resources/views/components/studio-templates/<template>/`, tags rewritten |
-| `data/collections/*` | the values stored on each section instance |
-| `data/site.json` | the site document, injected into sections as `$site` |
-| `pages/*.blade.php` | Studio pages |
-| `layouts/main.blade.php` | a Studio layout, plus the site's fonts, theme CSS, and scripts |
-| `public/*` | `public/studio-templates/<template>/`, with every URL rewritten |
+`DesignerServiceProvider` is written into your app and depends only on Laravel:
 
-The template's stylesheet is stored on the site document and handed to Tailwind's browser
-build as `<style type="text/tailwindcss">`, which is what lets its `@theme` tokens become
-real utilities (`bg-canvas`, `text-ink`) with no build step.
+- registers `resources/designer/views/components` as an anonymous component path, so
+  `<x-sections.hero>` and `<x-layouts.main>` resolve;
+- answers from `Route::fallback`, so **your own routes always win**: a page, a
+  `[collection.field]` page, `/sitemap.xml`, a 301 for a renamed page, or the site's own
+  `404.blade.php`;
+- shares `$site`, every collection, and every `data/content/<dir>/*.md` folder with the page;
+- renders `@vite([...])` entries under `resources/designer` for Tailwind's browser build (the
+  stylesheet inlined in `<style type="text/tailwindcss">`), so the site needs no build step —
+  every other `@vite` entry goes to your app's own Vite as usual;
+- adds each page's SEO settings from `designer.json` (canonical URL, robots, Open Graph, X,
+  JSON-LD, extra head HTML) to the head its layout writes.
 
-Section names are prefixed with the template slug, so several templates can be installed
-side by side without colliding.
+It survives `route:cache` and is yours to edit — Studio never overwrites it once it exists.
 
-## What does not come across
+## How the editor works with the files
 
-**Collection-driven pages.** A file like `pages/guides/[guides.slug].blade.php` is one URL
-per row of a collection. Studio routes a fixed set of pages, so these are reported and
-skipped; rebuild them as ordinary pages if you need them.
+The files are the live site. The editor keeps a **draft** of it (in `storage/studio/draft`):
+edits land there, show on the canvas and in the draft preview (`/studio/preview`), and reach
+the files when you **Publish**. Publishing edits files in place — a changed heading rewrites
+one attribute; every other byte of the file is left as it was.
 
-**Nested page URLs.** Studio page slugs are a single segment, so `pages/legal/terms.blade.php`
-becomes `/legal-terms`. The import reports every page it renames.
+The editor manages:
 
-**`404.blade.php`**, which the host application owns.
+- **pages** that are compositions — one `<x-layouts.*>` tag wrapping nothing but section
+  tags, whitespace, and comments;
+- **layouts** — the sections before and after `{{ $slot }}` in each `layouts/*.blade.php`;
+- **global blocks**, **collections**, and **site data**.
+
+Anything else stays hand-written and is left alone: the 404 page, `[collection.field]` pages,
+nested pages, and any page with markup of its own between its sections. Those are still
+served, and still editable in Code mode. A new editor page can't take a URL a hand-written
+page already has.
+
+Files changed outside the editor — in Code mode, by the Assistant, in your own editor, or by a
+deploy — are read back in on the next editor load. A change reaches the draft only where the
+draft had no unpublished edits of its own, so nobody's work is overwritten silently.
+
+Studio's own storage holds nothing the site needs: a fresh deploy with empty storage rebuilds
+it from the files on the first visit to `/studio`.
+
+## Removing Studio
+
+```bash
+php artisan studio:uninstall      # removes Studio's working data (drafts, library cache)
+composer remove designer/studio
+```
+
+`resources/designer`, `public/designer`, and `DesignerServiceProvider` stay, and the site keeps
+serving exactly what was last published.

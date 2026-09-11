@@ -25,9 +25,8 @@ Route::group([
     // Iframe preview for pages
     Route::get('/page/{slug}/iframe', [StudioController::class, 'iframe'])->where('slug', '[a-z0-9-]+')->name('page.iframe');
 
-    // Rendered previews (section picker thumbnails + onboarding templates)
+    // Rendered previews (section picker thumbnails) + template thumbnails
     Route::get('/preview/component/{name}', [StudioController::class, 'componentPreview'])->where('name', '[a-z0-9-]+')->name('preview.component');
-    Route::get('/preview/template/{name}', [StudioController::class, 'templatePreview'])->where('name', '[a-z0-9-]+')->name('preview.template');
     Route::get('/preview/block/{slug}', [StudioController::class, 'blockPreview'])->where('slug', '[a-z0-9-]+')->name('preview.block');
     Route::get('/preview/thumbnail/{name}', [StudioController::class, 'templateThumbnail'])->where('name', '[a-z0-9-]+')->name('preview.thumbnail');
 
@@ -53,10 +52,10 @@ Route::group([
         // here, so the limit is generous.
         Route::post('/render', \Designer\Studio\Http\Controllers\RenderController::class)->middleware('throttle:600,1')->name('api.render');
 
-        // Uploads (image fields)
+        // Uploads (image fields) — public/designer/uploads
         Route::post('/upload', [StudioController::class, 'upload'])->middleware('throttle:30,1')->name('api.upload');
 
-        // Media library (public/studio-uploads)
+        // Media library (public/designer)
         Route::get('/media', [\Designer\Studio\Http\Controllers\MediaController::class, 'index'])->name('api.media.index');
         Route::post('/media/upload', [\Designer\Studio\Http\Controllers\MediaController::class, 'upload'])->middleware('throttle:60,1')->name('api.media.upload');
         Route::post('/media/folder', [\Designer\Studio\Http\Controllers\MediaController::class, 'folder'])->middleware('throttle:60,1')->name('api.media.folder');
@@ -66,10 +65,6 @@ Route::group([
 
         // Onboarding
         Route::post('/onboarding/apply-template', [StudioController::class, 'applyTemplate'])->name('api.onboarding.apply');
-
-        // Blade generation
-        Route::post('/generate', [StudioController::class, 'generate'])->middleware('throttle:12,1')->name('api.generate');
-        Route::post('/generate/{slug}', [StudioController::class, 'generatePage'])->where('slug', '[a-z0-9-]+')->middleware('throttle:12,1')->name('api.generate.page');
 
         // Code mode — the workspace file tree and its editor (404s unless
         // the dev-mode gate passes). Paths travel in the query/body, not the

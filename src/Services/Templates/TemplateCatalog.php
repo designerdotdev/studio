@@ -2,70 +2,49 @@
 
 namespace Designer\Studio\Services\Templates;
 
-use Designer\Studio\Services\TemplateRegistry;
 use Illuminate\Support\Str;
 
 /**
- * Every template a site can start from, wherever it came from.
+ * The templates a site can start from: the entries of
+ * `studio.templates.catalog`, each a whole site in its own git repository
+ * (the DevDojo `site-templates` format).
  *
- * Two sources feed this list. The templates built into the package are
- * always present, so a fresh install works with no network and no
- * configuration. Anything synced from the catalog of git repositories is
- * added alongside them, which is how one template gets maintained in one
- * place and used by every app.
- *
- * A synced template wins a name clash: if the catalog carries its own
- * "atlas", that is the one the site was meant to install.
+ * A template does not have to be downloaded to be offered — the picker
+ * shows the catalog's own name and description, with the thumbnail served
+ * from the repository — and it is cloned the moment someone picks it.
  */
 class TemplateCatalog
 {
     public function __construct(
-        protected TemplateRegistry $builtIn,
         protected TemplateSync $sync,
     ) {}
 
     /**
-     * Every available template, in the order the picker should show them:
-     * the built-ins first, then anything synced from a repository.
+     * Every catalogued template, in catalog order.
      *
-     * @return array<string, array{name: string, title: string, description: string, source: string, pages: int, empty: bool, preview: string}>
+     * @return array<string, array{name: string, title: string, description: string, pages: int, preview: string}>
      */
     public function all(): array
     {
         $entries = [];
 
-        foreach ($this->builtIn->all() as $name => $template) {
-            $entries[$name] = [
-                'name' => $name,
-                'title' => $template['title'] ?? Str::headline($name),
-                'description' => $template['description'] ?? '',
-                'source' => 'built-in',
-                'pages' => count($template['pages'] ?? []),
-                'empty' => ($template['pages'][0]['components'] ?? []) === [],
-                // A built-in is composed of library sections, so it can be
-                // rendered live; a repository ships a picture of itself.
-                'preview' => ($template['pages'][0]['components'] ?? []) === [] ? 'none' : 'live',
-            ];
-        }
-
-        foreach ($this->sync->synced() as $slug => $dir) {
+        foreach ($this->sync->catalog() as $slug => $url) {
             $manifest = $this->sync->manifest($slug) ?? [];
+            $declared = $this->sync->catalogEntry($slug);
 
             $entries[$slug] = [
                 'name' => $slug,
-                'title' => $manifest['name'] ?? Str::headline($slug),
-                'description' => $manifest['description'] ?? '',
-                'source' => 'repository',
-                'pages' => count($manifest['pages'] ?? []),
-                'empty' => false,
-                'preview' => is_file($dir . '/thumbnail.png') ? 'thumbnail' : 'none',
+                'title' => $manifest['name'] ?? $declared['name'] ?? Str::headline($slug),
+                'description' => $manifest['description'] ?? $declared['description'] ?? '',
+                'pages' => count($manifest['pages'] ?? $declared['pages'] ?? []),
+                'preview' => 'thumbnail',
             ];
         }
 
         return $entries;
     }
 
-    /** Absolute path to a synced template's thumbnail, if it ships one. */
+    /** Absolute path to a downloaded template's thumbnail, if it ships one. */
     public function thumbnailPath(string $name): ?string
     {
         $dir = $this->sync->directory($name);
@@ -73,18 +52,23 @@ class TemplateCatalog
         return $dir && is_file($dir . '/thumbnail.png') ? $dir . '/thumbnail.png' : null;
     }
 
-    /** Where a given template would be installed from, or null if unknown. */
-    public function sourceOf(string $name): ?string
+    /**
+     * The thumbnail straight from a GitHub repository, for a template that
+     * has not been downloaded yet. Null for repositories hosted elsewhere.
+     */
+    public function remoteThumbnail(string $name): ?string
     {
-        if ($this->sync->directory($name)) {
-            return 'repository';
+        $url = $this->sync->catalog()[$name] ?? null;
+
+        if (!$url || !preg_match('#^https://github\.com/([^/]+)/([^/.]+)(\.git)?/?$#', $url, $m)) {
+            return null;
         }
 
-        return $this->builtIn->find($name) ? 'built-in' : null;
+        return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/HEAD/thumbnail.png";
     }
 
     public function has(string $name): bool
     {
-        return $this->sourceOf($name) !== null;
+        return array_key_exists($name, $this->sync->catalog());
     }
 }

@@ -59,22 +59,20 @@ class PageRepository
             $slug = 'untitled';
         }
 
-        // Ensure unique slug
-        $originalSlug = $slug;
-        $counter = 1;
-        while ($this->storage->exists("pages/{$slug}.json")) {
-            $slug = $originalSlug . '-' . $counter++;
-        }
+        $slug = $this->uniqueSlug($slug);
 
         $pageData = [
             'id' => (string) Str::uuid(),
             'slug' => $slug,
             'title' => $data['title'] ?? 'Untitled Page',
             'description' => $data['description'] ?? '',
-            // null = follow studio.default_layout at export time
             'layout' => $data['layout'] ?? null,
-            // Studio layout (shared header/footer sections), null = none
-            'layout_ref' => $data['layout_ref'] ?? null,
+            // The layout the page file wraps its sections in. A new page
+            // gets the site's main one — without a layout a page has no
+            // <head>, so no fonts or styles.
+            'layout_ref' => array_key_exists('layout_ref', $data)
+                ? $data['layout_ref']
+                : app(LayoutRepository::class)->primary(),
             'created_at' => now()->toIso8601String(),
             'updated_at' => now()->toIso8601String(),
             'meta' => $data['meta'] ?? [],
@@ -98,11 +96,7 @@ class PageRepository
         $newSlug = Str::slug($data['slug'] ?? $slug) ?: $slug;
 
         if ($newSlug !== $slug) {
-            $base = $newSlug;
-            $counter = 1;
-            while ($this->storage->exists("pages/{$newSlug}.json")) {
-                $newSlug = $base . '-' . $counter++;
-            }
+            $newSlug = $this->uniqueSlug($newSlug);
             $data['slug'] = $newSlug;
 
             // Remember retired slugs so published URLs can 301 to the new one
@@ -123,6 +117,23 @@ class PageRepository
         $this->storage->write("pages/{$newSlug}.json", $updated);
 
         return PageData::fromArray($updated);
+    }
+
+    /**
+     * A slug no other page uses — Studio's pages, and the hand-written pages
+     * in the site's files (the 404 page, say), whose URLs are taken too.
+     */
+    protected function uniqueSlug(string $slug): string
+    {
+        $reserved = app(\Designer\Studio\Services\Site\SiteMirror::class)->reservedSlugs();
+        $base = $slug;
+        $counter = 1;
+
+        while ($this->storage->exists("pages/{$slug}.json") || in_array($slug, $reserved, true)) {
+            $slug = $base . '-' . $counter++;
+        }
+
+        return $slug;
     }
 
     public function delete(string $slug): bool
@@ -262,9 +273,10 @@ class PageRepository
     }
 
     /**
-     * The `{field: "collections.<name>"}` map a freshly added section should
-     * start with: every repeater whose yml declares a `source` naming a
-     * collection that exists. Shared by pages and layouts.
+     * The bindings a freshly added section should start with: every field
+     * whose yml declares a `source` — `collections.<name>` (a collection
+     * that exists) or `site.<key>` (site-wide data such as a menu). Shared
+     * by pages and layouts.
      */
     public static function defaultBindings(string $componentRef): array
     {
@@ -278,14 +290,18 @@ class PageRepository
         $bindings = [];
 
         foreach ($component->fields as $key => $config) {
-            if (($config['type'] ?? '') !== 'repeater') {
+            $source = $config['source'] ?? null;
+
+            if (is_string($source) && str_starts_with($source, 'collections.')) {
+                if ($name = $collections->resolveName(substr($source, strlen('collections.')))) {
+                    $bindings[$key] = 'collections.' . $name;
+                }
+
                 continue;
             }
 
-            $name = \Designer\Studio\Services\CollectionBinder::collectionName($config['source'] ?? null);
-
-            if ($name !== null && $collections->exists($name)) {
-                $bindings[$key] = 'collections.' . $name;
+            if (\Designer\Studio\Services\CollectionBinder::sitePath($source) !== null) {
+                $bindings[$key] = $source;
             }
         }
 

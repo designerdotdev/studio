@@ -1,7 +1,8 @@
 @php
     $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
-    $routingEnabled = config('studio.page_routing.enabled', true);
-    $liveUrl = $routingEnabled ? \Designer\Studio\Support\SiteUrls::pageUrl($page->slug) : null;
+    $liveUrl = \Designer\Studio\Support\SiteUrls::pageUrl($page->slug);
+    // Where publishing writes this page (index.blade.php for the home page)
+    $pageFile = 'resources/designer/views/pages/' . ($page->slug === $homeSlug ? 'index' : $page->slug) . '.blade.php';
     $totalComponents = $library->flatten(1)->count();
     // The server-side gate. Code mode needs this AND the user's dev-mode toggle.
     $devModeAvailable = \Designer\Studio\Support\DevMode::enabled();
@@ -372,7 +373,6 @@
         {{-- Publish --}}
         <div class="relative" x-data="{
             open: false,
-            exporting: false,
             copied: false,
             draftMode: @js($draftMode),
             status: @js($publishStatus),
@@ -425,6 +425,7 @@
                     const data = await response.json();
                     if (data.success) {
                         window.Studio.toast(data.count === 1 ? '1 change published' : data.count + ' changes published');
+                        (data.notes || []).forEach((note) => window.Studio.toast(note, 'error', 9000));
                         if (data.home_claimed) {
                             window.Studio.toast('Removed Laravel\'s default welcome page — your homepage now serves at /', 'info', 6000);
                         }
@@ -459,13 +460,6 @@
                 window.Studio.toast('Could not discard the draft', 'error');
                 this.busy = false;
             },
-
-            async exportBlade() {
-                this.exporting = true;
-                const ok = await window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
-                if (ok) this.open = false;
-                this.exporting = false;
-            }
         }"
         @click.outside="open = false"
         @keydown.escape.window="open = false"
@@ -544,7 +538,7 @@
                             <p class="mt-0.5 text-xs leading-relaxed text-soft">The live site matches your draft. New edits stay in the draft until you publish them.</p>
                         </div>
                     </div>
-                @elseif($routingEnabled)
+                @else
                     <div class="mb-3 flex items-start gap-2.5">
                         <span class="mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
                             <span class="s-status-dot bg-ok"></span>
@@ -556,26 +550,22 @@
                     </div>
                 @endif
 
-                @if($routingEnabled)
-                    <div class="flex items-center gap-1.5 rounded-lg border border-line bg-shell py-1.5 pl-2.5 pr-1.5">
-                        <span class="min-w-0 flex-1 truncate font-mono text-xs text-soft">{{ $liveUrl }}</span>
-                        <button @click="copyUrl()" class="s-icon-btn !h-6 !w-6" title="Copy URL">
-                            <svg x-show="!copied" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"/><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"/></svg>
-                            <svg x-show="copied" x-cloak class="h-3.5 w-3.5 text-ok" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
-                        </button>
-                    </div>
+                <div class="flex items-center gap-1.5 rounded-lg border border-line bg-shell py-1.5 pl-2.5 pr-1.5">
+                    <span class="min-w-0 flex-1 truncate font-mono text-xs text-soft">{{ $liveUrl }}</span>
+                    <button @click="copyUrl()" class="s-icon-btn !h-6 !w-6" title="Copy URL">
+                        <svg x-show="!copied" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"/><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"/></svg>
+                        <svg x-show="copied" x-cloak class="h-3.5 w-3.5 text-ok" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                    </button>
+                </div>
 
-                    <div class="s-divider my-3"></div>
-                @endif
+                <div class="s-divider my-3"></div>
 
-                <p class="font-medium text-ink">Export as Blade</p>
+                <p class="font-medium text-ink">Site files</p>
                 <p class="mt-0.5 text-xs leading-relaxed text-soft">
-                    Write this page to <span class="font-mono text-[11px] text-ink/80">resources/views/designer/{{ $page->slug }}.blade.php</span> to serve it from your own routes.
+                    {{ $draftMode ? 'Publishing writes' : 'Edits are written' }} to <span class="font-mono text-[11px] text-ink/80">resources/designer</span> —
+                    this page is <span class="font-mono text-[11px] text-ink/80">{{ \Illuminate\Support\Str::after($pageFile, 'resources/designer/') }}</span>.
+                    The site runs from those files, with or without Studio.
                 </p>
-                <button @click="exportBlade()" :disabled="exporting" class="s-btn-outline mt-2.5 w-full">
-                    <span x-show="!exporting">Export Blade file</span>
-                    <span x-show="exporting" x-cloak>Exporting…</span>
-                </button>
             </div>
         </div>
 
@@ -610,11 +600,6 @@
                         window.Studio.toast('Could not duplicate the page', 'error');
                     }
                 },
-        
-                exportBlade() {
-                    this.open = false;
-                    window.Studio.exportBlade(@js(route('studio.api.generate.page', ['slug' => $page->slug])));
-                }
             }"
             @click.outside="open = false"
             @keydown.escape.window="open = false"
@@ -656,13 +641,8 @@
                 </button>
         
                 <div class="s-divider my-1"></div>
-        
-                <button @click="exportBlade()" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
-                    Export Blade file
-                </button>
                 @if(\Designer\Studio\Support\DevMode::enabled())
-                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" title="Edit section .html and .yml source files from the editor">
+                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" title="Edit the site's source files — sections, layouts, data — from the editor">
                         <span class="flex items-center gap-2.5">
                             <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
                             Dev mode
@@ -766,8 +746,7 @@
                 // the list so ⌘K doubles as a file switcher.
                 if (studio.mode === 'code') {
                     ($store.code.nodes || []).filter((node) => node.type === 'file').forEach((node) => {
-                        const path = node.canonical || node.path;
-                        all.push({ label: node.path, hint: 'File', run: () => $store.code.openFile(path) });
+                        all.push({ label: node.path, hint: 'File', run: () => $store.code.openFile(node.path) });
                     });
                 }
                 @endif
@@ -1317,9 +1296,10 @@
                 active: null,
 
                 nodes: [],
-                // 'design' — just the surfaces Studio renders; 'laravel' —
-                // the host app's own directories, design folders tinted.
-                view: localStorage.getItem('studio.code-view') === 'laravel' ? 'laravel' : 'design',
+                // 'designer' — just the site (resources/designer and
+                // public/designer); 'laravel' — the whole app, the site's
+                // folders tinted.
+                view: localStorage.getItem('studio.code-view') === 'laravel' ? 'laravel' : 'designer',
                 openFolders: (() => {
                     try { return JSON.parse(localStorage.getItem('studio.code-folders') || '{}') } catch (e) { return {} }
                 })(),
@@ -1333,6 +1313,7 @@
                 newSectionOpen: false,
                 newName: '',
                 newCategory: '',
+                newLabel: '',
 
                 /** Entering Code mode: show the tree and take the sidebar. */
                 boot() {
@@ -1357,10 +1338,11 @@
                         const data = await response.json().catch(() => ({}));
                         if (!response.ok || !data.success) throw new Error(data.message || 'Could not read the workspace.');
                         this.nodes = data.nodes;
-                        // The design view is small enough to open outright; the
-                        // Laravel view starts collapsed, like any file explorer.
-                        if (this.view === 'design') {
-                            this.nodes.filter((n) => n.depth === 0).forEach((n) => {
+                        // The Designer view is small enough to open down to its
+                        // two designer/ folders; the Laravel view starts
+                        // collapsed, like any file explorer.
+                        if (this.view === 'designer') {
+                            this.nodes.filter((n) => n.depth <= 1 && n.type === 'dir').forEach((n) => {
                                 if (!(n.path in this.openFolders)) this.openFolders[n.path] = true;
                             });
                             this.persistFolders();
@@ -1429,10 +1411,8 @@
 
                         await this.mount();
 
-                        // The server answers with the file's canonical path,
-                        // which is what everything keys on — open the same
-                        // section through designer/ or through the Laravel
-                        // view and you land on one buffer, not two.
+                        // A file has one path in both views, so opening it
+                        // from either lands on the same buffer.
                         const key = data.path || path;
 
                         if (!studioCodeBuffers.models[key]) {
@@ -1507,7 +1487,7 @@
                         this.dirty = { ...this.dirty, [path]: false };
 
                         window.Studio.toast(data.synced
-                            ? 'Saved — every page using this section is updated'
+                            ? 'Saved — live on the site, and the editor is up to date'
                             : 'Saved');
                         window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
                         if (data.synced) window.Livewire?.dispatch('studio:code-saved');
@@ -1534,7 +1514,7 @@
                             body: JSON.stringify({
                                 name: this.newName,
                                 category: this.newCategory || 'content',
-                                label: '',
+                                label: this.newLabel || '',
                             }),
                         });
                         const data = await response.json().catch(() => ({}));
@@ -1543,6 +1523,7 @@
                         this.newSectionOpen = false;
                         this.newName = '';
                         this.newCategory = '';
+                        this.newLabel = '';
                         await this.loadTree();
                         await this.openFile(data.path);
                         window.Studio.toast(`Created ${data.name} — it is in the section library now`);
@@ -1706,7 +1687,7 @@
                     </div>
 
                     <div class="s-seg ml-auto">
-                        <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'html' && 'is-active'" @click="tab = 'html'">HTML</button>
+                        <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'html' && 'is-active'" @click="tab = 'html'">Blade</button>
                         <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'yaml' && 'is-active'" @click="tab = 'yaml'">YAML</button>
                     </div>
 

@@ -144,7 +144,7 @@
         {{ $addLabel }}
     </button>
 
-    @if(!empty($collectionOptions))
+    @if(!empty($collectionOptions) && $bound === null)
         <div class="flex items-center gap-1.5 pt-0.5" x-data="{ pick: '' }">
             <select class="s-input !h-7 flex-1 !text-[11px]" x-model="pick" @change="if (pick) { $wire.bindRepeater('{{ $sectionId }}', '{{ $key }}', pick); pick = '' }">
                 <option value="">Bind to a collection…</option>

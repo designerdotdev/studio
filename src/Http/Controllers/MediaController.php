@@ -10,7 +10,7 @@ use InvalidArgumentException;
 
 /**
  * JSON endpoints behind the Media panel. Every path is relative to
- * public/studio-uploads; MediaLibrary does the fencing.
+ * public/designer; MediaLibrary does the fencing.
  */
 class MediaController extends Controller
 {

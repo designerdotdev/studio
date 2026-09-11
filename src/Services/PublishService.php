@@ -2,16 +2,18 @@
 
 namespace Designer\Studio\Services;
 
+use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Services\Storage\StudioStorage;
 use Illuminate\Support\Facades\File;
 
 /**
- * Draft mode — the editor works on storage/studio/draft/*, the live site
- * serves storage/studio/{pages,layouts,blocks}. Publishing mirrors the
- * whole draft to live in one operation; discarding mirrors live back to
- * draft. Deliberately whole-site: layouts and global blocks are shared
- * across pages, so partial publishes could go live referencing draft-only
- * state.
+ * Draft mode — the editor works on storage/studio/draft/*, while the live
+ * site is the installed files in resources/designer (mirrored as documents
+ * in storage/studio/{pages,layouts,…} by SiteMirror). Publishing mirrors the
+ * whole draft to live and writes it into the files in one operation;
+ * discarding re-reads the files and mirrors live back to draft.
+ * Deliberately whole-site: layouts and global blocks are shared across
+ * pages, so partial publishes could go live referencing draft-only state.
  *
  * This service works on raw paths (never through the storage workspace
  * prefix) so it behaves identically no matter which workspace the current
@@ -107,44 +109,38 @@ class PublishService
      */
     public function publishAll(): array
     {
+        // Edits made to the files outside Studio reach the draft first, so
+        // publishing never writes over them unseen.
+        $this->site()->refresh();
+
         $status = $this->status();
-        $this->mirror(fn ($tree) => [$this->draftPath($tree), $this->livePath($tree)]);
+        $this->mirrorTrees(fn ($tree) => [$this->draftPath($tree), $this->livePath($tree)]);
+
+        $status['notes'] = $this->site()->flush();
 
         return $status;
     }
 
     /**
-     * Throw the draft away: mirror live back onto the draft tree.
+     * Throw the draft away: re-read the site's files, then mirror live back
+     * onto the draft tree.
      */
     public function discardAll(): array
     {
+        $this->site()->refresh();
+
         $status = $this->status();
-        $this->mirror(fn ($tree) => [$this->livePath($tree), $this->draftPath($tree)]);
+        $this->mirrorTrees(fn ($tree) => [$this->livePath($tree), $this->draftPath($tree)]);
 
         return $status;
     }
 
-    /**
-     * Make both trees identical after programmatic site creation
-     * (onboarding templates, studio:seed) — a fresh site starts published.
-     */
-    public function syncAfterSeed(): void
+    protected function site(): SiteMirror
     {
-        $this->ensureDraftSeeded();
-
-        // Whichever workspace the seeder wrote into is the fuller one;
-        // seeding only runs on empty sites, so mirror the side with docs.
-        $draftCount = count($this->jsonFiles($this->draftPath('pages')));
-        $liveCount = count($this->jsonFiles($this->livePath('pages')));
-
-        if ($draftCount >= $liveCount) {
-            $this->publishAll();
-        } else {
-            $this->discardAll();
-        }
+        return app(SiteMirror::class);
     }
 
-    protected function mirror(callable $paths): void
+    protected function mirrorTrees(callable $paths): void
     {
         foreach (StudioStorage::WORKSPACE_TREES as $tree) {
             [$from, $to] = $paths($tree);

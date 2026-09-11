@@ -8,10 +8,12 @@ use Illuminate\Support\Str;
  * Collections: named, schema'd lists of rows that sections can bind a
  * repeater to (guides, testimonials, team members…). Stored one document
  * per collection at `collections/<name>.json`, workspaced like pages so
- * a draft edit publishes with the site.
+ * a draft edit publishes with the site — into the site's own data file,
+ * `resources/designer/data/collections/<source>.json`.
  *
  * Document shape:
- *   { name, title, fields: {key: {type, label?, options?}}, rows: [{id, …}], created_at, updated_at }
+ *   { name, title, fields: {key: {type, label?, options?}}, rows: [{id, …}],
+ *     source, studio_ids, created_at, updated_at }
  *
  * Field types: text, textarea, richtext, url, image, select, toggle, number.
  */
@@ -60,6 +62,27 @@ class CollectionRepository
         return $this->storage->exists("collections/{$name}.json");
     }
 
+    /**
+     * The collection a template means by a name: its Studio name
+     * (`service-details`) or the name of its data file (`serviceDetails`,
+     * which is how a section's yml `source:` and a page's `$variable`
+     * spell it).
+     */
+    public function resolveName(string $name): ?string
+    {
+        if (preg_match('/^[a-z0-9-]+$/', $name) && $this->exists($name)) {
+            return $name;
+        }
+
+        foreach ($this->all() as $docName => $doc) {
+            if (($doc['source'] ?? null) === $name) {
+                return $docName;
+            }
+        }
+
+        return null;
+    }
+
     /** Create a collection. The name is the slug of the title, kept unique. */
     public function create(string $title, array $fields, array $rows = [], ?string $name = null): array
     {
@@ -76,6 +99,11 @@ class CollectionRepository
             'title' => trim($title) !== '' ? trim($title) : Str::headline($slug),
             'fields' => $this->normaliseFields($fields),
             'rows' => array_values(array_map(fn ($row) => $this->normaliseRow($row), $rows)),
+            // The data file's name — and so the variable pages read it as:
+            // data/collections/teamMembers.json is $teamMembers
+            'source' => Str::camel($slug),
+            // Row ids are Studio's own; the file on disk carries none
+            'studio_ids' => true,
             'created_at' => now()->toIso8601String(),
             'updated_at' => now()->toIso8601String(),
         ];

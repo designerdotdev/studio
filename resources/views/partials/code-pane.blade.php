@@ -67,7 +67,7 @@
             <svg class="h-7 w-7 text-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
             <p class="text-[13px] font-medium text-soft">Pick a file to edit</p>
             <p class="max-w-xs text-[12px] leading-relaxed text-faint">
-                Section sources, imported template components, and the site's own theme CSS and head markup. Saving a section updates every page that uses it.
+                The site lives in resources/designer and public/designer — pages, sections, layouts, data, and CSS. A saved file is live at once, and the editor picks it up.
             </p>
         </div>
 

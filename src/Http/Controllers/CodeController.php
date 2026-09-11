@@ -3,7 +3,7 @@
 namespace Designer\Studio\Http\Controllers;
 
 use Designer\Studio\Services\CodeWorkspace;
-use Designer\Studio\Services\DesignSyncService;
+use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Support\DevMode;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -21,14 +21,19 @@ class CodeController extends Controller
 {
     public function __construct(
         protected CodeWorkspace $workspace,
-        protected DesignSyncService $designSync,
-    ) {}
+        protected SiteMirror $mirror,
+    ) {
+        // Re-reading the site updates the draft the editor works on
+        if (config('studio.draft_mode', true)) {
+            app(\Designer\Studio\Services\Storage\StudioStorage::class)->useDraft();
+        }
+    }
 
     public function tree(Request $request)
     {
         abort_unless(DevMode::enabled(), 404);
 
-        $view = $request->query('view') === 'laravel' ? 'laravel' : 'design';
+        $view = $request->query('view') === 'laravel' ? 'laravel' : 'designer';
 
         return response()->json([
             'success' => true,
@@ -67,14 +72,7 @@ class CodeController extends Controller
         return $this->guard(function () use ($validated, $contents) {
             $result = $this->workspace->write($validated['path'], $contents);
 
-            // Section edits only reach the canvas once the library has them
-            $synced = $this->workspace->isSectionSource($validated['path']);
-
-            if ($synced) {
-                $this->designSync->syncAll();
-            }
-
-            return array_merge(['success' => true, 'synced' => $synced], $result);
+            return array_merge(['success' => true, 'synced' => $this->resync($validated['path'])], $result);
         });
     }
 
@@ -95,9 +93,9 @@ class CodeController extends Controller
                 $validated['label'] ?? ''
             );
 
-            $this->designSync->syncAll();
+            $this->mirror->sync();
 
-            return array_merge(['success' => true], $created);
+            return array_merge(['success' => true, 'synced' => true], $created);
         });
     }
 
@@ -110,14 +108,31 @@ class CodeController extends Controller
         ]);
 
         return $this->guard(function () use ($validated) {
+            $isSite = $this->workspace->isDesignPath(trim($validated['path'], '/'));
             $result = $this->workspace->delete($validated['path']);
 
-            if ($this->workspace->isSectionSource($validated['path'])) {
-                $this->designSync->syncAll();
+            if ($isSite) {
+                $this->mirror->sync();
             }
 
-            return array_merge(['success' => true], $result);
+            return array_merge(['success' => true, 'synced' => $isSite], $result);
         });
+    }
+
+    /**
+     * A save inside the site is live the moment it lands: re-read it into
+     * the editor — sections into the library, pages and data into the
+     * documents. Returns whether the editor has to reload what it shows.
+     */
+    protected function resync(string $path): bool
+    {
+        if (!$this->workspace->isDesignPath(trim($path, '/'))) {
+            return false;
+        }
+
+        $this->mirror->sync();
+
+        return true;
     }
 
     /**

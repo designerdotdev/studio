@@ -37,7 +37,7 @@
                         x-cloak
                         @click="window.dispatchEvent(new CustomEvent('studio:open-code-editor', { detail: { ref: @js($selected['ref']), title: @js($selected['title']) } }))"
                         class="s-icon-btn"
-                        title="Edit source code — .html + .yml (dev mode)"
+                        title="Edit source code — .blade.php + .yml (dev mode)"
                     >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
                     </button>
@@ -117,13 +117,42 @@
                         $partial = in_array($type, ['text', 'url', 'textarea', 'select', 'toggle', 'colorpicker', 'image', 'repeater'], true) ? $type : 'text';
                     @endphp
 
+                    @php
+                        $binding = $bindings[$selectedId][$key] ?? null;
+                        $sitePath = \Designer\Studio\Services\CollectionBinder::sitePath($binding);
+                    @endphp
+
                     <div wire:key="field-{{ $selectedId }}-{{ $key }}">
-                        @include('studio::livewire.fields.' . $partial, [
-                            'sectionId' => $selectedId,
-                            'key' => $key,
-                            'field' => $field,
-                            'value' => $variables[$selectedId][$key] ?? null,
-                        ])
+                        @if(\Designer\Studio\Services\CollectionBinder::isCode($binding))
+                            {{-- Written as code in the page file: shown, not edited --}}
+                            <span class="s-label">{{ $field['label'] ?? \Illuminate\Support\Str::headline($key) }}</span>
+                            <div class="mt-1.5 rounded-lg border border-line bg-raised p-2.5">
+                                <p class="flex items-center gap-1.5 text-[11px] font-medium text-soft">
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                                    Set in code
+                                </p>
+                                <p class="mt-1.5 break-all font-mono text-[11px] leading-relaxed text-ink">{{ \Illuminate\Support\Str::after($binding, ':') }}</p>
+                                <button type="button" class="s-btn-ghost mt-2 !h-7 !px-2 !text-[11px]" wire:click="unbindField('{{ $selectedId }}', '{{ $key }}')" title="Replace the expression with its current value, which you can then edit here">
+                                    Use a fixed value instead
+                                </button>
+                            </div>
+                        @else
+                            @include('studio::livewire.fields.' . $partial, [
+                                'sectionId' => $selectedId,
+                                'key' => $key,
+                                'field' => $field,
+                                'value' => $variables[$selectedId][$key] ?? null,
+                            ])
+
+                            @if($sitePath !== null)
+                                {{-- Two-way: edits save into the site data every section shares --}}
+                                <p class="mt-1.5 flex items-center gap-1.5 text-[11px] leading-relaxed text-faint">
+                                    <svg class="h-3 w-3 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1c3.866 0 7 1.79 7 4s-3.134 4-7 4-7-1.79-7-4 3.134-4 7-4Zm5.694 8.13c.464-.264.91-.583 1.306-.952V10c0 2.21-3.134 4-7 4s-7-1.79-7-4V8.178c.396.37.842.688 1.306.953C5.838 10.006 7.854 10.5 10 10.5s4.162-.494 5.694-1.37ZM3 13.179V15c0 2.21 3.134 4 7 4s7-1.79 7-4v-1.822c-.396.37-.842.688-1.306.953-1.532.875-3.548 1.369-5.694 1.369s-4.162-.494-5.694-1.37A7.009 7.009 0 0 1 3 13.179Z"/></svg>
+                                    <span class="min-w-0 flex-1">Site-wide — also changes it everywhere else <span class="font-mono">$site-&gt;{{ str_replace('.', '->', $sitePath) }}</span> is used.</span>
+                                    <button type="button" class="shrink-0 text-soft underline-offset-2 hover:text-ink hover:underline" wire:click="unbindField('{{ $selectedId }}', '{{ $key }}')">Unlink</button>
+                                </p>
+                            @endif
+                        @endif
 
                         @if(!empty($field['description']))
                             <p class="mt-1.5 text-[11px] leading-relaxed text-faint">{{ $field['description'] }}</p>
@@ -290,12 +319,14 @@
                     <div>
                         <label for="page-layout" class="s-label">Page layout</label>
                         <select id="page-layout" class="s-input" wire:change="assignLayout($event.target.value)">
-                            <option value="" @selected(!$layoutSlug)>None</option>
+                            @if(!$layoutSlug)
+                                <option value="" selected>None</option>
+                            @endif
                             @foreach($layouts as $slug => $name)
                                 <option value="{{ $slug }}" @selected($layoutSlug === $slug)>{{ $name }}</option>
                             @endforeach
                         </select>
-                        <p class="mt-1.5 text-[11px] leading-relaxed text-faint">A layout wraps this page with shared sections — like a site-wide header and footer.</p>
+                        <p class="mt-1.5 text-[11px] leading-relaxed text-faint">The layout is the page's document: its head — fonts, styles, scripts — and the sections every page shares, like the header and footer.</p>
                     </div>
 
                     @if($layoutSlug)
@@ -320,13 +351,17 @@
 
                         <div class="s-divider"></div>
 
-                        <button
-                            wire:click="deleteLayout"
-                            wire:confirm="Delete “{{ $layoutName }}”? Its header and footer sections will be removed from {{ $this->layoutUsageCount }} {{ \Illuminate\Support\Str::plural('page', $this->layoutUsageCount) }}. This cannot be undone."
-                            class="s-btn-danger w-full"
-                        >
-                            Delete layout
-                        </button>
+                        @if(count($layouts) > 1)
+                            <button
+                                wire:click="deleteLayout"
+                                wire:confirm="Delete “{{ $layoutName }}”? The {{ $this->layoutUsageCount }} {{ \Illuminate\Support\Str::plural('page', $this->layoutUsageCount) }} using it will move to another layout. This cannot be undone."
+                                class="s-btn-danger w-full"
+                            >
+                                Delete layout
+                            </button>
+                        @else
+                            <p class="text-[11px] leading-relaxed text-faint">This is the site's only layout, so it can't be deleted — every page is written inside one.</p>
+                        @endif
                     @endif
 
                     @if(!$layoutSlug || $showCreateLayout)
@@ -346,7 +381,7 @@
                                 >
                                 <button wire:click="createLayout" class="s-btn-outline shrink-0">Create</button>
                             </div>
-                            <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Creates an empty layout and applies it to this page — then add its shared sections right on the canvas.</p>
+                            <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Starts from the main layout's head with no shared sections, and applies it to this page — then add its sections right on the canvas.</p>
                         </div>
                     @elseif($layoutSlug)
                         <button
