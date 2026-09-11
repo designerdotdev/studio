@@ -334,17 +334,17 @@ html.studio-light {
 
     /* --- workspace: sidebar + canvas as cards on the shell ----------- */
 
-    /* 4px under the borderless topbar, 8px round the rest — the cards'
+    /* Flush under the borderless topbar, 8px round the rest — the cards'
        left edge lines up under the menu button (topbar pl-2) */
     .s-workspace {
-        @apply flex min-h-0 flex-1 items-stretch px-2 pt-1 pb-2;
+        @apply flex min-h-0 flex-1 items-stretch px-2 pb-2;
     }
 
     .s-card {
         position: relative;
         isolation: isolate;
         overflow: hidden;
-        border-radius: 12px;
+        border-radius: 8px;
     }
 
     /* The hairline is drawn over the content, so an iframe or a panel's
