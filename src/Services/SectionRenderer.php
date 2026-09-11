@@ -5,7 +5,7 @@ namespace Designer\Studio\Services;
 use Designer\Studio\DataTransferObjects\ComponentData;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Support\DataBag;
-use Illuminate\Support\Facades\Blade;
+use Designer\Studio\Support\NestedBlade;
 
 /**
  * The one place a section turns into HTML.
@@ -56,7 +56,7 @@ class SectionRenderer
     public function render(ComponentData $component, array $variables, array $bindings = []): string
     {
         try {
-            return Blade::render($component->html, $this->context($this->binder->apply($variables, $bindings)));
+            return NestedBlade::render($component->html, $this->context($this->binder->apply($variables, $bindings)));
         } catch (\Throwable $e) {
             report($e);
 
@@ -68,7 +68,7 @@ class SectionRenderer
     public function renderHtml(string $html, array $variables, string $label = 'section'): string
     {
         try {
-            return Blade::render($html, $this->context($variables));
+            return NestedBlade::render($html, $this->context($variables));
         } catch (\Throwable $e) {
             report($e);
 

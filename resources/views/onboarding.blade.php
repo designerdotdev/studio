@@ -18,6 +18,7 @@
         x-data="{
             step: 1,
             selected: @js(array_key_first($templates)),
+            filter: 'all',
             applying: false,
 
             showTemplates() {
@@ -78,12 +79,12 @@
         </div>
 
         {{-- Step 2 — Template picker --}}
-        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-4xl px-6 py-12 lg:py-16">
+        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
             <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                     <p class="s-microlabel">Step 2 of 2</p>
                     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-ink">Pick a starting point</h1>
-                    <p class="mt-1.5 text-[13.5px] text-soft">Whole sites, ready to edit. Its files are added to your app in <span class="font-mono text-[12px] text-ink/80">resources/designer</span> and <span class="font-mono text-[12px] text-ink/80">public/designer</span> — yours to keep, with or without Studio.</p>
+                    <p class="mt-1.5 max-w-2xl text-[13.5px] text-soft">Whole sites, ready to edit. Its files are added to your app in <span class="font-mono text-[12px] text-ink/80">resources/designer</span> and <span class="font-mono text-[12px] text-ink/80">public/designer</span> — yours to keep, with or without Studio.</p>
                 </div>
                 <button @click="step = 1" class="s-btn-ghost shrink-0">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>
@@ -91,10 +92,26 @@
                 </button>
             </div>
 
-            <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            @if(count($categories) > 1)
+                <div class="mt-8 flex items-center gap-3">
+                    <div class="s-seg" role="tablist" aria-label="Filter templates">
+                        <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === 'all' && 'is-active'" :aria-selected="filter === 'all'" @click="filter = 'all'">All</button>
+                        @foreach($categories as $category => $label)
+                            <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === @js($category) && 'is-active'" :aria-selected="filter === @js($category)" @click="filter = @js($category)">{{ $label }}</button>
+                        @endforeach
+                    </div>
+                    <span
+                        class="text-xs text-faint"
+                        x-text="(({ all: {{ count($templates) }}, @foreach(array_count_values(array_column($templates, 'category')) as $category => $count)@js($category): {{ $count }}, @endforeach })[filter] ?? 0) + ' templates'"
+                    >{{ count($templates) }} templates</span>
+                </div>
+            @endif
+
+            <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach($templates as $key => $template)
                     <button
                         type="button"
+                        x-show="filter === 'all' || filter === @js($template['category'])"
                         @click="selected = @js($key)"
                         @dblclick="selected = @js($key); apply()"
                         class="group relative flex flex-col overflow-hidden rounded-2xl border bg-raised text-left transition-all duration-150"
@@ -152,7 +169,7 @@
             x-cloak
             class="sticky bottom-0 z-20 border-t border-line bg-shell/85 shadow-[0_-16px_40px_-16px_rgba(0,0,0,0.65)] backdrop-blur-xl"
         >
-            <div class="mx-auto flex w-full max-w-4xl items-center gap-4 px-6 py-3.5">
+            <div class="mx-auto flex w-full max-w-6xl items-center gap-4 px-6 py-3.5">
                 <p class="hidden text-xs text-faint sm:block">Tip: double-click a template to jump straight in.</p>
 
                 <div class="ml-auto flex items-center gap-3">

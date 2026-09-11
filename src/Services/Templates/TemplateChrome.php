@@ -2,8 +2,9 @@
 
 namespace Designer\Studio\Services\Templates;
 
+use Designer\Studio\Services\Site\PhpLiteral;
 use Designer\Studio\Support\DataBag;
-use Illuminate\Support\Facades\Blade;
+use Designer\Studio\Support\NestedBlade;
 
 /**
  * Reads a site's page layout for everything that isn't a section.
@@ -16,21 +17,30 @@ use Illuminate\Support\Facades\Blade;
  * here and stamped onto the canvas document instead.
  *
  * Head fragments are compiled against the site data first, since a font
- * URL is often written as `{{ $site->theme->fonts_url ?? '…' }}`.
+ * URL is often written as `{{ $site->theme->fonts_url ?? '…' }}`, and
+ * against the defaults the layout's own `@props` declares (`{{ $favicon }}`).
  */
 class TemplateChrome
 {
+    /** The layout's `@props` defaults, for the fragments that use them. */
+    protected array $props = [];
+
     /**
      * @param  callable(string): ?string  $stylesheet  path of a `@vite` entry, or null
      * @return array{head_html: string, scripts: string[], theme_css: string, body_class: string, html_class: string}
      */
     public function extract(string $layoutSource, array $siteData, callable $stylesheet): array
     {
+        $this->props = $this->propDefaults($layoutSource);
         $head = $this->section($layoutSource, 'head');
 
         return [
             'head_html' => $this->headHtml($head, $siteData),
-            'scripts' => $this->scripts($head),
+            // Head first, then the ones a layout loads at the end of <body>
+            'scripts' => array_values(array_unique([
+                ...$this->scripts($head),
+                ...$this->scripts($this->section($layoutSource, 'body')),
+            ])),
             'theme_css' => $this->themeCss($head, $stylesheet),
             'body_class' => $this->bodyClass($layoutSource, $siteData),
             'html_class' => $this->attributeClass($layoutSource, 'html', $siteData),
@@ -64,7 +74,10 @@ class TemplateChrome
             }
         }
 
-        return $this->compile(implode("\n", $keep), $siteData);
+        // One at a time, so a link Studio can't resolve costs only itself.
+        $compiled = array_map(fn (string $element) => $this->compile($element, $siteData), $keep);
+
+        return implode("\n", array_filter($compiled, fn (string $element) => $element !== ''));
     }
 
     /** @return string[] */
@@ -203,10 +216,57 @@ class TemplateChrome
             return trim($fragment);
         }
 
+        $data = ['site' => new DataBag($siteData)];
+
+        foreach ($this->props as $name => $value) {
+            $data[$name] ??= DataBag::wrap($value);
+        }
+
         try {
-            return trim(Blade::render($fragment, ['site' => new DataBag($siteData)]));
+            return trim(NestedBlade::render($fragment, $data));
         } catch (\Throwable) {
             return '';
         }
+    }
+
+    /**
+     * The literal defaults of the layout's `@props([...])` — parsed, never
+     * evaluated, so a computed default is simply left out.
+     */
+    protected function propDefaults(string $source): array
+    {
+        if (!preg_match('/@props\s*\(/', $source, $match, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $start = $match[0][1] + strlen($match[0][0]);
+        $depth = 1;
+        $quote = null;
+
+        for ($i = $start, $length = strlen($source); $i < $length && $depth > 0; $i++) {
+            $char = $source[$i];
+
+            if ($quote !== null) {
+                if ($char === '\\') {
+                    $i++;
+                } elseif ($char === $quote) {
+                    $quote = null;
+                }
+            } elseif ($char === '"' || $char === "'") {
+                $quote = $char;
+            } elseif ($char === '(' || $char === '[') {
+                $depth++;
+            } elseif ($char === ')' || $char === ']') {
+                $depth--;
+            }
+        }
+
+        [$isLiteral, $value] = PhpLiteral::parse(substr($source, $start, $i - $start - 1));
+
+        if (!$isLiteral) {
+            return [];
+        }
+
+        return array_filter((array) $value, fn ($key) => is_string($key), ARRAY_FILTER_USE_KEY);
     }
 }

@@ -22,7 +22,7 @@ class TemplateCatalog
     /**
      * Every catalogued template, in catalog order.
      *
-     * @return array<string, array{name: string, title: string, description: string, pages: int, preview: string}>
+     * @return array<string, array{name: string, title: string, description: string, category: string, pages: int, preview: string}>
      */
     public function all(): array
     {
@@ -36,12 +36,34 @@ class TemplateCatalog
                 'name' => $slug,
                 'title' => $manifest['name'] ?? $declared['name'] ?? Str::headline($slug),
                 'description' => $manifest['description'] ?? $declared['description'] ?? '',
+                // The catalog's grouping wins: it is what the picker's filters are built from
+                'category' => (string) ($declared['category'] ?? $manifest['category'] ?? ''),
                 'pages' => count($manifest['pages'] ?? $declared['pages'] ?? []),
                 'preview' => 'thumbnail',
             ];
         }
 
         return $entries;
+    }
+
+    /**
+     * The picker's filters: each category the catalog uses, in first-seen
+     * order, with its label.
+     *
+     * @return array<string, string>
+     */
+    public function categories(): array
+    {
+        $labels = ['landing' => 'Landing pages', 'business' => 'Business'];
+        $categories = [];
+
+        foreach ($this->all() as $entry) {
+            if ($entry['category'] !== '' && !isset($categories[$entry['category']])) {
+                $categories[$entry['category']] = $labels[$entry['category']] ?? Str::headline($entry['category']);
+            }
+        }
+
+        return $categories;
     }
 
     /** Absolute path to a downloaded template's thumbnail, if it ships one. */

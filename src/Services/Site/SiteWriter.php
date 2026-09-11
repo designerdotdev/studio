@@ -179,6 +179,14 @@ class SiteWriter
                 'description' => ($doc['meta']['seo_description'] ?? '') !== '' ? $doc['meta']['seo_description'] : ($doc['description'] ?? ''),
             ];
 
+            // A layout tag written without a title leaves the <title> to the
+            // layout (often just the site name, on a home page). The reader
+            // takes the page's name from designer.json then, so the tag only
+            // gains a title when an SEO title is set.
+            if ($wrapper !== null && ($doc['meta']['seo_title'] ?? '') === '' && !$this->hasAttribute($wrapper, 'title')) {
+                unset($attributes['title']);
+            }
+
             if ($wrapper === null) {
                 $open = $this->openTag(['head' => '<x-layouts.' . $layout, 'items' => [], 'trailing' => '', 'tail' => '>'], $attributes);
                 $body = rtrim($region);
@@ -204,6 +212,17 @@ class SiteWriter
         }
 
         return [$contents, $written];
+    }
+
+    protected function hasAttribute(array $tag, string $key): bool
+    {
+        foreach ($tag['items'] as $item) {
+            if (($this->codec->read($item)['key'] ?? null) === $key) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** A layout tag's opening part with title/description set. */
@@ -854,10 +873,12 @@ class SiteWriter
         $manifest['home'] = $site['home_slug'] ?? $manifest['home'];
 
         // Settings for a hand-written page (its SEO tags, say) belong to the
-        // developer: kept for as long as the page file exists.
+        // developer: kept for as long as the page file exists — the home
+        // page's file being index.blade.php.
         $manifest['pages'] = array_filter(
             $manifest['pages'],
-            fn ($settings, $slug) => !isset($docs['pages'][$slug]) && is_file(SitePaths::pages($slug . '.blade.php')),
+            fn ($settings, $slug) => !isset($docs['pages'][$slug])
+                && is_file(SitePaths::pages(($slug === $manifest['home'] ? 'index' : $slug) . '.blade.php')),
             ARRAY_FILTER_USE_BOTH
         );
         $manifest['layouts'] = [];

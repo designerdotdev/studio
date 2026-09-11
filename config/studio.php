@@ -141,26 +141,86 @@ return [
     | into your app — its `files/resources` tree into resources/designer and
     | its `files/public` tree into public/designer — and nothing else.
     |
-    | `catalog` is the authority on which templates are offered: slug =>
-    | repository URL, or an array with a `repo` plus the `name` and
-    | `description` the picker shows before the template is downloaded.
-    | Repositories are cloned on first use into `path`, a cache inside
-    | Studio's storage (`php artisan studio:templates:sync` refreshes it).
+    | `catalog` is the authority on which templates are offered, in picker
+    | order: slug => repository URL, or an array with a `repo` plus the
+    | `name`, `description` and `category` (landing | business) the picker
+    | shows before the template is downloaded. Repositories are cloned on
+    | first use into `path`, a cache inside Studio's storage
+    | (`php artisan studio:templates:sync` refreshes it).
     |
     */
     'templates' => [
         'path' => storage_path('studio/templates'),
 
         'catalog' => [
+            // Landing pages — products, SaaS, and the studios that build them
             'pilot' => [
                 'repo' => 'https://github.com/site-templates/pilot',
                 'name' => 'Pilot',
+                'category' => 'landing',
                 'description' => 'An off-white, monochrome site for an AI agent framework — dark dropdown menus, a three-pane agent console standing on a painted landscape, and a guides library.',
             ],
+            'amber' => [
+                'repo' => 'https://github.com/site-templates/amber',
+                'name' => 'Amber',
+                'category' => 'landing',
+                'description' => 'A warm, serif-led studio landing page — an art-directed hero, numbered services, featured work, retainer pricing, an accordion FAQ, and a news section with full posts.',
+            ],
+            'draft' => [
+                'repo' => 'https://github.com/site-templates/draft',
+                'name' => 'Draft',
+                'category' => 'landing',
+                'description' => 'A dark, Linear-grade SaaS site — glass nav with a mega-dropdown, a CSS-built product mock, bento features, an Updates journal, a changelog, and a mini docs hub.',
+            ],
+            'signal' => [
+                'repo' => 'https://github.com/site-templates/signal',
+                'name' => 'Signal',
+                'category' => 'landing',
+                'description' => 'A warm, canvas-styled SaaS marketing site — floating pill nav, a giant cursor-bar headline, a CSS-built product window, bento features, pricing, a changelog, and a blog.',
+            ],
+            'reply' => [
+                'repo' => 'https://github.com/site-templates/reply',
+                'name' => 'Reply',
+                'category' => 'landing',
+                'description' => 'A cream-canvas SaaS site for a help desk with an AI teammate — an inbox floating on painterly wildflower fields, a live resolution ticker, a pricing toggle, and customer stories.',
+            ],
+            'lumen' => [
+                'repo' => 'https://github.com/site-templates/lumen',
+                'name' => 'Lumen',
+                'category' => 'landing',
+                'description' => 'A polished, deep-green landing page for studios and consultancies — editorial serif headlines, numbered services, big stats, a case-study spotlight, and a journal.',
+            ],
+
+            // Businesses — studios, hospitality, and property
             'monarch' => [
                 'repo' => 'https://github.com/site-templates/monarch',
                 'name' => 'Monarch',
+                'category' => 'business',
                 'description' => 'A bone-and-black product studio site built around an oversized menu capsule — split hero, services bento, a dark testimonial, a studio journal, and a dated changelog, lit by an electric lime accent.',
+            ],
+            'stone' => [
+                'repo' => 'https://github.com/site-templates/stone',
+                'name' => 'Stone',
+                'category' => 'business',
+                'description' => 'A calm, confident studio site on warm paper — serif display headlines, a numbered fullscreen menu, an ink-dark pricing tier, and a remembered light/dark mode.',
+            ],
+            'strata' => [
+                'repo' => 'https://github.com/site-templates/strata',
+                'name' => 'Strata',
+                'category' => 'business',
+                'description' => 'An elegant luxury real-estate site — a full-bleed dusk hero, serif-display property pages with stat cards, a curated portfolio grid, and warm editorial storytelling.',
+            ],
+            'crema' => [
+                'repo' => 'https://github.com/site-templates/crema',
+                'name' => 'Crema',
+                'category' => 'business',
+                'description' => 'A specialty coffee roaster and neighbourhood bar, built around a hand-set counter board, a priced menu, and structured single-origin pages.',
+            ],
+            'norden' => [
+                'repo' => 'https://github.com/site-templates/norden',
+                'name' => 'Norden',
+                'category' => 'business',
+                'description' => 'A calm, photographic coffee house — a split hero under a rotating seal, a full drinks menu with a page for every cup, a drawn neighbourhood map, and a journal.',
             ],
         ],
     ],

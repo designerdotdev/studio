@@ -46,16 +46,31 @@ Installing:
         'pilot' => [
             'repo' => 'https://github.com/site-templates/pilot',
             'name' => 'Pilot',
+            'category' => 'landing',
             'description' => '…',
         ],
-        'monarch' => 'https://github.com/site-templates/monarch',
+        'my-template' => 'https://github.com/acme/my-template',
     ],
 ],
 ```
 
-The catalog decides which templates the picker offers. An entry is a repository URL, or an
-array with a `repo` plus the `name`/`description` shown before it is downloaded (the picture
-comes from the repository's `thumbnail.png`).
+The catalog decides which templates the picker offers, and in what order. An entry is a
+repository URL, or an array with a `repo` plus the `name`/`description` shown before it is
+downloaded (the picture comes from the repository's `thumbnail.png`) and a `category` the
+picker's filters group by (`landing`, `business`, or any word of your own).
+
+Studio ships with eleven:
+
+| Landing pages | | Business | |
+|---|---|---|---|
+| Pilot | AI agent framework, off-white and monochrome | Monarch | Product studio, bone and black with a lime accent |
+| Amber | Warm, serif-led studio landing page | Stone | Calm studio site on warm paper, light/dark |
+| Draft | Dark, Linear-grade SaaS with a changelog and docs | Strata | Luxury real estate with property pages |
+| Signal | Warm SaaS marketing site with a changelog and blog | Crema | Coffee roaster and bar with single-origin pages |
+| Reply | Cream-canvas help desk SaaS with customer stories | Norden | Photographic coffee house with a page per drink |
+| Lumen | Deep-green landing page for studios and consultancies | | |
+
+Any repository in the `site-templates` format works — add your own to the list.
 
 A downloaded clone is an ordinary checkout; one holding uncommitted or unpushed work is never
 reset — sync reports it and moves on, and only `--force` discards it.

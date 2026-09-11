@@ -66,6 +66,8 @@ class SiteInstaller
         $files = $this->copy($dir . '/files/resources', SitePaths::resources(), $assets, rewriteVite: true)
             + $this->copy($dir . '/files/public', SitePaths::public(), $assets, rewriteVite: false);
 
+        $this->forgetCompiledViews();
+
         SiteManifest::write($this->manifest($slug, $dir));
 
         $runtime = $this->runtime->install();
@@ -135,6 +137,33 @@ class SiteInstaller
         }
 
         return $count;
+    }
+
+    /**
+     * A replacing site reuses the old one's paths, and Laravel names a
+     * compiled view after its source path — so a request in the same moment
+     * could still run the old site's footer (OPcache holds compiled views
+     * for a couple of seconds after they change). Drop them outright.
+     */
+    protected function forgetCompiledViews(): void
+    {
+        $compiler = app('blade.compiler');
+
+        foreach (File::allFiles(SitePaths::views()) as $file) {
+            if (!str_ends_with($file->getFilename(), '.blade.php')) {
+                continue;
+            }
+
+            $compiled = $compiler->getCompiledPath($file->getPathname());
+
+            if (is_file($compiled)) {
+                @unlink($compiled);
+
+                if (function_exists('opcache_invalidate')) {
+                    @opcache_invalidate($compiled, true);
+                }
+            }
+        }
     }
 
     /**

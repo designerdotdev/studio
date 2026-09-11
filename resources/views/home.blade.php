@@ -869,8 +869,8 @@
     {{-- Canvas                                                        --}}
     {{-- ============================================================ --}}
     {{-- Code mode takes the canvas's slot; the split gives half of it back.
-         Both sit inset on the canvas surface as rounded frames. --}}
-    <div class="s-canvas flex h-full w-full min-w-0 p-1 lg:p-2" x-data>
+         Both fill the canvas edge to edge as square frames. --}}
+    <div class="s-canvas flex h-full w-full min-w-0" x-data>
         @if($devModeAvailable)
             @include('studio::partials.code-pane')
 
@@ -906,6 +906,7 @@
             <div class="flex h-full flex-col">
                 <div
                     class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
+                    :class="$store.studio.device !== 'desktop' && 'is-narrow'"
                     :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
                 >
                     {{-- Live preview --}}
