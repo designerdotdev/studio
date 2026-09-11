@@ -35,20 +35,30 @@
                         this.sidebar = !this.sidebar;
                         localStorage.setItem('studio.sidebar', this.sidebar ? '1' : '0');
                     },
-                    // The rail: which panel the sidebar shows. Clicking the active
-                    // rail item again collapses the panel; anything else opens it.
-                    // 'files' belongs to Code mode and is never restored on
-                    // its own — entering Code mode selects it.
+                    // The rail: which panel the sidebar shows. 'files' belongs to
+                    // Code mode and is never restored on its own — entering
+                    // Code mode selects it.
                     rail: (s => s === 'files' ? 'sections' : s)(localStorage.getItem('studio.rail') || 'sections'),
                     setRail(name, force = false) {
+                        // A left activity bar outlives the sidebar, so its active
+                        // item collapses the panel (VS Code). Top/bottom bars
+                        // live inside the sidebar: there it's just a tab.
                         if (!force && this.rail === name && this.sidebar) {
-                            this.toggleSidebar();
+                            if (this.activityBar === 'left') this.toggleSidebar();
                             return;
                         }
                         this.rail = name;
                         localStorage.setItem('studio.rail', name);
                         if (!this.sidebar) this.toggleSidebar();
                         window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name } }));
+                    },
+                    // Where the activity bar (the panel switcher) sits: across
+                    // the sidebar's top (default) or bottom, a strip to its
+                    // left, or hidden (panels stay reachable from ⌘K)
+                    activityBar: (p => ['left', 'top', 'bottom', 'hidden'].includes(p) ? p : 'top')(localStorage.getItem('studio.activity-bar')),
+                    setActivityBar(position) {
+                        this.activityBar = position;
+                        localStorage.setItem('studio.activity-bar', position);
                     },
                     // Editor chrome theme: dark by default, 'light' mirrors the Sites builder
                     theme: document.documentElement.classList.contains('studio-light') ? 'light' : 'dark',
@@ -657,6 +667,29 @@
                     </span>
                     <span class="s-chip" :class="$store.studio.theme === 'light' && '!border-accent/50 !text-accent'" x-text="$store.studio.theme === 'light' ? 'On' : 'Off'"></span>
                 </button>
+                {{-- Activity bar placement — a row of little window diagrams --}}
+                <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
+                    <span class="flex items-center gap-2.5">
+                        @include('studio::partials.activity-bar-glyph', ['position' => 'top'])
+                        Activity bar
+                    </span>
+                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Activity bar position">
+                        @foreach(['left' => 'Left', 'top' => 'Top', 'bottom' => 'Bottom', 'hidden' => 'Hidden'] as $value => $label)
+                            <button
+                                type="button"
+                                class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
+                                :class="$store.studio.activityBar === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
+                                @click="$store.studio.setActivityBar('{{ $value }}')"
+                                role="radio"
+                                :aria-checked="$store.studio.activityBar === '{{ $value }}'"
+                                title="{{ $label }}"
+                                aria-label="{{ $label }}"
+                            >
+                                @include('studio::partials.activity-bar-glyph', ['position' => $value])
+                            </button>
+                        @endforeach
+                    </span>
+                </div>
                 @if($liveUrl)
                     <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
                         <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
@@ -732,6 +765,10 @@
                     { label: 'Files panel', hint: 'Panel', when: studio.mode === 'code', run: () => studio.setRail('files', true) },
                     @endif
                     { label: studio.sidebar ? 'Hide the sidebar' : 'Show the sidebar', hint: 'Layout', run: () => studio.toggleSidebar() },
+                    { label: 'Activity bar: top', hint: 'Layout', when: studio.activityBar !== 'top', run: () => studio.setActivityBar('top') },
+                    { label: 'Activity bar: left', hint: 'Layout', when: studio.activityBar !== 'left', run: () => studio.setActivityBar('left') },
+                    { label: 'Activity bar: bottom', hint: 'Layout', when: studio.activityBar !== 'bottom', run: () => studio.setActivityBar('bottom') },
+                    { label: 'Activity bar: hidden', hint: 'Layout', when: studio.activityBar !== 'hidden', run: () => studio.setActivityBar('hidden') },
                     { label: 'Preview: desktop', hint: 'Device', run: () => studio.device = 'desktop' },
                     { label: 'Preview: tablet', hint: 'Device', run: () => studio.device = 'tablet' },
                     { label: 'Preview: mobile', hint: 'Device', run: () => studio.device = 'mobile' },

@@ -242,6 +242,14 @@ const StudioEditor = {
 
         if (typing) return;
 
+        // Cmd/Ctrl+B — collapse the sidebar for a full-width canvas (after
+        // the typing check: rich-text fields own ⌘B as bold)
+        if (meta && (key === 'b' || key === 'B')) {
+            preventDefault();
+            window.Alpine?.store('studio')?.toggleSidebar();
+            return;
+        }
+
         if (key === 'Escape') {
             if (this.selectedId) {
                 this.selectedId = null;
@@ -472,7 +480,7 @@ const StudioPreview = {
             const relevant = event.key === 'Escape'
                 || event.key === 'Backspace'
                 || event.key === 'Delete'
-                || ((event.metaKey || event.ctrlKey) && ['d', 'D', 's', 'S', 'k', 'K', 'ArrowUp', 'ArrowDown'].includes(event.key));
+                || ((event.metaKey || event.ctrlKey) && ['b', 'B', 'd', 'D', 's', 'S', 'k', 'K', 'ArrowUp', 'ArrowDown'].includes(event.key));
 
             if (!relevant) return;
 

@@ -332,28 +332,174 @@ html.studio-light {
         @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-line-strong bg-raised px-1 font-mono text-[10px] text-faint;
     }
 
-    /* --- the rail (panel switcher beside the sidebar) ---------------- */
+    /* --- workspace: sidebar + canvas as cards on the shell ----------- */
 
-    /* 48px wide under the topbar; the topbar's 8px left padding centres the
-       32px menu button over the rail's buttons */
-    .s-rail {
-        @apply flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-shell py-2;
+    /* 4px under the borderless topbar, 8px round the rest — the cards'
+       left edge lines up under the menu button (topbar pl-2) */
+    .s-workspace {
+        @apply flex min-h-0 flex-1 items-stretch px-2 pt-1 pb-2;
     }
 
-    .s-rail-btn {
-        @apply flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors duration-150;
+    .s-card {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        border-radius: 12px;
     }
 
-    .s-rail-btn:hover {
-        @apply text-ink bg-wash;
+    /* The hairline is drawn over the content, so an iframe or a panel's
+       own backgrounds can't paint across it */
+    .s-card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 30;
+        border: 1px solid var(--color-line);
+        border-radius: inherit;
+        pointer-events: none;
     }
 
-    .s-rail-btn.is-active {
-        @apply text-ink bg-wash-strong;
+    .s-sidebar {
+        @apply flex shrink-0 flex-col bg-panel;
+        width: 320px;
+        margin-right: 8px;
+        transition:
+            width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin-right 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 200ms ease;
     }
 
-    .s-rail-btn:active {
-        transform: scale(0.94);
+    .s-sidebar.is-collapsed {
+        width: 0;
+        margin-right: 0;
+        opacity: 0;
+    }
+
+    .s-stage {
+        @apply min-h-0 min-w-0 flex-1 bg-canvas;
+    }
+
+    /* --- the activity bar (panel switcher) --------------------------- */
+
+    .s-activity {
+        @apply relative flex shrink-0;
+    }
+
+    .s-activity-items {
+        @apply relative flex gap-0.5;
+    }
+
+    /* Across the top or bottom of the sidebar card */
+    .s-activity.is-horizontal {
+        @apply h-11 items-center justify-between px-1.5;
+    }
+
+    /* No hairline under a top bar: the icons flow straight into the panel
+       header, which draws its own */
+    .s-activity.is-top {
+        @apply pt-1;
+    }
+
+    .s-activity.is-bottom {
+        @apply border-t border-line;
+    }
+
+    /* A strip on the shell, left of the sidebar: 32px wide so its buttons
+       sit exactly under the menu button */
+    .s-activity.is-vertical {
+        @apply mr-2 w-8 flex-col items-center justify-between;
+    }
+
+    .s-activity.is-vertical .s-activity-items {
+        @apply flex-col gap-1;
+    }
+
+    .s-activity-btn {
+        @apply relative z-[1] flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint;
+        transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
+    }
+
+    .s-activity-btn:hover {
+        @apply text-ink;
+    }
+
+    .s-activity-btn:not(.is-active):hover {
+        @apply bg-wash;
+    }
+
+    .s-activity-btn.is-active {
+        @apply text-ink;
+    }
+
+    .s-activity-btn:active {
+        transform: scale(0.92);
+    }
+
+    .s-activity-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: -2px;
+    }
+
+    /* The active marker glides between buttons */
+    .s-activity-pill {
+        @apply pointer-events-none absolute top-0 left-0 h-8 w-8 rounded-lg bg-wash-strong;
+        box-shadow: inset 0 0 0 1px var(--color-wash), 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+
+    .s-activity-pill.is-ready {
+        transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Label tooltips: below a top bar, above a bottom bar, beside the strip */
+    .s-activity-btn[data-tip]::after {
+        content: attr(data-tip);
+        position: absolute;
+        z-index: 60;
+        padding: 4px 8px;
+        border-radius: 7px;
+        background: var(--color-ink);
+        color: var(--color-shell);
+        font-size: 11.5px;
+        font-weight: 500;
+        line-height: 1.2;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 120ms ease, translate 120ms ease;
+        transition-delay: 0ms;
+    }
+
+    .s-activity-btn[data-tip]:hover::after {
+        opacity: 1;
+        translate: 0 0;
+        transition-delay: 450ms;
+    }
+
+    .is-top .s-activity-btn[data-tip]::after {
+        top: calc(100% + 6px);
+        left: 0;
+        translate: 0 -3px;
+    }
+
+    .is-bottom .s-activity-btn[data-tip]::after {
+        bottom: calc(100% + 6px);
+        left: 0;
+        translate: 0 3px;
+    }
+
+    .is-horizontal .s-activity-btn.is-more[data-tip]::after {
+        left: auto;
+        right: 0;
+    }
+
+    .is-vertical .s-activity-btn[data-tip]::after {
+        top: 50%;
+        left: calc(100% + 10px);
+        translate: -3px -50%;
+    }
+
+    .is-vertical .s-activity-btn[data-tip]:hover::after {
+        translate: 0 -50%;
     }
 
     /* --- rich text (collections) ------------------------------------- */
@@ -446,8 +592,10 @@ html.studio-light {
 
     /* --- topbar ----------------------------------------------------- */
 
+    /* No bottom hairline: the topbar is the shell itself, flowing round
+       the workspace cards. pr-2 lines Publish up with the canvas edge. */
     .s-topbar {
-        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-shell pl-2 pr-3;
+        @apply relative z-40 flex h-12 shrink-0 items-center gap-1.5 bg-shell px-2;
     }
 
     /* Assistant suggestion — a wrapping outline button */
