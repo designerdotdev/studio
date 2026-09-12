@@ -599,6 +599,10 @@ const StudioPreview = {
     // of pointer events never forces more than one layout write per frame.
     pendingPaint: undefined,
     paintFrame: null,
+    // The last pointer position hoverAt() saw, in viewport coordinates — so
+    // scroll/resize (which move content under a pointer that never itself
+    // moved) can re-resolve the hover without a fresh mousemove.
+    lastPointer: null,
     renderUrl: null,
     csrf: null,
     // Per-section render state: an in-flight request, plus the newest
@@ -848,6 +852,13 @@ const StudioPreview = {
         document.querySelectorAll('[data-section].is-selected').forEach((el) => {
             el.classList.remove('is-selected');
         });
+
+        // A deselect drops every tier — otherwise a stale field/item
+        // selection (and its halo) could survive a mode switch or an
+        // empty-canvas click, and Esc would then walk up from state that
+        // no longer matches anything on screen.
+        this.selection = { tier: 'section', sectionId: null, path: null, key: null, index: null };
+        this.clearHover();
     },
 
     /* --- field + item tiers --------------------------------------- */
@@ -869,21 +880,51 @@ const StudioPreview = {
     hoverAt(event) {
         if (this.mode === 'preview') return this.clearHover();
 
-        const wrapper = event.target.closest?.('[data-section]');
+        this.lastPointer = { x: event.clientX, y: event.clientY };
+
+        this.resolveHover(event.target, event.clientX, event.clientY);
+    },
+
+    /**
+     * Re-resolve whatever is now under the last known pointer position.
+     * Scroll and resize move content under a pointer that never itself
+     * moved, so no `mousemove` fires to re-sync the fixed-position halo —
+     * without this it stays glued to its last screen coordinates while the
+     * field underneath it scrolls away. Re-resolving (rather than just
+     * clearing) means a stationary pointer during a wheel-scroll keeps
+     * tracking whatever field is now under it.
+     */
+    rehover() {
+        if (this.mode === 'preview') return;
+        if (!this.lastPointer) return;
+
+        const { x, y } = this.lastPointer;
+        const target = document.elementFromPoint(x, y);
+
+        if (!target) return this.clearHover();
+
+        this.resolveHover(target, x, y);
+    },
+
+    /** Shared by hoverAt() (from a real pointer event) and rehover() (from
+     * scroll/resize, which have no target of their own — elementFromPoint
+     * stands in for event.target). */
+    resolveHover(target, x, y) {
+        const wrapper = target.closest?.('[data-section]');
 
         if (!wrapper) return this.clearHover();
 
         const sectionId = wrapper.dataset.section;
-        const hit = this.tierAt(sectionId, event.clientX, event.clientY);
+        const hit = this.tierAt(sectionId, x, y);
 
         if (hit.tier === 'section') {
             // Inside the rendered markup but on nothing Studio owns
-            const inContent = !!event.target.closest?.('[data-section-content]');
+            const inContent = !!target.closest?.('[data-section-content]');
 
-            return inContent ? this.paintHalo(null, 'code', event) : this.clearHover();
+            return inContent ? this.paintHalo(null, 'code', { target }) : this.clearHover();
         }
 
-        this.paintHalo(hit, hit.tier, event);
+        this.paintHalo(hit, hit.tier, { target });
     },
 
     /**
@@ -1139,6 +1180,13 @@ const StudioPreview = {
 
         window.addEventListener('scroll', () => this.closeMenu(), { passive: true });
         window.addEventListener('resize', () => this.closeMenu());
+
+        // The canvas scrolls via the iframe's own documentElement, and
+        // scroll doesn't bubble — capture it at the document so a nested
+        // scroll container re-syncs the halo/chip too. Both re-resolve
+        // through the same rAF-batched queuePaint(), never writing directly.
+        document.addEventListener('scroll', () => this.rehover(), { capture: true, passive: true });
+        window.addEventListener('resize', () => this.rehover(), { passive: true });
     },
 
     sectionMenuItems(wrapper) {
