@@ -170,6 +170,7 @@
 
             .studio-cursor.is-item { background: #e08c2e; border-radius: 8px 8px 2px 8px; }
             .studio-cursor.is-code { background: rgba(70, 70, 80, 0.92); }
+            .studio-cursor.is-toggle { background: #e5484d; }
 
             .studio-cursor svg { width: 14px; height: 14px; }
             .studio-cursor span { font-size: 13px; font-weight: 700; line-height: 1; }
@@ -225,6 +226,78 @@
             }
 
             html.studio-preview .studio-control { display: none !important; }
+
+            /* ---- Toggle switch-off toast ----
+               studio.js's toast() helper renders straight into whichever
+               document it runs in; the canvas document never loads
+               studio.css (only studio.js, via @studioIframeCore), so the
+               toast markup needs its own styling here — a dark-chrome
+               match for the halo/cursor/control overlay above it, not the
+               editor window's design tokens. */
+            #studio-toasts {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 2147483008;
+                display: flex;
+                flex-direction: column-reverse;
+                align-items: center;
+                gap: 8px;
+                pointer-events: none;
+            }
+
+            .studio-toast {
+                pointer-events: auto;
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                max-width: 420px;
+                padding: 9px 14px 9px 11px;
+                border-radius: 12px;
+                background: rgba(12, 12, 14, 0.96);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: #fff;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 13px;
+                font-weight: 500;
+                box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.5);
+                cursor: pointer;
+                opacity: 0;
+                transform: translateY(8px) scale(0.97);
+                transition: opacity 200ms ease, transform 200ms cubic-bezier(0.21, 1.02, 0.73, 1);
+            }
+
+            .studio-toast.is-visible {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            .studio-toast__action {
+                margin-left: 4px;
+                padding: 3px 10px;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.06);
+                color: #fff;
+                font: inherit;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+
+            .studio-toast__action:hover {
+                background: rgba(255, 255, 255, 0.12);
+            }
+
+            .studio-toast__icon { display: flex; width: 16px; height: 16px; }
+            .studio-toast__icon svg { width: 16px; height: 16px; }
+            .studio-toast--success .studio-toast__icon { color: #4ade80; }
+            .studio-toast--error .studio-toast__icon { color: #f87171; }
+            .studio-toast--info .studio-toast__icon { color: #4c7dfa; }
+
+            html.studio-preview #studio-toasts { display: none !important; }
 
             /* A file dragged over an image field — a class on the target
                element itself, not a second overlay writer. */

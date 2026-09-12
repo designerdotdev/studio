@@ -687,6 +687,30 @@ const StudioFields = {
         return best;
     },
 
+    /**
+     * The toggle governing the point, when nothing more specific is there.
+     *
+     * `StudioFields.at()` deliberately never returns a `when` entry — a
+     * toggle governs a whole container and would shadow every field inside
+     * it. So a toggle is only offered where the pointer is over its
+     * governed element but over no field and no repeater item, which is
+     * exactly where the grey "set in code" state would otherwise paint.
+     */
+    toggleAt(target, sectionId) {
+        const el = target?.closest?.('[data-sf-when]');
+
+        if (!el) return null;
+
+        const wrapper = el.closest('[data-section]');
+
+        if (!wrapper || wrapper.dataset.section !== sectionId) return null;
+
+        const raw = el.getAttribute('data-sf-when');
+        const at = raw.lastIndexOf('@');
+
+        return { key: raw.slice(0, at), line: Number(raw.slice(at + 1)) || 0, el, index: null, subKey: null, kind: 'when' };
+    },
+
     refFor(sectionId) {
         return document.querySelector(`[data-section="${sectionId}"]`)?.dataset.ref || null;
     },
@@ -1290,6 +1314,36 @@ const StudioPreview = {
         });
     },
 
+    /**
+     * Switch a toggle off from the canvas — the only direction a canvas
+     * click can take one. When a `when` block is false its governed
+     * element isn't rendered at all, so there is nothing left on the
+     * canvas to hover or click (toggleAt() finds no marker); turning one
+     * back on stays an inspector action.
+     *
+     * Hiding a whole block on a single click reads as destructive, so it's
+     * undoable via a toast — the same affordance section deletion uses
+     * (`studio:toast`'s `{label, dispatch}` action), just resolved locally:
+     * the value and the render call needed to restore it both live on
+     * this side of the canvas already, so there's no server round trip to
+     * wire up.
+     */
+    openToggle(entry, sectionId, box) {
+        const on = String(this.currentValue(sectionId, entry) ?? '1') !== '0';
+
+        // The canvas can only turn a toggle OFF: when it is false the
+        // governed element is not rendered, so there is nothing to hover.
+        // Turning one back on stays an inspector action.
+        if (!on) return;
+
+        this.fieldValue(entry, sectionId, '0');
+
+        toast(`“${this.labelFor(entry, sectionId)}” turned off`, 'success', 3200, {
+            label: 'Undo',
+            onClick: () => this.fieldValue(entry, sectionId, '1'),
+        });
+    },
+
     /* --- selection ------------------------------------------------ */
 
     select(sectionId, event) {
@@ -1407,6 +1461,21 @@ const StudioPreview = {
                 this.post('studio:section-selected', { sectionId });
 
                 return;
+            } else {
+                // Nothing more specific was hit — the same position
+                // resolveHover() offers the toggle halo/cursor at. Same gate
+                // as the hover path: a php:/blade:-bound or collection-bound
+                // toggle offers nothing, and the click falls through to a
+                // plain section selection below, same as any other
+                // code-rendered content.
+                const toggleEntry = StudioFields.toggleAt(event.target, sectionId);
+
+                if (toggleEntry
+                    && this.editabilityOf(toggleEntry, sectionId) !== 'code'
+                    && !this.isCollectionBound(sectionId, toggleEntry.key)
+                ) {
+                    this.openToggle(toggleEntry, sectionId, StudioFields.box(toggleEntry));
+                }
             }
         }
 
@@ -1524,6 +1593,21 @@ const StudioPreview = {
         }
 
         if (hit.tier === 'section') {
+            // Nothing more specific is under the pointer — exactly where the
+            // grey "set in code" halo would otherwise paint. Offer the
+            // toggle governing this position instead, when there is one and
+            // it isn't bound in code or to a collection row (editabilityOf/
+            // isCollectionBound are the same gate select() consults, so
+            // hover and click never disagree).
+            const toggleEntry = StudioFields.toggleAt(target, sectionId);
+
+            if (toggleEntry
+                && this.editabilityOf(toggleEntry, sectionId) !== 'code'
+                && !this.isCollectionBound(sectionId, toggleEntry.key)
+            ) {
+                return this.paintHalo({ tier: 'field', entry: toggleEntry }, 'field', { target, sectionId });
+            }
+
             // Inside the rendered markup but on nothing Studio owns
             const inContent = !!target.closest?.('[data-section-content]');
 
@@ -1714,6 +1798,7 @@ const StudioPreview = {
             color: '<svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="6"/></svg>',
             item: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 4.5h13v3h-13v-3Zm0 4.75h13v3h-13v-3Zm0 4.75h13v3h-13v-3Z"/></svg>',
             code: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 5.2a1 1 0 0 1 .2 1.4L5.25 10l2.55 3.4a1 1 0 1 1-1.6 1.2l-3-4a1 1 0 0 1 0-1.2l3-4a1 1 0 0 1 1.4-.2Zm4.8 0a1 1 0 0 1 1.4.2l3 4a1 1 0 0 1 0 1.2l-3 4a1 1 0 1 1-1.6-1.2L14.75 10 12.2 6.6a1 1 0 0 1 .2-1.4Z"/></svg>',
+            toggle: '<svg viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="7" width="16" height="6" rx="3" opacity="0.35"/><circle cx="13" cy="10" r="4"/></svg>',
         },
 
         mount() {
@@ -1727,7 +1812,7 @@ const StudioPreview = {
                 this.kind = kind;
                 this.el.innerHTML = this.glyphs[kind] || this.glyphs.text;
                 this.el.className = 'studio-cursor is-on'
-                    + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
+                    + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'toggle' ? ' is-toggle' : '');
             }
 
             this.el.classList.add('is-on');
@@ -1768,6 +1853,8 @@ const StudioPreview = {
         if (kind === 'code') return 'code';
 
         const entry = hit.entry;
+
+        if (entry.kind === 'when') return 'toggle';
 
         if (entry.kind === 'attr') {
             if (entry.attribute === 'src' || entry.attribute === 'srcset') return 'image';
