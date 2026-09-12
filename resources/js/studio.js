@@ -2090,6 +2090,10 @@ const StudioPreview = {
         const drag = this.itemDrag;
         if (!drag.active) return;
 
+        // A mode switch mid-drag (⌘K to the palette, say) must not let a
+        // drag that started in Edit still commit once Preview is inert.
+        if (this.mode === 'preview') return this.dragItemEnd(false);
+
         const target = this.itemAtForKey(drag.sectionId, drag.key, event.clientX, event.clientY);
 
         if (!target) return;
