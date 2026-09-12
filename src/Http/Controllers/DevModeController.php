@@ -320,7 +320,25 @@ class DevModeController extends Controller
         if ($commaOffset !== null) {
             $commaAt = $openBracket + $commaOffset;
             $blade = substr($blade, 0, $commaAt) . ',' . substr($blade, $commaAt);
-            $insertAt++;
+
+            // $insertAt is a line-start guess computed on the pre-splice
+            // text; it only stays valid — one character further along —
+            // when the comma landed strictly before it (the closing
+            // bracket on its own line, the common shape). When the last
+            // element and the closing bracket share a line, the comma can
+            // land at or after that guess, and blindly incrementing it
+            // would splice the new entry mid-indent or even mid-string.
+            // Deriving it from the comma's own (post-splice) position
+            // instead always lands the new entry right after the real
+            // last element — that position sits mid-line rather than at a
+            // fresh line's start, so the entry needs its own leading
+            // newline this time.
+            if ($commaAt < $insertAt) {
+                $insertAt++;
+            } else {
+                $insertAt = $commaAt + 1;
+                $entry = "\n" . $entry;
+            }
         }
 
         return substr($blade, 0, $insertAt) . $entry . substr($blade, $insertAt);
@@ -507,17 +525,19 @@ class DevModeController extends Controller
 
     /**
      * Same guarantee as the YAML side, for the Blade half — held to the
-     * standard the ORIGINAL array already met, not a stricter one: a
-     * rewritten array is required to still parse as a pure PHP literal
-     * (never evaluating it — see `PhpLiteral`) only when the original one
-     * did. A hand-written section may legitimately mix in a non-literal
-     * default somewhere else in the array (a helper call, a constant);
-     * requiring the whole array to be a literal after our edit would
-     * refuse a perfectly valid promotion over an untouched neighbour. When
-     * the original wasn't a pure literal either, the weaker but still
-     * meaningful check is: the brackets still balance (guaranteed by
-     * `findBracketedArray` returning a match at all) and the exact entry
-     * we spliced in is really there.
+     * standard the ORIGINAL array already met, not a stricter one. Every
+     * rewrite must clear one floor unconditionally: `arrayTokenizesCleanly()`
+     * (PHP's own tokenizer, in strict `TOKEN_PARSE` mode) has to accept it
+     * as syntactically real PHP — that guarantee must not depend on a
+     * subtlety of `PhpLiteral`'s own grammar (it happens to also reject a
+     * missing comma, but the floor shouldn't be resting on "happens to").
+     * On top of that floor, a rewritten array is required to still parse
+     * as a pure PHP literal (never evaluating it — see `PhpLiteral`) only
+     * when the original one did: a hand-written section may legitimately
+     * mix in a non-literal default somewhere else in the array (a helper
+     * call, a constant), and requiring the whole array to be a literal
+     * after our edit would refuse a perfectly valid promotion over an
+     * untouched neighbour.
      */
     protected function propsArrayIsValid(string $originalBlade, string $newBlade, string $key): bool
     {
@@ -536,6 +556,10 @@ class DevModeController extends Controller
         [$newOpen, $newClose] = $newBounds;
         $newArrayText = substr($newBlade, $newOpen, $newClose - $newOpen + 1);
 
+        if (!$this->arrayTokenizesCleanly($newArrayText)) {
+            return false;
+        }
+
         $originalPropsAt = strpos($originalBlade, '@props(');
         $originalBounds = $originalPropsAt === false ? null : $this->findBracketedArray($originalBlade, $originalPropsAt);
         $originalWasLiteral = false;
@@ -552,13 +576,10 @@ class DevModeController extends Controller
         }
 
         // The array carries something PhpLiteral can't evaluate (a helper
-        // call, a constant) elsewhere — that's fine, but the rewrite still
-        // has to be syntactically real PHP. TOKEN_PARSE makes the
-        // tokenizer itself enforce that (it throws on exactly the missing-
-        // comma shape this feature exists to guard against), which is a
-        // genuine syntax check rather than a substring guess.
-        return $this->arrayTokenizesCleanly($newArrayText)
-            && str_contains($newArrayText, "'{$key}' => ''");
+        // call, a constant) elsewhere — that's fine, the syntax floor above
+        // already covers it; just confirm the exact entry we spliced in is
+        // really there.
+        return str_contains($newArrayText, "'{$key}' => ''");
     }
 
     /** Whether `$arrayText` (a `[...]` array literal) is syntactically valid PHP. */
