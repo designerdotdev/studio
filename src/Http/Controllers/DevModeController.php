@@ -3,6 +3,7 @@
 namespace Designer\Studio\Http\Controllers;
 
 use Designer\Studio\Services\DesignSyncService;
+use Designer\Studio\Services\Site\PhpLiteral;
 use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Support\DevMode;
 use Designer\Studio\Support\SitePaths;
@@ -156,6 +157,12 @@ class DevModeController extends Controller
         $blade = (string) file_get_contents($files['blade']);
         $newBlade = $this->appendPropDefault($blade, $key);
 
+        // Same guarantee as the YAML side: nothing is written unless the
+        // rewritten @props array is provably still valid PHP.
+        if (!$this->propsArrayIsValid($newBlade, $key)) {
+            return response()->json(['success' => false, 'message' => 'Could not add that field: the result was not valid PHP.'], 500);
+        }
+
         File::put($files['yaml'], $newYaml);
         File::put($files['blade'], $newBlade);
 
@@ -273,15 +280,84 @@ class DevModeController extends Controller
             return "@props([\n    '{$key}' => '',\n])\n" . $blade;
         }
 
+        [$openBracket, $closeBracket] = $this->findBracketedArray($blade, $propsAt) ?? [null, null];
+
+        if ($openBracket === null) {
+            return $blade;
+        }
+
+        $inner = substr($blade, $openBracket + 1, $closeBracket - $openBracket - 1);
+        $indent = '    ';
+
+        if (preg_match('/\n(\s+)\S/', $inner, $m)) {
+            $indent = $m[1];
+        }
+
+        $newlineInside = strpos($inner, "\n") !== false;
+
+        if (!$newlineInside) {
+            $entry = "\n" . $indent . "'{$key}' => '',\n";
+
+            return substr($blade, 0, $openBracket + 1) . $entry . substr($blade, $openBracket + 1);
+        }
+
+        $lineStart = strrpos(substr($blade, 0, $closeBracket), "\n");
+        $insertAt = $lineStart === false ? $openBracket + 1 : $lineStart + 1;
+
+        // A hand-written array's last entry may have no trailing comma yet
+        // (valid PHP — one is only required BEFORE a further element): find
+        // the last non-blank line before the closing bracket and add one,
+        // or the new entry would run straight into it as a syntax error.
+        $before = substr($blade, $openBracket + 1, $insertAt - $openBracket - 1);
+        $lines = explode("\n", $before);
+        $offsets = [];
+        $pos = 0;
+
+        foreach ($lines as $line) {
+            $offsets[] = $pos;
+            $pos += strlen($line) + 1;
+        }
+
+        $idx = count($lines) - 1;
+
+        while ($idx >= 0 && trim($lines[$idx]) === '') {
+            $idx--;
+        }
+
+        $entry = $indent . "'{$key}' => '',\n";
+
+        if ($idx >= 0) {
+            $bare = rtrim((string) preg_replace('#//[^\n]*$#', '', $lines[$idx]));
+
+            if ($bare !== '' && !str_ends_with($bare, ',')) {
+                $commaAt = $openBracket + 1 + $offsets[$idx] + strlen($bare);
+                $blade = substr($blade, 0, $commaAt) . ',' . substr($blade, $commaAt);
+                $insertAt++;
+            }
+        }
+
+        return substr($blade, 0, $insertAt) . $entry . substr($blade, $insertAt);
+    }
+
+    /**
+     * Bracket-depth (and quote-aware) scan for the `[...]` array right
+     * after `@props(` — a naive search for the first `]` would stop short
+     * of a default value that contains its own `[]` (an empty repeater
+     * default, say). Returns `[openBracket, closeBracket]` byte offsets
+     * into `$blade`, or null if the array has no matching close.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    protected function findBracketedArray(string $blade, int $propsAt): ?array
+    {
         $openBracket = strpos($blade, '[', $propsAt);
 
         if ($openBracket === false) {
-            return $blade;
+            return null;
         }
 
         $depth = 0;
         $inString = null;
-        $closeBracket = null;
 
         for ($i = $openBracket, $len = strlen($blade); $i < $len; $i++) {
             $char = $blade[$i];
@@ -316,36 +392,40 @@ class DevModeController extends Controller
                 $depth--;
 
                 if ($depth === 0) {
-                    $closeBracket = $i;
-
-                    break;
+                    return [$openBracket, $i];
                 }
             }
         }
 
-        if ($closeBracket === null) {
-            return $blade;
+        return null;
+    }
+
+    /**
+     * Same guarantee as the YAML side, for the Blade half: parse the
+     * rewritten `@props([...])` array as a PHP literal — never evaluating
+     * it — and refuse to write anything unless it is still one, and still
+     * carries the new key. `PhpLiteral` already does exactly this parsing
+     * for bound component attributes; reusing it here means a bug in the
+     * splice above fails loudly instead of corrupting the section's file.
+     */
+    protected function propsArrayIsValid(string $blade, string $key): bool
+    {
+        $propsAt = strpos($blade, '@props(');
+
+        if ($propsAt === false) {
+            return false;
         }
 
-        $inner = substr($blade, $openBracket + 1, $closeBracket - $openBracket - 1);
-        $indent = '    ';
+        $bounds = $this->findBracketedArray($blade, $propsAt);
 
-        if (preg_match('/\n(\s+)\S/', $inner, $m)) {
-            $indent = $m[1];
+        if ($bounds === null) {
+            return false;
         }
 
-        $newlineInside = strpos($inner, "\n") !== false;
+        [$open, $close] = $bounds;
+        [$isLiteral, $value] = PhpLiteral::parse(substr($blade, $open, $close - $open + 1));
 
-        if ($newlineInside) {
-            $lineStart = strrpos(substr($blade, 0, $closeBracket), "\n");
-            $insertAt = $lineStart === false ? $openBracket + 1 : $lineStart + 1;
-            $entry = $indent . "'{$key}' => '',\n";
-        } else {
-            $insertAt = $openBracket + 1;
-            $entry = "\n" . $indent . "'{$key}' => '',\n";
-        }
-
-        return substr($blade, 0, $insertAt) . $entry . substr($blade, $insertAt);
+        return $isLiteral && is_array($value) && array_key_exists($key, $value);
     }
 
     /**
