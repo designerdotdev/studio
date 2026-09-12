@@ -20,7 +20,7 @@
         turn: null,
         source: null,
         live: { text: '', activity: null, files: [] },
-        element: null,          // {sectionId, ref, path, tag, text}
+        element: null,          // {sectionId, ref, path, tag, text, field, itemIndex, subKey, source}
         picking: false,
 
         init() {
@@ -51,7 +51,15 @@
             const section = $wire.get('selected');
             const context = { page: this.page };
             if (section) context.section = section;
-            if (this.element) context.element = { path: this.element.path, tag: this.element.tag, text: this.element.text };
+            if (this.element) context.element = {
+                path: this.element.path,
+                tag: this.element.tag,
+                text: this.element.text,
+                field: this.element.field,
+                itemIndex: this.element.itemIndex,
+                subKey: this.element.subKey,
+                source: this.element.source,
+            };
 
             this.busy = true;
             this.live = { text: '', activity: 'Starting…', files: [] };
