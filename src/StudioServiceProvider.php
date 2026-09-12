@@ -89,15 +89,23 @@ class StudioServiceProvider extends ServiceProvider
         $this->registerAssetDirectives();
 
         if ($this->app->runningInConsole()) {
-            $this->commands([
+            $commands = [
                 DevReset::class,
-                InlineVerify::class,
                 PublishAssets::class,
                 SyncDesigns::class,
                 TemplatesImport::class,
                 TemplatesSync::class,
                 Uninstall::class,
-            ]);
+            ];
+
+            // Read-only regression gate for inline editing, but still a
+            // dev-mode surface per the spec — same gate as the dev-mode
+            // routes and the Code-mode workspace.
+            if (\Designer\Studio\Support\DevMode::enabled()) {
+                $commands[] = InlineVerify::class;
+            }
+
+            $this->commands($commands);
 
             $this->publishes([
                 __DIR__ . '/../config/studio.php' => config_path('studio.php'),

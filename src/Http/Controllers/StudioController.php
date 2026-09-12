@@ -266,10 +266,26 @@ class StudioController extends Controller
 
             $componentPaths[$section['ref']] = $component->path;
             $componentContracts[$section['ref']] = collect($component->fields)
-                ->map(fn ($config, $key) => [
-                    'label' => $config['label'] ?? \Illuminate\Support\Str::headline($key),
-                    'type' => $config['type'] ?? 'text',
-                ])
+                ->map(function ($config, $key) {
+                    $contract = [
+                        'label' => $config['label'] ?? \Illuminate\Support\Str::headline($key),
+                        'type' => $config['type'] ?? 'text',
+                    ];
+
+                    // A repeater's own type ("repeater") tells the canvas
+                    // nothing about whether a given sub-field is inline
+                    // text-editable — that lives one level down, per item.
+                    if (!empty($config['sub_fields']) && is_array($config['sub_fields'])) {
+                        $contract['sub_fields'] = collect($config['sub_fields'])
+                            ->map(fn ($sub, $subKey) => [
+                                'label' => $sub['label'] ?? \Illuminate\Support\Str::headline($subKey),
+                                'type' => $sub['type'] ?? 'text',
+                            ])
+                            ->all();
+                    }
+
+                    return $contract;
+                })
                 ->all();
         }
 

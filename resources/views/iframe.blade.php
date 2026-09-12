@@ -111,10 +111,6 @@
                 opacity: 1;
             }
 
-            .studio-fhalo.is-selected {
-                box-shadow: inset 0 0 0 2px #4c7dfa;
-            }
-
             .studio-fchip {
                 position: fixed;
                 z-index: 2147483004;
