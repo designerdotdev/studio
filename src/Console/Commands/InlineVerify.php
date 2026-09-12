@@ -3,6 +3,7 @@
 namespace Designer\Studio\Console\Commands;
 
 use Designer\Studio\Services\Inline\EchoScanner;
+use Designer\Studio\Services\Inline\Instrumenter;
 use Designer\Studio\Support\SitePaths;
 use Illuminate\Console\Command;
 use Symfony\Component\Yaml\Yaml;
@@ -25,7 +26,7 @@ class InlineVerify extends Command
     protected const EXPECT_MAPPED = 365;
     protected const EXPECT_FIELDS = 369;
 
-    public function handle(EchoScanner $scanner): int
+    public function handle(EchoScanner $scanner, Instrumenter $instrumenter): int
     {
         $sections = $this->sections();
 
@@ -82,7 +83,104 @@ class InlineVerify extends Command
             return self::FAILURE;
         }
 
+        $this->newLine();
+
+        if (!$this->inertness($sections, $instrumenter)) {
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
+    }
+
+    /**
+     * The invariant: stripping the sentinels out of an instrumented render
+     * must reproduce the plain render byte for byte. If this ever fails, a
+     * sentinel is changing the page rather than just describing it.
+     *
+     * @param array<string, array<string, array>> $sections
+     */
+    protected function inertness(array $sections, Instrumenter $instrumenter): bool
+    {
+        $identical = 0;
+        $diverged = [];
+        $unrenderable = 0;
+        $sentinels = 0;
+
+        foreach ($sections as $base => $fields) {
+            $source = (string) file_get_contents($base . '.blade.php');
+
+            // The defaults a section sees when nothing has been edited, the
+            // way ComponentData::resolveVariables resolves them.
+            $variables = [];
+            foreach ($fields as $key => $config) {
+                $variables[$key] = ($config['type'] ?? 'text') === 'repeater' ? [] : ($config['default'] ?? '');
+            }
+
+            $plain = $this->render($source, $variables);
+
+            if ($plain === null) {
+                // Layout files need $site/$slot globals a bare render has no
+                // way to supply; they are not canvas sections.
+                $unrenderable++;
+
+                continue;
+            }
+
+            $marked = $this->render($instrumenter->weave($source, $fields), $variables);
+
+            if ($marked === null) {
+                $diverged[] = basename($base) . ' (instrumented render threw)';
+
+                continue;
+            }
+
+            $sentinels += substr_count($marked, '<!--sf:');
+
+            if ($instrumenter->strip($marked) === $plain) {
+                $identical++;
+
+                continue;
+            }
+
+            $offset = 0;
+            $stripped = $instrumenter->strip($marked);
+            $limit = min(strlen($plain), strlen($stripped));
+
+            while ($offset < $limit && $plain[$offset] === $stripped[$offset]) {
+                $offset++;
+            }
+
+            $diverged[] = sprintf(
+                "%s diverges at byte %d\n      plain: %s\n      strip: %s",
+                basename($base),
+                $offset,
+                json_encode(substr($plain, max(0, $offset - 40), 90)),
+                json_encode(substr($stripped, max(0, $offset - 40), 90))
+            );
+        }
+
+        $this->info(sprintf(
+            'Inertness: %d identical, %d diverged, %d unrenderable, %d sentinels rendered',
+            $identical,
+            count($diverged),
+            $unrenderable,
+            $sentinels
+        ));
+
+        foreach ($diverged as $line) {
+            $this->error('  ' . $line);
+        }
+
+        return $diverged === [];
+    }
+
+    protected function render(string $source, array $variables): ?string
+    {
+        try {
+            return \Designer\Studio\Support\NestedBlade::render($source, $variables);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
