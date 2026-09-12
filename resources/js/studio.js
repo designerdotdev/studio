@@ -326,6 +326,264 @@ function isTyping(doc = document) {
 /*  Preview runtime (inside the canvas iframe)                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The canvas field map.
+ *
+ * Section markup arrives carrying comment sentinels around every echo of a
+ * declared field (`<!--sf:headingStart@41-->…<!--/sf-->`), plus
+ * `data-sf-attr` / `data-sf-when` on tags. This walks them into live Ranges
+ * and elements, so the DOM itself becomes the index: a field's box comes
+ * from `Range.getBoundingClientRect()`, which fits the text exactly even
+ * when three fields share one <h1>.
+ *
+ * Anything with no entry is, by definition, set in code.
+ */
+const StudioFields = {
+    maps: {},       // sectionId → { entries: [...], items: [...] }
+    paths: {},      // ref → 'sections/hero'
+    contracts: {},  // ref → { key: { label, type } }
+
+    init(paths, contracts) {
+        this.paths = paths || {};
+        this.contracts = contracts || {};
+        this.indexAll();
+    },
+
+    indexAll() {
+        this.maps = {};
+        document.querySelectorAll('[data-section]').forEach((wrapper) => this.index(wrapper));
+    },
+
+    /** (Re)build the map for one section. Called after every paint. */
+    index(wrapper) {
+        const sectionId = wrapper.dataset.section;
+        const content = wrapper.querySelector('[data-section-content]');
+
+        if (!sectionId || !content) return;
+
+        const entries = [];
+        const open = [];
+        const walker = document.createTreeWalker(content, NodeFilter.SHOW_COMMENT);
+
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const value = node.nodeValue || '';
+
+            if (value.startsWith('sf:')) {
+                const at = value.lastIndexOf('@');
+                open.push({ raw: value.slice(3, at), line: Number(value.slice(at + 1)) || 0, start: node });
+                continue;
+            }
+
+            if (value === '/sf' && open.length) {
+                const { raw, line, start } = open.pop();
+                const range = document.createRange();
+
+                try {
+                    range.setStartAfter(start);
+                    range.setEndBefore(node);
+                } catch (e) {
+                    continue;
+                }
+
+                entries.push({ ...this.parsePath(raw), line, kind: 'text', range, el: null });
+            }
+        }
+
+        // Attribute and toggle markers live on the tag itself
+        content.querySelectorAll('[data-sf-attr]').forEach((el) => {
+            el.getAttribute('data-sf-attr').split(';').forEach((pair) => {
+                const [attribute, rest] = pair.split(':');
+                if (!rest) return;
+                const at = rest.lastIndexOf('@');
+                entries.push({
+                    ...this.parsePath(rest.slice(0, at)),
+                    line: Number(rest.slice(at + 1)) || 0,
+                    kind: 'attr',
+                    attribute,
+                    range: null,
+                    el,
+                });
+            });
+        });
+
+        content.querySelectorAll('[data-sf-when]').forEach((el) => {
+            const raw = el.getAttribute('data-sf-when');
+            const at = raw.lastIndexOf('@');
+            entries.push({
+                ...this.parsePath(raw.slice(0, at)),
+                line: Number(raw.slice(at + 1)) || 0,
+                kind: 'when',
+                range: null,
+                el,
+            });
+        });
+
+        this.maps[sectionId] = { entries, items: this.groupItems(entries) };
+    },
+
+    /** `people.0.name` → {path, key: 'people', index: 0, subKey: 'name'} */
+    parsePath(raw) {
+        const parts = raw.split('.');
+
+        if (parts.length >= 3 && /^\d+$/.test(parts[1])) {
+            return { path: raw, key: parts[0], index: Number(parts[1]), subKey: parts.slice(2).join('.') };
+        }
+
+        return { path: raw, key: parts[0], index: null, subKey: null };
+    },
+
+    /**
+     * Repeater items are derived, not instrumented: entries sharing a
+     * `key.index` prefix are grouped and their nearest common ancestor
+     * element becomes the item's box.
+     */
+    groupItems(entries) {
+        const groups = {};
+
+        entries.forEach((entry) => {
+            if (entry.index === null) return;
+            const id = entry.key + '.' + entry.index;
+            (groups[id] = groups[id] || []).push(entry);
+        });
+
+        return Object.entries(groups)
+            .map(([id, members]) => ({
+                id,
+                key: members[0].key,
+                index: members[0].index,
+                el: this.commonAncestor(members),
+            }))
+            .filter((item) => item.el);
+    },
+
+    commonAncestor(entries) {
+        const elementOf = (entry) => {
+            const node = entry.range ? entry.range.commonAncestorContainer : entry.el;
+            return node && node.nodeType === 1 ? node : node?.parentElement || null;
+        };
+
+        let el = elementOf(entries[0]);
+
+        for (const entry of entries.slice(1)) {
+            const other = elementOf(entry);
+            while (el && other && !el.contains(other)) el = el.parentElement;
+        }
+
+        return el;
+    },
+
+    entriesFor(sectionId) {
+        return this.maps[sectionId]?.entries || [];
+    },
+
+    /** Every rect a field occupies — text wraps, so there may be several. */
+    rects(entry) {
+        if (entry.kind === 'text' && entry.range) {
+            return Array.from(entry.range.getClientRects());
+        }
+
+        return entry.el ? [entry.el.getBoundingClientRect()] : [];
+    },
+
+    /** The union box, for drawing a halo around a whole wrapped heading. */
+    box(entry) {
+        const rects = this.rects(entry);
+
+        if (!rects.length) return null;
+
+        const left = Math.min(...rects.map((r) => r.left));
+        const top = Math.min(...rects.map((r) => r.top));
+        const right = Math.max(...rects.map((r) => r.right));
+        const bottom = Math.max(...rects.map((r) => r.bottom));
+
+        return { left, top, width: right - left, height: bottom - top };
+    },
+
+    /**
+     * The field under a point. Text entries win over attribute ones (an
+     * image's alt text and its src share an element), and the smallest
+     * matching box wins so a nested field beats its container.
+     */
+    at(sectionId, x, y) {
+        let best = null;
+        let bestArea = Infinity;
+
+        for (const entry of this.entriesFor(sectionId)) {
+            if (entry.kind === 'when') continue;
+
+            for (const rect of this.rects(entry)) {
+                if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+
+                const area = rect.width * rect.height;
+
+                if (area < bestArea) {
+                    best = entry;
+                    bestArea = area;
+                }
+            }
+        }
+
+        return best;
+    },
+
+    itemAt(sectionId, x, y) {
+        let best = null;
+        let bestArea = Infinity;
+
+        for (const item of this.maps[sectionId]?.items || []) {
+            const rect = item.el.getBoundingClientRect();
+
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+
+            const area = rect.width * rect.height;
+
+            if (area < bestArea) {
+                best = item;
+                bestArea = area;
+            }
+        }
+
+        return best;
+    },
+
+    refFor(sectionId) {
+        return document.querySelector(`[data-section="${sectionId}"]`)?.dataset.ref || null;
+    },
+
+    /** The source file behind a section wrapper, for the provenance chip. */
+    sourceFor(sectionId) {
+        const ref = this.refFor(sectionId);
+
+        return ref && this.paths[ref] ? this.paths[ref] : null;
+    },
+
+    /** The declared `{label, type}` for a field, or null when undeclared. */
+    contractFor(sectionId, key) {
+        const ref = this.refFor(sectionId);
+
+        return (ref && this.contracts[ref]?.[key]) || null;
+    },
+
+    debug() {
+        const rows = [];
+
+        Object.entries(this.maps).forEach(([sectionId, map]) => {
+            map.entries.forEach((entry) => rows.push({
+                section: sectionId,
+                path: entry.path,
+                kind: entry.kind + (entry.attribute ? ':' + entry.attribute : ''),
+                line: entry.line,
+                text: entry.kind === 'text' ? (entry.range?.toString() || '').slice(0, 40) : '',
+            }));
+            map.items.forEach((item) => rows.push({ section: sectionId, path: item.id, kind: 'item', line: '', text: '' }));
+        });
+
+        console.table(rows);
+
+        return rows.length;
+    },
+};
+
 const StudioPreview = {
     variables: {},
     refs: {},
@@ -355,7 +613,7 @@ const StudioPreview = {
         }
     },
 
-    init({ variables, bindings, refs, blocks, renderUrl, csrf }) {
+    init({ variables, bindings, refs, blocks, renderUrl, csrf, paths, contracts }) {
         this.variables = variables || {};
         // Per-section {field: 'collections.<name>'} — sent with every render
         // so bound repeaters keep reading the collection, not stale values
@@ -379,6 +637,8 @@ const StudioPreview = {
         this.setMode(savedMode === 'preview' || savedMode === null ? 'preview' : 'edit');
 
         this.setupContextMenu();
+
+        StudioFields.init(paths, contracts);
 
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
@@ -903,6 +1163,9 @@ const StudioPreview = {
         if (window.Alpine?.initTree) {
             window.Alpine.initTree(el);
         }
+
+        // The sentinels came with the new markup — rebuild this section's map
+        StudioFields.index(el.closest('[data-section]'));
     },
 };
 
@@ -915,6 +1178,7 @@ window.Studio = {
 
     editor: StudioEditor,
     preview: StudioPreview,
+    fields: StudioFields,
 
     // Set by the dev-mode code modal so global shortcuts stand down
     codeModalOpen: false,

@@ -249,6 +249,30 @@ class StudioController extends Controller
         $push($pageComponents, 'page', 0, count($pageComponents));
         $push($regions['after'], 'layout', count($regions['before']) + 1, $layoutCount);
 
+        // ref → source path, and ref → {key: {label, type}}. The sentinels
+        // carry only a path and a line, so the labels and types the chips and
+        // the editor need travel once, per ref, instead of per echo.
+        $componentPaths = [];
+        $componentContracts = [];
+
+        foreach ($sections as $section) {
+            if (isset($componentPaths[$section['ref']])) {
+                continue;
+            }
+
+            if (!$component = $this->components->find($section['ref'])) {
+                continue;
+            }
+
+            $componentPaths[$section['ref']] = $component->path;
+            $componentContracts[$section['ref']] = collect($component->fields)
+                ->map(fn ($config, $key) => [
+                    'label' => $config['label'] ?? \Illuminate\Support\Str::headline($key),
+                    'type' => $config['type'] ?? 'text',
+                ])
+                ->all();
+        }
+
         return view('studio::iframe', [
             'page' => $page,
             'sections' => $sections,
@@ -260,6 +284,8 @@ class StudioController extends Controller
             'layoutAfterCount' => count($regions['after']),
             'layoutComponentCount' => $layoutCount,
             'pageSectionCount' => count($pageComponents),
+            'componentPaths' => $componentPaths,
+            'componentContracts' => $componentContracts,
         ]);
     }
 
