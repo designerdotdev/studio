@@ -1494,6 +1494,13 @@
                 async openFileAt(path, line) {
                     await this.openFile(path);
 
+                    // openFile() swallows its own errors (sets `error`, no
+                    // rethrow) — if the target failed to open (deleted,
+                    // renamed, no permission), `active` is left pointing at
+                    // whatever file was already open. Bail rather than move
+                    // that unrelated file's caret.
+                    if (this.active !== path) return;
+
                     const editor = studioCodeBuffers.editor;
 
                     if (!editor || !line) return;

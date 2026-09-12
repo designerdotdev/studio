@@ -612,6 +612,9 @@ const StudioPreview = {
     // single field. Esc walks up one tier at a time.
     selection: { tier: 'section', sectionId: null, path: null, key: null, index: null },
     hovered: null,
+    // The last { source, line } highlightLine() painted — lets a Monaco
+    // cursor move that only advances the column skip the rescan/scroll.
+    lastHighlight: null,
     // Hover geometry is read (getClientRects/getBoundingClientRect) on every
     // mousemove, but the halo/chip are only ever written from a single
     // rAF-batched flush below — see queuePaint()/flushPaint() — so a flurry
@@ -1111,7 +1114,13 @@ const StudioPreview = {
         chip.style.left = box.left + 'px';
         chip.style.top = Math.max(0, box.top - 18) + 'px';
 
-        this.cursor.show(cursorKind);
+        // A code-triggered highlight has no pointer position to show a type
+        // cursor at (cursorKind is null), so it's a genuine skip — leave
+        // whatever the badge was already doing alone. A real hover/select
+        // job always supplies a truthy kind, so this never affects those.
+        if (cursorKind) {
+            this.cursor.show(cursorKind);
+        }
     },
 
     clearHover() {
@@ -1263,14 +1272,25 @@ const StudioPreview = {
      *
      * This runs on every Monaco cursor move, so it stays cheap: the caller
      * (home.blade.php) already bails before posting unless the active file
-     * matches the section-source path regex, and here each iteration is
-     * just a dataset read + one string compare against StudioFields.paths
-     * (no DOM re-query per section — see sourceFor()) until a section's
-     * source matches; only then is that one section's entries array
-     * scanned. Nothing here re-scans every section's fields.
+     * matches the section-source path regex. Typing only advances the
+     * column on the same line, so the (source, line) pair is memoised —
+     * an unchanged pair bails before any DOM work at all, which is also
+     * what makes leaving and returning to a file "just work": the source
+     * (or the line within it) differs from what was last recorded, so the
+     * memo never masks a real move. Once past that guard, each iteration
+     * is just a dataset read + one string compare against
+     * StudioFields.paths (no DOM re-query per section — see sourceFor())
+     * until a section's source matches; only then is that one section's
+     * entries array scanned. Nothing here re-scans every section's fields.
      */
     highlightLine(source, line) {
         if (this.mode === 'preview') return;
+
+        if (this.lastHighlight && this.lastHighlight.source === source && this.lastHighlight.line === line) {
+            return;
+        }
+
+        this.lastHighlight = { source, line };
 
         for (const wrapper of document.querySelectorAll('[data-section]')) {
             const ref = wrapper.dataset.ref;
@@ -1291,10 +1311,22 @@ const StudioPreview = {
                 box,
                 label: this.labelFor(entry, sectionId),
                 source: '',
-                cursorKind: this.cursorKind({ entry }, 'field'),
+                // No pointer position stands behind a code-triggered
+                // highlight, so there is no type-cursor kind to show.
+                cursorKind: null,
             });
 
-            wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Only pull the canvas back into view when the target isn't
+            // already visible — a developer who scrolled elsewhere on the
+            // canvas shouldn't get yanked back just because the caret
+            // moved to a line that happens to still be onscreen.
+            const rect = wrapper.getBoundingClientRect();
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+            const inView = rect.bottom > 0 && rect.top < viewportHeight;
+
+            if (!inView) {
+                wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
 
             return;
         }
