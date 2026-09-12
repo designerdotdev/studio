@@ -255,6 +255,111 @@
 
             html.studio-preview .studio-control { display: none !important; }
 
+            /* ---- Repeater item controls ----
+               Flanking + buttons (add before/after) and a small toolbar
+               (drag + delete) for the item tier — orange like the item
+               halo/chip/cursor. Own elements, own pointer-events: the chip
+               above is pointer-events:none by design, so an interactive
+               control can't live inside it. Positioned from JS
+               (paintItemControls) through the same rAF write phase as the
+               halo/chip. */
+            .studio-item-flank {
+                position: fixed;
+                z-index: 2147483007;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                width: 22px;
+                height: 22px;
+                margin: -11px 0 0 -11px;
+                border-radius: 999px;
+                background: #e08c2e;
+                color: #fff;
+                border: 2px solid rgba(255, 255, 255, 0.9);
+                box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.45);
+                cursor: pointer;
+            }
+
+            .studio-item-flank.is-on { display: flex; }
+
+            .studio-item-flank button {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 100%;
+                padding: 0;
+                border: 0;
+                background: none;
+                color: inherit;
+                cursor: pointer;
+            }
+
+            .studio-item-flank svg {
+                width: 12px;
+                height: 12px;
+            }
+
+            .studio-item-toolbar {
+                position: fixed;
+                z-index: 2147483007;
+                display: none;
+                align-items: center;
+                gap: 2px;
+                padding: 3px;
+                margin: 0 0 0 6px;
+                border-radius: 9px;
+                background: rgba(12, 12, 14, 0.92);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
+            }
+
+            .studio-item-toolbar.is-on { display: flex; }
+
+            .studio-item-toolbar button {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                border: 0;
+                border-radius: 6px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.7);
+                cursor: pointer;
+                transition: background 100ms ease, color 100ms ease;
+                padding: 0;
+            }
+
+            .studio-item-toolbar button:hover {
+                background: rgba(255, 255, 255, 0.14);
+                color: #fff;
+            }
+
+            .studio-item-toolbar .studio-item-drag {
+                cursor: grab;
+            }
+
+            .studio-item-toolbar .studio-item-drag:active {
+                cursor: grabbing;
+            }
+
+            .studio-item-toolbar .studio-item-remove:hover {
+                background: rgba(243, 114, 114, 0.2);
+                color: #f37272;
+            }
+
+            .studio-item-toolbar svg {
+                width: 13px;
+                height: 13px;
+            }
+
+            /* Preview mode owns the canvas — no item chrome either */
+            html.studio-preview .studio-item-flank,
+            html.studio-preview .studio-item-toolbar {
+                display: none !important;
+            }
+
             /* ---- Toggle switch-off toast ----
                studio.js's toast() helper renders straight into whichever
                document it runs in; the canvas document never loads
@@ -1144,4 +1249,27 @@
     <div class="studio-fchip" id="studio-fchip"></div>
     <div class="studio-cursor" id="studio-cursor"></div>
     <div class="studio-control" id="studio-control"></div>
+
+    {{-- Repeater item controls — positioned from JS (paintItemControls),
+         same rAF write phase as the halo/chip above. Their own visibility
+         is independent of the halo's (see resolveHover()'s isOverItemControls
+         guard), so hovering these buttons never hides them. --}}
+    <div class="studio-item-flank studio-item-flank--before" id="studio-item-before">
+        <button type="button" onclick="Studio.preview.itemAction('add-before', event)" title="Add item before">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+        </button>
+    </div>
+    <div class="studio-item-flank studio-item-flank--after" id="studio-item-after">
+        <button type="button" onclick="Studio.preview.itemAction('add-after', event)" title="Add item after">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+        </button>
+    </div>
+    <div class="studio-item-toolbar" id="studio-item-toolbar" onclick="event.stopPropagation()">
+        <button type="button" class="studio-item-drag" onmousedown="Studio.preview.startItemDrag(event)" title="Drag to reorder">
+            <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="7" cy="5" r="1.4"/><circle cx="13" cy="5" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="15" r="1.4"/><circle cx="13" cy="15" r="1.4"/></svg>
+        </button>
+        <button type="button" class="studio-item-remove" onclick="Studio.preview.itemAction('remove', event)" title="Delete item">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+        </button>
+    </div>
 </x-studio::layouts.iframe>

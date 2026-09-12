@@ -116,6 +116,23 @@ const StudioEditor = {
                     window.Livewire?.dispatch('studio:section-action', { id: data.sectionId, action: data.action });
                     break;
 
+                case 'studio:item-action':
+                    // add-before | add-after | remove | move — relayed
+                    // as-is to EditorPanel::handleItemAction(), which
+                    // composes the existing addRepeaterItem/
+                    // removeRepeaterItem/moveRepeaterItem methods. The
+                    // canvas already refused to send this for a
+                    // collections.*-bound repeater (isCollectionBound), and
+                    // saveVariables() drops a bound key regardless.
+                    window.Livewire?.dispatch('studio:item-action', {
+                        sectionId: data.sectionId,
+                        key: data.key,
+                        index: data.index,
+                        action: data.action,
+                        toIndex: data.toIndex ?? null,
+                    });
+                    break;
+
                 case 'studio:open-code':
                     window.dispatchEvent(new CustomEvent('studio:open-code-editor', {
                         detail: { ref: data.ref, title: data.title },
@@ -1615,6 +1632,10 @@ const StudioPreview = {
     /** Paint the hover halo + chip for whatever is under the pointer. */
     hoverAt(event) {
         if (this.mode === 'preview') return this.clearHover();
+        // A drag in progress owns the halo/chip write queue itself
+        // (dragItemMove) — the normal hover resolution must stand down for
+        // the duration, or the two would fight over the same overlay.
+        if (this.itemDrag.active) return;
 
         this.lastPointer = { x: event.clientX, y: event.clientY };
 
@@ -1646,6 +1667,13 @@ const StudioPreview = {
      * scroll/resize, which have no target of their own — elementFromPoint
      * stands in for event.target). */
     resolveHover(target, x, y) {
+        // The item toolbar/flanks are fixed elements outside any
+        // [data-section] — without this they'd read as "off the canvas
+        // content" the instant the pointer reaches them, clearing the very
+        // controls being approached. Leave whatever was last painted alone;
+        // their own click/mousedown handlers own what happens next.
+        if (this.isOverItemControls(target)) return;
+
         const wrapper = target.closest?.('[data-section]');
 
         if (!wrapper) return this.clearHover();
@@ -1760,6 +1788,7 @@ const StudioPreview = {
             const path = StudioFields.sourceFor(sectionId);
             source = path ? path.split('/').pop() + ':' + hit.entry.line : '';
         } else if (kind === 'item') {
+            sectionId = this.sectionIdAt(event);
             const rect = hit.item.el.getBoundingClientRect();
             box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
             label = this.itemLabel(hit.item);
@@ -1780,7 +1809,17 @@ const StudioPreview = {
 
         if (!box || box.width === 0) return this.clearHover();
 
-        this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind, sectionId) });
+        // The item toolbar/flanks ride the same rAF write queue as the halo
+        // — one read phase (here), one write phase (flushPaint) — so an
+        // animated section (Pilot's marquee) never has its controls pinned
+        // to a rect from a stale frame. Only a genuine, non-suppressed item
+        // hover carries this; every other kind leaves it undefined, which
+        // flushPaint() treats as "hide".
+        const itemControls = (kind === 'item' && sectionId && this.itemControlsAllowed(hit.item, sectionId))
+            ? { sectionId, key: hit.item.key, index: hit.item.index, box }
+            : null;
+
+        this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind, sectionId), itemControls });
     },
 
     /**
@@ -1814,10 +1853,13 @@ const StudioPreview = {
             halo.classList.remove('is-on');
             chip.classList.remove('is-on');
             this.cursor.hide();
+            this.paintItemControls(null);
             return;
         }
 
-        const { kind, box, label, source, cursorKind } = job;
+        const { kind, box, label, source, cursorKind, itemControls } = job;
+
+        this.paintItemControls(itemControls || null);
 
         halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'undeclared' ? ' is-undeclared' : '');
         halo.style.left = box.left + 'px';
@@ -1850,6 +1892,256 @@ const StudioPreview = {
 
     clearHover() {
         this.queuePaint(null);
+    },
+
+    /* --- repeater item controls (add/reorder/delete) ---------------- */
+
+    // The {sectionId, key, index} the flanking + buttons and toolbar are
+    // currently anchored to — set only by paintItemControls() below, read
+    // by itemAction() when a button is actually clicked. null whenever
+    // nothing is showing (preview mode, a code/collection-bound repeater,
+    // or the two-@foreach case — see itemControlsAllowed()).
+    itemControlsInfo: null,
+
+    // In-progress pointer drag state; see startItemDrag().
+    itemDrag: { active: false, sectionId: null, key: null, fromIndex: null, overIndex: null, overBefore: false },
+
+    /**
+     * Whether an item may offer add/reorder/delete at all. Three
+     * independent reasons to say no, all previously-fixed bugs:
+     *  - preview mode is fully inert (belt-and-suspenders — hoverAt()
+     *    already bails before this is ever reached)
+     *  - a `collections.*`-bound repeater's rows live in the Content panel,
+     *    not this instance — EditorPanel::saveVariables() silently drops a
+     *    write to a bound key, so offering the controls would look like it
+     *    worked and do nothing
+     *  - a `php:`/`blade:`-bound repeater is set in code, same as any other
+     *    code-owned field
+     * checked against the repeater KEY directly (not a specific entry —
+     * an item may hold several sub-fields, and the binding governs the
+     * whole array, not one of them).
+     */
+    itemControlsAllowed(item, sectionId) {
+        if (this.mode === 'preview') return false;
+        if (this.isSectionSpanningItem(sectionId, item)) return false;
+        if (this.isCollectionBound(sectionId, item.key)) return false;
+
+        const binding = this.bindings[sectionId]?.[item.key];
+
+        if (binding && (binding.startsWith('php:') || binding.startsWith('blade:'))) return false;
+
+        return true;
+    },
+
+    /**
+     * Pilot's `logos` marquee renders the same repeater in two `@foreach`
+     * loops (a visual duplicate for the scrolling effect), so entries with
+     * the same `key.index` exist in both copies. groupItems()'s
+     * commonAncestor() then has to walk up through both copies to find one
+     * element containing both — which can reach all the way to the section
+     * wrapper itself. An item whose box IS the section would show a toolbar
+     * that covers the whole section and, worse, a working "delete" that
+     * reads as "delete this section" — so controls are suppressed whenever
+     * the item's element carries the section's own `data-section` (i.e. the
+     * common ancestor climbed past every real container).
+     */
+    isSectionSpanningItem(sectionId, item) {
+        return !!(item.el && item.el.dataset && item.el.dataset.section === sectionId);
+    },
+
+    /** Fixed-position elements, moved/shown from the same rAF write phase
+     * as the halo/chip (see paintHalo()'s itemControls + flushPaint()) —
+     * but their own visibility is independent of the halo's: hovering the
+     * buttons themselves must not hide them (see resolveHover()'s guard),
+     * where hovering off the halo's own box normally would. */
+    paintItemControls(info) {
+        const before = document.getElementById('studio-item-before');
+        const after = document.getElementById('studio-item-after');
+        const toolbar = document.getElementById('studio-item-toolbar');
+
+        if (!before || !after || !toolbar) return;
+
+        if (!info) {
+            before.classList.remove('is-on');
+            after.classList.remove('is-on');
+            toolbar.classList.remove('is-on');
+            this.itemControlsInfo = null;
+
+            return;
+        }
+
+        this.itemControlsInfo = info;
+
+        const { box } = info;
+        const midX = box.left + box.width / 2;
+
+        before.style.left = midX + 'px';
+        before.style.top = box.top + 'px';
+        before.classList.add('is-on');
+
+        after.style.left = midX + 'px';
+        after.style.top = (box.top + box.height) + 'px';
+        after.classList.add('is-on');
+
+        toolbar.style.left = (box.left + box.width) + 'px';
+        toolbar.style.top = box.top + 'px';
+        toolbar.classList.add('is-on');
+    },
+
+    /** target is over one of the item control elements — themselves fixed
+     * elements outside any [data-section], so resolveHover() would
+     * otherwise read them as "off the canvas content" and clear the very
+     * controls being hovered/clicked. */
+    isOverItemControls(target) {
+        return !!(target?.closest
+            && (target.closest('#studio-item-before') || target.closest('#studio-item-after') || target.closest('#studio-item-toolbar')));
+    },
+
+    /** add-before / add-after / remove, from the flanking buttons/toolbar. */
+    itemAction(action, event) {
+        if (event) event.stopPropagation();
+
+        const info = this.itemControlsInfo;
+        if (!info || this.mode === 'preview') return;
+
+        this.post('studio:item-action', { sectionId: info.sectionId, key: info.key, index: info.index, action });
+
+        // The item this was anchored to is about to move/disappear under a
+        // re-render — hide rather than leave a stale box on screen.
+        this.queuePaint(null);
+    },
+
+    /** Every item belonging to the same repeater (sectionId + key) — the
+     * pool a drag is allowed to land in. Section-spanning duplicates (the
+     * two-@foreach case) are excluded, same as itemControlsAllowed(). */
+    itemsForKey(sectionId, key) {
+        return (StudioFields.maps[sectionId]?.items || [])
+            .filter((item) => item.key === key && !this.isSectionSpanningItem(sectionId, item));
+    },
+
+    /** The same-repeater item under a point, smallest box wins (mirrors
+     * StudioFields.itemAt(), scoped to one field). */
+    itemAtForKey(sectionId, key, x, y) {
+        let best = null;
+        let bestArea = Infinity;
+
+        for (const item of this.itemsForKey(sectionId, key)) {
+            const rect = item.el.getBoundingClientRect();
+
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+
+            const area = rect.width * rect.height;
+
+            if (area < bestArea) {
+                best = item;
+                bestArea = area;
+            }
+        }
+
+        return best;
+    },
+
+    /**
+     * Drag-to-reorder from the toolbar's handle. SortableJS (the helper
+     * `window.Studio.sortable()` wraps for the sidebar's own lists) assumes
+     * every draggable is a direct DOM child of one shared container —
+     * true for a flat sidebar list, not for a repeater's items, whose
+     * markup shape is whatever the section's own Blade wrote (a grid, a
+     * table, items separated by other markup). So this drags by geometry
+     * instead: track the pointer, find which sibling item it's over
+     * (itemAtForKey — never cached across frames, so an animated section
+     * stays correct), halo that item as the drop target, and commit a
+     * single moveRepeaterItem() on release.
+     */
+    startItemDrag(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const info = this.itemControlsInfo;
+        if (!info || this.mode === 'preview') return;
+
+        // Handlers are stored on the drag itself (rather than as bare
+        // closures) so a mouseleave — the pointer released outside the
+        // iframe, which never delivers this document a mouseup — can tear
+        // the same listeners down through the one shared teardown path
+        // instead of leaking them.
+        const onMove = (e) => this.dragItemMove(e);
+        const onUp = () => this.dragItemEnd(true);
+        const onCancel = () => this.dragItemEnd(false);
+
+        this.itemDrag = {
+            active: true,
+            sectionId: info.sectionId,
+            key: info.key,
+            fromIndex: info.index,
+            overIndex: info.index,
+            overBefore: false,
+            onMove,
+            onUp,
+            onCancel,
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        document.addEventListener('mouseleave', onCancel);
+    },
+
+    dragItemMove(event) {
+        const drag = this.itemDrag;
+        if (!drag.active) return;
+
+        const target = this.itemAtForKey(drag.sectionId, drag.key, event.clientX, event.clientY);
+
+        if (!target) return;
+
+        const rect = target.el.getBoundingClientRect();
+
+        drag.overIndex = target.index;
+        drag.overBefore = event.clientY < rect.top + rect.height / 2;
+
+        // Halo the prospective drop target through the normal write queue —
+        // a plain read (getBoundingClientRect) feeding the one write phase,
+        // same as every other hover.
+        this.queuePaint({
+            kind: 'item',
+            box: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+            label: this.itemLabel(target),
+            source: '',
+            cursorKind: 'item',
+            itemControls: null,
+        });
+    },
+
+    dragItemEnd(commit) {
+        const drag = this.itemDrag;
+        if (!drag.active) return;
+
+        document.removeEventListener('mousemove', drag.onMove);
+        document.removeEventListener('mouseup', drag.onUp);
+        document.removeEventListener('mouseleave', drag.onCancel);
+
+        this.itemDrag = { active: false, sectionId: null, key: null, fromIndex: null, overIndex: null, overBefore: false };
+
+        this.queuePaint(null);
+
+        if (!commit || drag.overIndex === null) return;
+
+        // Splice-target arithmetic: dropping "before" a later item lands at
+        // that item's own index; "after" lands one past it; either way,
+        // removing the dragged item first shifts every later index down by
+        // one, so a target past the source needs that correction.
+        let to = drag.overBefore ? drag.overIndex : drag.overIndex + 1;
+        if (drag.fromIndex < to) to -= 1;
+
+        if (to === drag.fromIndex) return;
+
+        this.post('studio:item-action', {
+            sectionId: drag.sectionId,
+            key: drag.key,
+            index: drag.fromIndex,
+            toIndex: to,
+            action: 'move',
+        });
     },
 
     /**
