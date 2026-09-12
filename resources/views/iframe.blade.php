@@ -87,6 +87,70 @@
                 transform: translateY(0);
             }
 
+            /* ---- Field and item tiers ---- */
+            .studio-fhalo {
+                position: fixed;
+                z-index: 2147483003;
+                pointer-events: none;
+                border-radius: 3px;
+                box-shadow: inset 0 0 0 1.5px #4c7dfa;
+                opacity: 0;
+                transition: opacity 100ms ease;
+            }
+
+            .studio-fhalo.is-item {
+                box-shadow: inset 0 0 0 1.5px #e08c2e;
+                border-radius: 5px;
+            }
+
+            .studio-fhalo.is-code {
+                box-shadow: inset 0 0 0 1.5px rgba(148, 148, 158, 0.55);
+            }
+
+            .studio-fhalo.is-on {
+                opacity: 1;
+            }
+
+            .studio-fhalo.is-selected {
+                box-shadow: inset 0 0 0 2px #4c7dfa;
+            }
+
+            .studio-fchip {
+                position: fixed;
+                z-index: 2147483004;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 2px 7px 3px;
+                border-radius: 4px 4px 0 0;
+                background: #4c7dfa;
+                color: #fff;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 10.5px;
+                font-weight: 600;
+                line-height: 1.45;
+                white-space: nowrap;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 100ms ease;
+            }
+
+            .studio-fchip.is-item { background: #e08c2e; }
+            .studio-fchip.is-code { background: rgba(88, 88, 98, 0.92); }
+            .studio-fchip.is-on { opacity: 1; }
+
+            .studio-fchip-src {
+                font-weight: 500;
+                opacity: 0.75;
+                font-variant-numeric: tabular-nums;
+            }
+
+            /* Preview mode owns the canvas — no field chrome at all */
+            html.studio-preview .studio-fhalo,
+            html.studio-preview .studio-fchip {
+                display: none !important;
+            }
+
             /* Floating toolbar — always wins pointer events over insert zones */
             .studio-toolbar {
                 position: absolute;
@@ -874,4 +938,8 @@
             </div>
         </div>
     @endif
+
+    {{-- Field/item tier overlay, positioned from JS --}}
+    <div class="studio-fhalo" id="studio-fhalo"></div>
+    <div class="studio-fchip" id="studio-fchip"></div>
 </x-studio::layouts.iframe>
