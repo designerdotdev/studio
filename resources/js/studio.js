@@ -591,6 +591,32 @@ const StudioFields = {
         return this.maps[sectionId]?.entries || [];
     },
 
+    /**
+     * The `href` attr entry, if any, carried by `el` itself or the nearest
+     * ancestor still inside this section — i.e. "is this text sitting
+     * inside a link". A link's own text entry always wins the hit test
+     * against its href attr entry (the smallest box wins, and the text
+     * range nests inside the anchor's box), so this is how the link
+     * popover finds its href without depending on winning that hit test.
+     */
+    hrefEntryFor(sectionId, el) {
+        const entries = this.entriesFor(sectionId);
+
+        while (el) {
+            const entry = entries.find((e) => e.kind === 'attr' && e.attribute === 'href' && e.el === el);
+            if (entry) return entry;
+
+            // Reached the section wrapper without finding one — entries
+            // never live outside it, so there is nothing further up worth
+            // walking to.
+            if (el.dataset && el.dataset.section === sectionId) break;
+
+            el = el.parentElement;
+        }
+
+        return null;
+    },
+
     /** Every rect a field occupies — text wraps, so there may be several. */
     rects(entry) {
         if (entry.kind === 'text' && entry.range) {
@@ -1165,7 +1191,7 @@ const StudioPreview = {
 
         mount() { this.el = document.getElementById('studio-control'); },
 
-        open(kind, entry, sectionId, box, options) {
+        open(kind, entry, sectionId, box, options, { placement = 'above', focus = true } = {}) {
             if (!this.el) return;
 
             this.entry = entry;
@@ -1212,8 +1238,22 @@ const StudioPreview = {
 
             this.el.classList.add('is-on');
             this.el.style.left = Math.max(8, box.left) + 'px';
-            this.el.style.top = Math.max(8, box.top - 38) + 'px';
-            this.el.querySelector('input,select')?.focus();
+            // Anchored to a link that's being edited in place, the popover
+            // sits below the anchor instead of above it — above would cover
+            // the very text the user is typing into.
+            this.el.style.top = placement === 'below'
+                ? (box.top + box.height + 8) + 'px'
+                : Math.max(8, box.top - 38) + 'px';
+
+            // A standalone open (the field itself was clicked) can safely
+            // steal focus. Anchored to a live text edit it must not — the
+            // caret is mid-edit in the host, and stealing focus here would
+            // blur it (committing/ending the edit) before the user typed a
+            // single character. The user reaches this input with a
+            // deliberate click instead, which commits the text edit via the
+            // normal blur path (see editBlur's relatedTarget check) without
+            // tearing the popover down.
+            if (focus) this.el.querySelector('input,select')?.focus();
         },
 
         close() {
@@ -1304,7 +1344,37 @@ const StudioPreview = {
                     // still selects (inspector focus / "Edit in Content")
                     // but never takes free text on the canvas.
                     if (editability === 'edit') {
-                        this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
+                        const started = this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
+
+                        // A link's own text always wins the hit test against
+                        // its href attr entry (the smallest box wins, and the
+                        // text nests inside the anchor) — so the href input
+                        // opens here, anchored to the link, rather than
+                        // depending on a click ever resolving to the href
+                        // entry itself. Not focused: the caret is mid-edit in
+                        // the text host, and stealing focus would blur (and
+                        // so commit/end) the edit before it began.
+                        if (started) {
+                            const hrefEntry = StudioFields.hrefEntryFor(sectionId, this.editing.host);
+
+                            if (hrefEntry
+                                && this.editabilityOf(hrefEntry, sectionId) !== 'code'
+                                && !this.isCollectionBound(sectionId, hrefEntry.key)
+                            ) {
+                                const hrefBox = StudioFields.box(hrefEntry);
+
+                                if (hrefBox) {
+                                    this.control.open(
+                                        'url',
+                                        hrefEntry,
+                                        sectionId,
+                                        hrefBox,
+                                        StudioFields.contractFor(sectionId, hrefEntry.key)?.options,
+                                        { placement: 'below', focus: false }
+                                    );
+                                }
+                            }
+                        }
                     } else if (this.isImageField(hit.entry, sectionId)) {
                         this.fieldAction(hit.entry, sectionId, 'pick-media');
                     } else if (!this.isCollectionBound(sectionId, hit.entry.key)) {
@@ -1999,12 +2069,20 @@ const StudioPreview = {
         document.execCommand('insertText', false, text);
     },
 
-    editBlur() {
-        StudioPreview.commitEdit();
+    editBlur(event) {
+        // Moving focus into the link popover's own href input (a deliberate
+        // click there — it's never auto-focused while anchored) blurs the
+        // host like any other blur, so the text still commits normally.
+        // But this blur must not tear the popover down with it: that would
+        // destroy the very input the click just landed in, before the user
+        // typed anything into it.
+        const intoControl = !!(event?.relatedTarget && StudioPreview.control.el?.contains(event.relatedTarget));
+
+        StudioPreview.commitEdit(intoControl);
     },
 
     /** Read the value back out of the DOM and hand it to the editor. */
-    commitEdit() {
+    commitEdit(keepControl = false) {
         const state = this.editing;
 
         if (!state) return;
@@ -2013,7 +2091,7 @@ const StudioPreview = {
 
         const value = this.readValue(state.host);
 
-        this.teardownEdit(state);
+        this.teardownEdit(state, keepControl);
 
         if (value === state.original) return;
 
@@ -2076,7 +2154,7 @@ const StudioPreview = {
         this.teardownEdit(state);
     },
 
-    teardownEdit(state) {
+    teardownEdit(state, keepControl = false) {
         state.host.removeEventListener('keydown', this.editKeydown);
         state.host.removeEventListener('paste', this.editPaste);
         state.host.removeEventListener('blur', this.editBlur);
@@ -2091,6 +2169,11 @@ const StudioPreview = {
 
         document.documentElement.classList.remove('studio-editing');
         window.getSelection()?.removeAllRanges();
+
+        // Ending the text edit closes any link popover it opened — unless
+        // this end was itself "focus moved into that popover", which
+        // editBlur() already told us to keep open.
+        if (!keepControl) this.control.close();
 
         // A render that landed while the caret was in this section was
         // stashed by paint() rather than discarded — apply it now that
