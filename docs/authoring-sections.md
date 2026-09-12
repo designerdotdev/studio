@@ -136,6 +136,39 @@ Studio writes what the editor does back into the page file, as the template itse
 Only what changed is rewritten: every other tag, attribute, comment, and blank line in the
 file stays byte for byte, and comments above a section travel with it when it moves.
 
+## How your Blade decides what is editable on the canvas
+
+Studio derives inline editing from the source you write — nothing is annotated — so a few
+authoring choices decide what a marketer can touch directly on the page. See
+[inline-editing.md](inline-editing.md) for the mechanics.
+
+**Echo a field and it becomes editable.** A plain `{{ $heading }}` in element content is
+editable in place. `src="{{ $image }}"` opens the media Library. `href="{{ $link }}"` gets a
+link popover alongside the label's own editor.
+
+**A field with no echo has no canvas presence.** A `select` used only in a comparison
+(`@if ($align == 'left')`) or as a class name renders no value, so there is nothing to hover —
+it stays panel-only. That is correct behaviour, not a gap, but it is worth knowing when you
+choose between a `select` that switches a layout and one that prints a label.
+
+**Keep a field's echo in text, not markup.** `{!! $icon !!}` that renders an `<svg>` is
+detected and made non-editable, because committing it would read an empty `innerText` and wipe
+the value. If a field is meant to be edited as text, echo it as text.
+
+**A toggle's `@if` should wrap a plain element, not a component tag.** Studio marks the element
+the `@if` opens so the toggle can be switched off from the canvas, but it never annotates an
+`<x-…>` tag — that would become a component prop. `@if ($showFooter) <x-footer />` therefore
+gets no canvas affordance; wrap it in a `<div>` if you want one.
+
+**Bound fields are not canvas-editable, by design.** A field bound to `collections.*` selects
+but refuses free text (its rows live in the Content panel), and one bound to `php:`/`blade:`
+shows a grey "Set in code" halo. `site.*` bindings *are* editable, since they persist to the
+site document.
+
+**Prefer one `@foreach` per repeater.** Rendering the same repeater through two loops (a
+marquee that duplicates its row for seamless scrolling, say) merges both copies into one group,
+and those rows get no item controls.
+
 ## Still worth avoiding
 
 - Blade echoes **inside Alpine attributes** (`x-data="{ open: {{ … }} }"`) — quoting breaks.
