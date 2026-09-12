@@ -1316,13 +1316,17 @@ const StudioPreview = {
                 cursorKind: null,
             });
 
-            // Only pull the canvas back into view when the target isn't
-            // already visible — a developer who scrolled elsewhere on the
-            // canvas shouldn't get yanked back just because the caret
-            // moved to a line that happens to still be onscreen.
-            const rect = wrapper.getBoundingClientRect();
+            // Only pull the canvas back into view when the target field
+            // itself isn't already usably visible — a developer who
+            // scrolled elsewhere on the canvas shouldn't get yanked back
+            // just because the caret moved to a line whose *section* (often
+            // taller than the viewport, e.g. a hero) still has some edge
+            // onscreen. Tested against the field's own box, not the section
+            // wrapper, and a sliver at the very edge doesn't count.
             const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-            const inView = rect.bottom > 0 && rect.top < viewportHeight;
+            const visibleHeight = Math.min(box.top + box.height, viewportHeight) - Math.max(box.top, 0);
+            const threshold = Math.min(40, box.height);
+            const inView = visibleHeight >= threshold;
 
             if (!inView) {
                 wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
