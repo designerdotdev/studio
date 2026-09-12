@@ -51,6 +51,9 @@ class EditorPanel extends Component
     /** The most recently deleted section, restorable via the toast's Undo */
     public ?array $lastDeleted = null;
 
+    /** The most recently deleted repeater item, restorable via the toast's Undo */
+    public ?array $lastDeletedItem = null;
+
     /** updated_at of the page/layout docs as loaded — for conflict detection */
     public array $docVersions = [];
 
@@ -945,6 +948,92 @@ class EditorPanel extends Component
         $this->variables[$sectionId][$fieldKey] = $items;
         $this->saveVariables($sectionId);
         $this->pushRepeaterToPreview($sectionId, $fieldKey);
+    }
+
+    /**
+     * The canvas item toolbar's relay — `add-before`/`add-after`/`remove`/
+     * `move` all compose the three primitives above, which is the whole of
+     * this method's job: it never touches `$this->variables` itself.
+     *
+     * A canvas control never fires for a `collections.*`-bound repeater (the
+     * rows live in the Content panel) — see `StudioPreview.isCollectionBound`
+     * — but nothing here needs to re-check that: {@see saveVariables()}
+     * already strips bound keys before persisting, so a stray call would be
+     * a no-op on disk, exactly like the inspector's own add/remove/move
+     * buttons (which carry no such guard either).
+     */
+    #[On('studio:item-action')]
+    public function handleItemAction(string $sectionId, string $key, int $index, string $action, ?int $toIndex = null): void
+    {
+        match ($action) {
+            'add-before' => $this->insertRepeaterItemAt($sectionId, $key, $index),
+            'add-after' => $this->insertRepeaterItemAt($sectionId, $key, $index + 1),
+            'remove' => $this->removeRepeaterItemWithUndo($sectionId, $key, $index),
+            'move' => $toIndex !== null ? $this->moveRepeaterItem($sectionId, $key, $index, $toIndex) : null,
+            default => null,
+        };
+    }
+
+    /**
+     * `addRepeaterItem()` only ever appends — inserting "before/after" a
+     * given index is appending then moving into place, rather than teaching
+     * the repeater primitives a position argument they have no other caller
+     * for.
+     */
+    protected function insertRepeaterItemAt(string $sectionId, string $key, int $at): void
+    {
+        $this->addRepeaterItem($sectionId, $key);
+
+        $count = count($this->variables[$sectionId][$key] ?? []);
+        $target = max(0, min($at, $count - 1));
+
+        if ($target !== $count - 1) {
+            $this->moveRepeaterItem($sectionId, $key, $count - 1, $target);
+        }
+    }
+
+    /**
+     * A canvas delete reads as destructive on a single click, so — like
+     * {@see removeSection()} — it captures the raw item first and offers an
+     * Undo toast rather than a confirm.
+     */
+    protected function removeRepeaterItemWithUndo(string $sectionId, string $key, int $index): void
+    {
+        $item = $this->variables[$sectionId][$key][$index] ?? null;
+
+        $this->removeRepeaterItem($sectionId, $key, $index);
+
+        if ($item === null) {
+            return;
+        }
+
+        $this->lastDeletedItem = compact('sectionId', 'key', 'index', 'item');
+
+        $this->dispatch(
+            'studio:toast',
+            message: 'Item deleted',
+            type: 'info',
+            action: ['label' => 'Undo', 'dispatch' => 'studio:undo-item-delete'],
+        );
+    }
+
+    #[On('studio:undo-item-delete')]
+    public function undoItemDelete(): void
+    {
+        $deleted = $this->lastDeletedItem;
+        $this->lastDeletedItem = null;
+
+        if (!$deleted || !isset($this->variables[$deleted['sectionId']][$deleted['key']])) {
+            return;
+        }
+
+        $items = $this->variables[$deleted['sectionId']][$deleted['key']];
+        $at = max(0, min($deleted['index'], count($items)));
+        array_splice($items, $at, 0, [$deleted['item']]);
+        $this->variables[$deleted['sectionId']][$deleted['key']] = $items;
+
+        $this->saveVariables($deleted['sectionId']);
+        $this->pushRepeaterToPreview($deleted['sectionId'], $deleted['key']);
     }
 
     public function updateRepeaterSubField(string $sectionId, string $fieldKey, int $index, string $subField, string $value, bool $push = true): void
