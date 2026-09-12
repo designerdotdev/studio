@@ -78,6 +78,7 @@ Route::group([
         // Dev mode — section source editing (404s unless the gate passes)
         Route::get('/dev/components/{name}', [\Designer\Studio\Http\Controllers\DevModeController::class, 'show'])->where('name', '[a-z0-9-]+')->name('api.dev.components.show');
         Route::put('/dev/components/{name}', [\Designer\Studio\Http\Controllers\DevModeController::class, 'update'])->where('name', '[a-z0-9-]+')->middleware('throttle:30,1')->name('api.dev.components.update');
+        Route::post('/dev/components/{name}/field', [\Designer\Studio\Http\Controllers\DevModeController::class, 'promoteField'])->where('name', '[a-z0-9-]+')->middleware('throttle:30,1')->name('api.dev.components.field');
 
         // Assistant — the local AI CLI (404s unless dev mode is on)
         Route::get('/assistant/engines', [\Designer\Studio\Http\Controllers\AssistantController::class, 'engines'])->name('api.assistant.engines');

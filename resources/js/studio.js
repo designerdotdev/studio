@@ -122,6 +122,10 @@ const StudioEditor = {
                     }));
                     break;
 
+                case 'studio:promote-field':
+                    this.promoteField(data);
+                    break;
+
                 case 'studio:element-selected':
                     // The Assistant composer listens for this and shows a chip
                     window.dispatchEvent(new CustomEvent('studio:element-selected', { detail: data }));
@@ -357,6 +361,35 @@ const StudioEditor = {
     },
 
     /**
+     * Declare an undeclared canvas echo as a real field — the source-file
+     * write happens server-side; this only asks for it and reacts to the
+     * result, exactly as the dev-mode code modal's own save() does.
+     */
+    async promoteField({ ref, key }) {
+        if (!ref || !key) return;
+
+        try {
+            const response = await fetch(`${window.__studioEditorUrl}/api/dev/components/${ref}/field`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ key }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) throw new Error(data.message || 'Could not add that field.');
+
+            toast(`Added "${key}" as a field`);
+            this.refreshPreview();
+            if (data.synced) window.Livewire?.dispatch('studio:code-saved');
+        } catch (e) {
+            toast(e.message || 'Could not add that field.', 'error');
+        }
+    },
+
+    /**
      * Resolve a canvas field action in the editor window, then persist it
      * and hand the value back to the canvas.
      *
@@ -470,14 +503,18 @@ const StudioFields = {
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
             const value = node.nodeValue || '';
 
-            if (value.startsWith('sf:')) {
+            // `sf?:` is an undeclared echo — same closing comment, but it
+            // never resolves to a declared field (see editabilityOf()).
+            if (value.startsWith('sf:') || value.startsWith('sf?:')) {
+                const undeclared = value.startsWith('sf?:');
+                const prefixLen = undeclared ? 4 : 3;
                 const at = value.lastIndexOf('@');
-                open.push({ raw: value.slice(3, at), line: Number(value.slice(at + 1)) || 0, start: node });
+                open.push({ raw: value.slice(prefixLen, at), line: Number(value.slice(at + 1)) || 0, start: node, undeclared });
                 continue;
             }
 
             if (value === '/sf' && open.length) {
-                const { raw, line, start } = open.pop();
+                const { raw, line, start, undeclared } = open.pop();
                 const range = document.createRange();
 
                 try {
@@ -490,7 +527,7 @@ const StudioFields = {
                 entries.push({
                     ...this.parsePath(raw),
                     line,
-                    kind: 'text',
+                    kind: undeclared ? 'undeclared' : 'text',
                     range,
                     el: null,
                     // A raw echo (`{!! !!}`) is scanned the same as an
@@ -1119,8 +1156,15 @@ const StudioPreview = {
      *              binding (EditorPanel::saveSiteValues persists those
      *              for real), a declared text/textarea type (or no
      *              declared type at all), and a plain text host.
+     *
+     * An undeclared echo (`kind: 'undeclared'` — a bare `{{ $x }}` with no
+     * yml entry yet) is always 'code': there is no field to write to until
+     * it is promoted, so this must never fall into 'select' or 'edit'
+     * however the checks below would otherwise resolve it.
      */
     editabilityOf(entry, sectionId) {
+        if (entry.kind === 'undeclared') return 'code';
+
         const binding = this.bindings[sectionId]?.[entry.key];
 
         if (binding) {
@@ -1260,6 +1304,20 @@ const StudioPreview = {
                 this.el.appendChild(input);
             }
 
+            // An undeclared echo (dev mode only) — no value to edit yet,
+            // just a button asking the parent window to write the field
+            // contract. The endpoint is dev-mode-gated server-side too.
+            if (kind === 'add-field') {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = `Add "${entry.key}" as a field`;
+                button.addEventListener('click', () => {
+                    StudioPreview.post('studio:promote-field', { ref: StudioPreview.refs[sectionId], key: entry.key });
+                    this.close();
+                });
+                this.el.appendChild(button);
+            }
+
             this.el.classList.add('is-on');
             this.el.style.left = Math.max(8, box.left) + 'px';
             // Anchored to a link that's being edited in place, the popover
@@ -1383,6 +1441,19 @@ const StudioPreview = {
                 }
 
                 const editability = this.editabilityOf(hit.entry, sectionId);
+
+                // Dev mode only: clicking an undeclared echo offers to
+                // declare it as a field. Outside dev mode (or once the
+                // control is dismissed) it falls through to the plain
+                // section selection below, exactly like any other
+                // code-owned content.
+                if (hit.entry.kind === 'undeclared' && document.documentElement.classList.contains('studio-devmode')) {
+                    this.applySelection(sectionId, false);
+                    const box = StudioFields.box(hit.entry);
+                    if (box) this.control.open('add-field', hit.entry, sectionId, box);
+
+                    return;
+                }
 
                 // A php:/blade:-bound value is set in code — Studio never
                 // owns it as a field, so a click here falls through to a
@@ -1614,6 +1685,16 @@ const StudioPreview = {
             return inContent ? this.paintHalo(null, 'code', { target }) : this.clearHover();
         }
 
+        // An undeclared echo gets its own dashed hint — but only in dev
+        // mode, matching the click side (select()) and the constraint that
+        // this affordance never appears outside it. Outside dev mode it
+        // hovers exactly like any other code-owned content, below.
+        if (hit.tier === 'field' && hit.entry.kind === 'undeclared') {
+            const devMode = document.documentElement.classList.contains('studio-devmode');
+
+            return this.paintHalo(hit, devMode ? 'undeclared' : 'code', { target, sectionId });
+        }
+
         // A php:/blade:-bound field hovers exactly like code-owned content
         // — the click and the hover must agree on this (editabilityOf is
         // the single source both consult).
@@ -1688,6 +1769,10 @@ const StudioPreview = {
             // be a whole paragraph around several fields), keep the default
             // "Set in code" label.
             box = StudioFields.box(hit.entry);
+        } else if (kind === 'undeclared') {
+            sectionId = this.sectionIdAt(event);
+            box = StudioFields.box(hit.entry);
+            label = `Add "${hit.entry.key}" as a field`;
         } else {
             const rect = event.target.getBoundingClientRect?.();
             if (rect) box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
@@ -1734,13 +1819,13 @@ const StudioPreview = {
 
         const { kind, box, label, source, cursorKind } = job;
 
-        halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
+        halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'undeclared' ? ' is-undeclared' : '');
         halo.style.left = box.left + 'px';
         halo.style.top = box.top + 'px';
         halo.style.width = box.width + 'px';
         halo.style.height = box.height + 'px';
 
-        chip.className = 'studio-fchip is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
+        chip.className = 'studio-fchip is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'undeclared' ? ' is-undeclared' : '');
         chip.innerHTML = '';
         chip.appendChild(document.createTextNode(label));
 
@@ -1850,7 +1935,7 @@ const StudioPreview = {
      */
     cursorKind(hit, kind, sectionId) {
         if (kind === 'item') return 'item';
-        if (kind === 'code') return 'code';
+        if (kind === 'code' || kind === 'undeclared') return 'code';
 
         const entry = hit.entry;
 

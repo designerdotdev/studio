@@ -22,6 +22,12 @@ final class EchoScanner
     ];
 
     /**
+     * Names {@see scanUndeclared()} never offers to promote: Blade/Studio's
+     * own implicit variables, not candidate top-level fields.
+     */
+    private const RESERVED = ['loop', 'slot', 'attributes', 'errors', 'site'];
+
+    /**
      * @param array<string, array> $fields the section's yml field contract
      * @return list<EchoRef>
      */
@@ -177,6 +183,149 @@ final class EchoScanner
             if ($char === $quote) {
                 $state = 'TAG';
                 $attribute = null;
+            }
+
+            $at++;
+        }
+
+        return $refs;
+    }
+
+    /**
+     * Bare `{{ $name }}` echoes in element text whose name has no yml
+     * field — a section a developer edited in Code mode ahead of its
+     * contract. A separate, deliberately narrower pass from {@see scan()}:
+     * it never touches that method's traversal, so the verified mapping it
+     * produces (and the coverage gate built on it) cannot move because of
+     * this one. Only the plain single-variable form is recognised — the
+     * same conservative rule `scan()` uses for a declared field — and never
+     * inside an attribute value, a `@php`/comment region, or governing an
+     * `@if`. What comes back here is informational only: nothing in this
+     * package ever treats it as an editable field.
+     *
+     * @param array<string, array> $fields the section's yml field contract
+     * @return list<EchoRef> refs with context `undeclared`
+     */
+    public function scanUndeclared(string $source, array $fields): array
+    {
+        $refs = [];
+        $skips = $this->skipRegions($source);
+        $length = strlen($source);
+        $at = 0;
+
+        $state = 'TEXT';    // TEXT | TAG | ATTR
+        $quote = null;
+
+        /** @var list<string> loop aliases in scope, innermost last */
+        $loopAliases = [];
+
+        while ($at < $length) {
+            if (($jump = $this->skipTo($skips, $at)) !== null) {
+                $at = $jump;
+                $state = 'TEXT';
+
+                continue;
+            }
+
+            $char = $source[$at];
+
+            if ($state === 'TEXT' && $char === '@') {
+                if (preg_match('/\G@(?:foreach|forelse)\s*\(\s*\$(\w+)(?:\[[^\]]*\])?\s+as\s+(?:\$\w+\s*=>\s*)?\$(\w+)\s*\)/A', $source, $m, 0, $at)) {
+                    $loopAliases[] = $m[2];
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (preg_match('/\G@end(?:foreach|forelse)/A', $source, $m, 0, $at)) {
+                    array_pop($loopAliases);
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (substr($source, $at, 3) === '@{{') {
+                    $at += 3;
+
+                    continue;
+                }
+            }
+
+            $raw = substr($source, $at, 3) === '{!!';
+            $escaped = !$raw && substr($source, $at, 2) === '{{';
+
+            if ($raw || $escaped) {
+                [$open, $close] = $raw ? ['{!!', '!!}'] : ['{{', '}}'];
+                $closeAt = strpos($source, $close, $at + strlen($open));
+
+                if ($closeAt === false) {
+                    $at += strlen($open);
+
+                    continue;
+                }
+
+                $expression = trim(substr($source, $at + strlen($open), $closeAt - $at - strlen($open)));
+                $echoEnd = $closeAt + strlen($close);
+
+                if (
+                    $state === 'TEXT'
+                    && preg_match('/^\$(\w+)(?:\s*\?\?.*)?$/s', $expression, $m)
+                    && !isset($fields[$m[1]])
+                    && !in_array($m[1], $loopAliases, true)
+                    && !in_array($m[1], self::RESERVED, true)
+                ) {
+                    $refs[] = new EchoRef($m[1], $m[1], 'undeclared', $at, $echoEnd, $this->lineAt($source, $at));
+                }
+
+                $at = $echoEnd;
+
+                continue;
+            }
+
+            if ($state === 'TEXT') {
+                if ($char === '<' && preg_match('/\G<([a-zA-Z][\w:.-]*)/A', $source, $m, 0, $at)) {
+                    $state = 'TAG';
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (substr($source, $at, 2) === '</') {
+                    $state = 'TAG';
+                    $at += 2;
+
+                    continue;
+                }
+
+                $at++;
+
+                continue;
+            }
+
+            if ($state === 'TAG') {
+                if ($char === '>') {
+                    $state = 'TEXT';
+                    $at++;
+
+                    continue;
+                }
+
+                if ($char === '"' || $char === "'") {
+                    $state = 'ATTR';
+                    $quote = $char;
+                    $at++;
+
+                    continue;
+                }
+
+                $at++;
+
+                continue;
+            }
+
+            // ATTR
+            if ($char === $quote) {
+                $state = 'TAG';
             }
 
             $at++;
