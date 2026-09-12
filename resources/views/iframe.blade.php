@@ -181,6 +181,51 @@
                 display: none !important;
             }
 
+            /* ---- Link/select/colour control ----
+               A separate floating element from the chip on purpose: the
+               chip is pointer-events:none by design (it must never block
+               the hover it describes), so an interactive widget cannot
+               live inside it. */
+            .studio-control {
+                position: fixed;
+                z-index: 2147483007;
+                display: none;
+                align-items: center;
+                gap: 6px;
+                padding: 6px;
+                border-radius: 8px;
+                background: rgba(12, 12, 14, 0.96);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.5);
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 12px;
+                color: #fff;
+            }
+
+            .studio-control.is-on { display: flex; }
+
+            .studio-control input[type="text"],
+            .studio-control select {
+                height: 26px;
+                min-width: 180px;
+                padding: 0 8px;
+                border-radius: 6px;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                background: rgba(255, 255, 255, 0.06);
+                color: #fff;
+                font: inherit;
+            }
+
+            .studio-control input[type="color"] {
+                width: 28px;
+                height: 26px;
+                padding: 0;
+                border: none;
+                background: none;
+            }
+
+            html.studio-preview .studio-control { display: none !important; }
+
             /* A file dragged over an image field — a class on the target
                element itself, not a second overlay writer. */
             .studio-drop-target {
@@ -997,4 +1042,5 @@
     <div class="studio-fhalo" id="studio-fhalo"></div>
     <div class="studio-fchip" id="studio-fchip"></div>
     <div class="studio-cursor" id="studio-cursor"></div>
+    <div class="studio-control" id="studio-control"></div>
 </x-studio::layouts.iframe>
