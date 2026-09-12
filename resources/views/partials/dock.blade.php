@@ -29,6 +29,8 @@
         dragging: false,
         drag: null,      // pointer offset inside the dock while dragging
         peek: false,
+        over: false,
+        peekTimer: null,
         style: '',
 
         // Position from the store: the dock's centre sits `along` the edge
@@ -77,7 +79,11 @@
     x-effect="$store.studio.dock; $store.studio.mode; $store.studio.codeAvailable; $nextTick(() => place())"
     @resize.window.debounce.50ms="place()"
     @transitionend.self="$dispatch('studio:dock-moved')"
-    @mouseleave="peek = false"
+    {{-- A peeked dock hides again when the pointer leaves it. The canvas
+         iframe swallows pointer events, so this is per-element enter/leave,
+         not a window-level watch. --}}
+    @mouseenter="over = true; clearTimeout(peekTimer)"
+    @mouseleave="over = false; if (!dragging) peek = false"
 >
     <span
         class="s-dock-grip"
@@ -144,4 +150,16 @@
     </div>
 
     {{ $actions ?? '' }}
+
+    {{-- Hidden dock (⌘.): a hot strip on its edge peeks it back --}}
+    <template x-teleport="body">
+        <div
+            x-show="$store.studio.dockHidden"
+            x-cloak
+            class="s-dock-peek"
+            :style="({ bottom: 'left:0;right:0;bottom:0;height:6px', top: 'left:0;right:0;top:0;height:6px', left: 'top:0;bottom:0;left:0;width:6px', right: 'top:0;bottom:0;right:0;width:6px' })[$store.studio.dock.edge]"
+            @mouseenter="peek = true; clearTimeout(peekTimer)"
+            @mouseleave="peekTimer = setTimeout(() => { if (!over) peek = false }, 500)"
+        ></div>
+    </template>
 </nav>
