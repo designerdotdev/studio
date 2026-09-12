@@ -148,3 +148,9 @@ php artisan studio:uninstall        # Remove Studio's editor data (--keep-data);
 - **Never take file contents from `$request->input()`/`validate()`.** Laravel's `TrimStrings` middleware strips leading and trailing whitespace from request input, which silently eats a saved file's trailing newline. `CodeController::rawContents()` reads `contents` off the raw JSON body instead; validation still guards the shape.
 - **Never put a Monaco editor or model inside an Alpine store or `x-data`.** Alpine deep-proxies what it holds, and Monaco's object graphs are large and getter-heavy — doing so hangs `openFile()` silently. Code mode keeps them in the plain `studioCodeBuffers` object beside the store (`home.blade.php`); only serialisable state (tabs, active path, dirty flags) is reactive.
 - The compiled asset list lives in several places that must stay in sync when files are added: `StudioAssets::FILES` (drives `studio:publish` + the provider's `studio-assets` publish tag), `AssetController::$allowedFiles` (adds MIME types), Vite's `ASSET_FILES` (`vite.config.js`), and `MONACO_FILES` in `esbuild.monaco.mjs`.
+
+## Skills (`.claude/skills/`)
+
+- `designer-craft` — the shared design contract for anything rendered by Designer: canonical `@theme` tokens, the motion vocabulary, the Higgsfield imagery pipeline, copy rules, and `scripts/lint-site.py` (props ↔ yml parity, palette literals, reduced-motion guards). Read it before writing a section.
+- `create-designer-template` — build a premium site template in the site-templates format (workspace `~/Sites/site-templates/<slug>`), verified through a throwaway lab app (`scripts/lab.sh`, `scripts/snap.mjs`, the round-trip invariant) — never the host app.
+- `create-block` — convert a screenshot, a Relume/shadcnblocks block, or a brief into a library section (`~/Sites/designer-blocks`) with its own copy, imagery, and one interaction; `scripts/install-block.sh` drops it into a site.
