@@ -159,7 +159,7 @@ class DevModeController extends Controller
 
         // Same guarantee as the YAML side: nothing is written unless the
         // rewritten @props array is provably still valid PHP.
-        if (!$this->propsArrayIsValid($newBlade, $key)) {
+        if (!$this->propsArrayIsValid($blade, $newBlade, $key)) {
             return response()->json(['success' => false, 'message' => 'Could not add that field: the result was not valid PHP.'], 500);
         }
 
@@ -306,37 +306,91 @@ class DevModeController extends Controller
 
         // A hand-written array's last entry may have no trailing comma yet
         // (valid PHP — one is only required BEFORE a further element): find
-        // the last non-blank line before the closing bracket and add one,
-        // or the new entry would run straight into it as a syntax error.
+        // the last significant character before the closing bracket and add
+        // one if it isn't already a comma, or the new entry would run
+        // straight into it as a syntax error. This has to be quote- and
+        // comment-aware — a regex stripping "//" would truncate a URL
+        // default (`'https://…'`) and either splice a comma into the
+        // middle of the string or miss a real trailing comma sitting after
+        // one, so it reuses the same character-scanning technique
+        // findBracketedArray() already uses for the brackets themselves.
         $before = substr($blade, $openBracket + 1, $insertAt - $openBracket - 1);
-        $lines = explode("\n", $before);
-        $offsets = [];
-        $pos = 0;
-
-        foreach ($lines as $line) {
-            $offsets[] = $pos;
-            $pos += strlen($line) + 1;
-        }
-
-        $idx = count($lines) - 1;
-
-        while ($idx >= 0 && trim($lines[$idx]) === '') {
-            $idx--;
-        }
+        $sig = $this->lastSignificantChar($before);
 
         $entry = $indent . "'{$key}' => '',\n";
 
-        if ($idx >= 0) {
-            $bare = rtrim((string) preg_replace('#//[^\n]*$#', '', $lines[$idx]));
-
-            if ($bare !== '' && !str_ends_with($bare, ',')) {
-                $commaAt = $openBracket + 1 + $offsets[$idx] + strlen($bare);
-                $blade = substr($blade, 0, $commaAt) . ',' . substr($blade, $commaAt);
-                $insertAt++;
-            }
+        if ($sig !== null && $sig[0] !== ',') {
+            $commaAt = $openBracket + 1 + $sig[1] + 1;
+            $blade = substr($blade, 0, $commaAt) . ',' . substr($blade, $commaAt);
+            $insertAt++;
         }
 
         return substr($blade, 0, $insertAt) . $entry . substr($blade, $insertAt);
+    }
+
+    /**
+     * The last character in `$text` that is neither inside a string
+     * literal nor a `//` line comment, ignoring whitespace — plus its byte
+     * offset. Quote- and comment-aware, so a comma or a `//` sitting
+     * inside a string value is never mistaken for the array's own trailing
+     * comma or a comment marker, and a real trailing comment doesn't hide
+     * a comma that already exists before it.
+     *
+     * @return array{0: string, 1: int}|null [character, offset]
+     */
+    protected function lastSignificantChar(string $text): ?array
+    {
+        $inString = null;
+        $inComment = false;
+        $last = null;
+
+        for ($i = 0, $len = strlen($text); $i < $len; $i++) {
+            $char = $text[$i];
+
+            if ($inComment) {
+                if ($char === "\n") {
+                    $inComment = false;
+                }
+
+                continue;
+            }
+
+            if ($inString !== null) {
+                if ($char === '\\') {
+                    $i++;
+
+                    continue;
+                }
+
+                if ($char === $inString) {
+                    $inString = null;
+                    $last = [$char, $i];
+                }
+
+                continue;
+            }
+
+            if ($char === "'" || $char === '"') {
+                $inString = $char;
+
+                continue;
+            }
+
+            if ($char === '/' && ($text[$i + 1] ?? '') === '/') {
+                $inComment = true;
+                $i++;
+
+                continue;
+            }
+
+            if (trim($char) === '') {
+                continue;
+            }
+
+            $last = [$char, $i];
+        }
+
+        return $last;
     }
 
     /**
@@ -401,31 +455,52 @@ class DevModeController extends Controller
     }
 
     /**
-     * Same guarantee as the YAML side, for the Blade half: parse the
-     * rewritten `@props([...])` array as a PHP literal — never evaluating
-     * it — and refuse to write anything unless it is still one, and still
-     * carries the new key. `PhpLiteral` already does exactly this parsing
-     * for bound component attributes; reusing it here means a bug in the
-     * splice above fails loudly instead of corrupting the section's file.
+     * Same guarantee as the YAML side, for the Blade half — held to the
+     * standard the ORIGINAL array already met, not a stricter one: a
+     * rewritten array is required to still parse as a pure PHP literal
+     * (never evaluating it — see `PhpLiteral`) only when the original one
+     * did. A hand-written section may legitimately mix in a non-literal
+     * default somewhere else in the array (a helper call, a constant);
+     * requiring the whole array to be a literal after our edit would
+     * refuse a perfectly valid promotion over an untouched neighbour. When
+     * the original wasn't a pure literal either, the weaker but still
+     * meaningful check is: the brackets still balance (guaranteed by
+     * `findBracketedArray` returning a match at all) and the exact entry
+     * we spliced in is really there.
      */
-    protected function propsArrayIsValid(string $blade, string $key): bool
+    protected function propsArrayIsValid(string $originalBlade, string $newBlade, string $key): bool
     {
-        $propsAt = strpos($blade, '@props(');
+        $newPropsAt = strpos($newBlade, '@props(');
 
-        if ($propsAt === false) {
+        if ($newPropsAt === false) {
             return false;
         }
 
-        $bounds = $this->findBracketedArray($blade, $propsAt);
+        $newBounds = $this->findBracketedArray($newBlade, $newPropsAt);
 
-        if ($bounds === null) {
+        if ($newBounds === null) {
             return false;
         }
 
-        [$open, $close] = $bounds;
-        [$isLiteral, $value] = PhpLiteral::parse(substr($blade, $open, $close - $open + 1));
+        [$newOpen, $newClose] = $newBounds;
+        $newArrayText = substr($newBlade, $newOpen, $newClose - $newOpen + 1);
 
-        return $isLiteral && is_array($value) && array_key_exists($key, $value);
+        $originalPropsAt = strpos($originalBlade, '@props(');
+        $originalBounds = $originalPropsAt === false ? null : $this->findBracketedArray($originalBlade, $originalPropsAt);
+        $originalWasLiteral = false;
+
+        if ($originalBounds !== null) {
+            [$origOpen, $origClose] = $originalBounds;
+            [$originalWasLiteral] = PhpLiteral::parse(substr($originalBlade, $origOpen, $origClose - $origOpen + 1));
+        }
+
+        if ($originalWasLiteral) {
+            [$isLiteral, $value] = PhpLiteral::parse($newArrayText);
+
+            return $isLiteral && is_array($value) && array_key_exists($key, $value);
+        }
+
+        return str_contains($newArrayText, "'{$key}' => ''");
     }
 
     /**
