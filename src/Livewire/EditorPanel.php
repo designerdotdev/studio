@@ -826,6 +826,32 @@ class EditorPanel extends Component
         );
     }
 
+    /**
+     * A value typed directly on the canvas.
+     *
+     * The canvas is already showing the new text, so unlike
+     * {@see setVariable()} this deliberately does not echo the value back
+     * to the iframe — repainting would destroy the caret. Everything else
+     * (global blocks, layout sections, conflict guarding, site-bound
+     * fields) is the panel's own save path, so behaviour is identical.
+     */
+    #[On('studio:set-field')]
+    public function setFieldFromCanvas(string $sectionId, string $key, $value, ?int $index = null, ?string $subKey = null): void
+    {
+        if (!isset($this->variables[$sectionId])) {
+            return;
+        }
+
+        if ($index !== null && $subKey !== null) {
+            $this->updateRepeaterSubField($sectionId, $key, $index, $subKey, (string) $value);
+
+            return;
+        }
+
+        $this->variables[$sectionId][$key] = $value;
+        $this->saveVariables($sectionId);
+    }
+
     /* ------------------------------------------------------------ */
     /*  Repeater fields                                              */
     /* ------------------------------------------------------------ */

@@ -185,6 +185,23 @@
                 display: none !important;
             }
 
+            /* ---- Inline text editing ---- */
+            [data-sf-edit],
+            [contenteditable="true"],
+            [contenteditable="plaintext-only"] {
+                outline: none;
+                background: rgba(76, 125, 250, 0.1);
+                box-shadow: 0 0 0 1.5px #4c7dfa;
+                border-radius: 2px;
+            }
+
+            /* The halo and chip would only fight the caret while typing */
+            html.studio-editing .studio-fhalo,
+            html.studio-editing .studio-fchip,
+            html.studio-editing .studio-cursor {
+                opacity: 0 !important;
+            }
+
             /* Floating toolbar — always wins pointer events over insert zones */
             .studio-toolbar {
                 position: absolute;

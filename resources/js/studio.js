@@ -127,6 +127,16 @@ const StudioEditor = {
                     window.dispatchEvent(new CustomEvent('studio:element-selected', { detail: data }));
                     break;
 
+                case 'studio:field-committed':
+                    window.Livewire?.dispatch('studio:set-field', {
+                        sectionId: data.sectionId,
+                        key: data.key,
+                        value: data.value,
+                        index: data.index,
+                        subKey: data.subKey,
+                    });
+                    break;
+
                 case 'studio:navigate':
                     this.navigate(data.path);
                     break;
@@ -809,6 +819,12 @@ const StudioPreview = {
                 this.selectField(hit.entry, sectionId);
                 this.post('studio:section-selected', { sectionId });
 
+                // Text fields become editable straight away; every other type
+                // selects and lets the inspector own the input.
+                if (hit.entry.kind === 'text') {
+                    this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId));
+                }
+
                 return;
             }
 
@@ -1213,6 +1229,210 @@ const StudioPreview = {
         this.selection = { tier: 'item', sectionId, path: item.id, key: item.key, index: item.index };
     },
 
+    /* --- inline text editing -------------------------------------- */
+
+    // The section whose markup must not be repainted: its DOM is the truth
+    // while the caret is in it.
+    editing: null,
+
+    /**
+     * Make a text field editable in place.
+     *
+     * When the sentinel range is the whole content of its parent (the common
+     * case, `<p>{{ $body }}</p>`) the parent becomes editable directly.
+     * Otherwise the range is wrapped in a transient span — safe, because it
+     * exists only while the caret is in it and is unwrapped on exit.
+     */
+    beginEdit(entry, sectionId, multiline) {
+        if (this.editing) this.commitEdit();
+
+        if (entry.kind !== 'text' || !entry.range) return false;
+
+        const parent = entry.range.commonAncestorContainer.nodeType === 1
+            ? entry.range.commonAncestorContainer
+            : entry.range.commonAncestorContainer.parentElement;
+
+        if (!parent) return false;
+
+        let host = parent;
+        let wrapper = null;
+
+        // Does the range already cover everything the parent contains?
+        const whole = document.createRange();
+        whole.selectNodeContents(parent);
+
+        const sameStart = whole.compareBoundaryPoints(Range.START_TO_START, entry.range) === 0;
+        const sameEnd = whole.compareBoundaryPoints(Range.END_TO_END, entry.range) === 0;
+
+        if (!sameStart || !sameEnd) {
+            wrapper = document.createElement('span');
+            wrapper.setAttribute('data-sf-edit', '');
+
+            try {
+                entry.range.surroundContents(wrapper);
+            } catch (e) {
+                return false;   // the range crosses an element boundary
+            }
+
+            host = wrapper;
+        }
+
+        host.setAttribute('contenteditable', this.plaintextMode());
+        host.focus();
+
+        // Put the caret where the user clicked rather than selecting all
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        const caret = document.createRange();
+        caret.selectNodeContents(host);
+        selection.addRange(caret);
+
+        this.editing = {
+            sectionId,
+            entry,
+            host,
+            wrapper,
+            multiline,
+            original: host.innerText,
+        };
+
+        document.documentElement.classList.add('studio-editing');
+
+        host.addEventListener('keydown', this.editKeydown);
+        host.addEventListener('paste', this.editPaste);
+        host.addEventListener('blur', this.editBlur);
+
+        return true;
+    },
+
+    /** `plaintext-only` where supported; plain contenteditable plus a paste
+     *  handler everywhere else. */
+    plaintextMode() {
+        if (this._plaintext === undefined) {
+            const probe = document.createElement('div');
+            probe.setAttribute('contenteditable', 'plaintext-only');
+            this._plaintext = probe.contentEditable === 'plaintext-only' ? 'plaintext-only' : 'true';
+        }
+
+        return this._plaintext;
+    },
+
+    editKeydown(event) {
+        const state = StudioPreview.editing;
+
+        if (!state) return;
+
+        if (event.key === 'Enter' && !state.multiline) {
+            event.preventDefault();
+            StudioPreview.commitEdit();
+
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            StudioPreview.cancelEdit();
+        }
+    },
+
+    editPaste(event) {
+        // Only needed on the fallback path — plaintext-only handles itself
+        if (StudioPreview.plaintextMode() === 'plaintext-only') return;
+
+        event.preventDefault();
+        const text = (event.clipboardData || window.clipboardData).getData('text/plain');
+        document.execCommand('insertText', false, text);
+    },
+
+    editBlur() {
+        StudioPreview.commitEdit();
+    },
+
+    /** Read the value back out of the DOM and hand it to the editor. */
+    commitEdit() {
+        const state = this.editing;
+
+        if (!state) return;
+
+        this.editing = null;
+
+        const value = this.readValue(state.host);
+
+        this.teardownEdit(state);
+
+        if (value === state.original) return;
+
+        const { entry, sectionId } = state;
+
+        // Keep the client's copy current so a later re-render is correct
+        if (entry.index === null) {
+            this.variables[sectionId] = this.variables[sectionId] || {};
+            this.variables[sectionId][entry.key] = value;
+        }
+
+        this.post('studio:field-committed', {
+            sectionId,
+            key: entry.key,
+            index: entry.index,
+            subKey: entry.subKey,
+            value,
+        });
+    },
+
+    cancelEdit() {
+        const state = this.editing;
+
+        if (!state) return;
+
+        this.editing = null;
+        state.host.innerText = state.original;
+        this.teardownEdit(state);
+    },
+
+    teardownEdit(state) {
+        state.host.removeEventListener('keydown', this.editKeydown);
+        state.host.removeEventListener('paste', this.editPaste);
+        state.host.removeEventListener('blur', this.editBlur);
+        state.host.removeAttribute('contenteditable');
+
+        if (state.wrapper && state.wrapper.parentNode) {
+            const parent = state.wrapper.parentNode;
+            while (state.wrapper.firstChild) parent.insertBefore(state.wrapper.firstChild, state.wrapper);
+            parent.removeChild(state.wrapper);
+            parent.normalize();
+        }
+
+        document.documentElement.classList.remove('studio-editing');
+        window.getSelection()?.removeAllRanges();
+
+        // The DOM moved under the map — rebuild it for this section
+        StudioFields.index(document.querySelector(`[data-section="${state.sectionId}"]`));
+    },
+
+    /**
+     * contenteditable produces <br>/<div> for line breaks and leaves
+     * non-breaking spaces behind where it padded the caret; normalise both
+     * so the saved value is the text the user believes they typed.
+     */
+    readValue(host) {
+        return host.innerText
+            .replace(/\u00a0/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    },
+
+    /**
+     * A textarea field takes Enter as a newline; a text field commits on it.
+     * This reads the declared type rather than sniffing the current value,
+     * so an empty textarea still behaves like one.
+     */
+    isMultiline(entry, sectionId) {
+        if (entry.index !== null) return false;   // repeater sub-fields are single-line in v1
+
+        return StudioFields.contractFor(sectionId, entry.key)?.type === 'textarea';
+    },
+
     /** Esc: field → item (when the field is in one) → section → nothing. */
     walkUp() {
         const { tier, sectionId, key, index } = this.selection;
@@ -1590,6 +1810,10 @@ const StudioPreview = {
     },
 
     paint(sectionId, markup) {
+        // The caret is in this section — its DOM already shows the truth, and
+        // replacing innerHTML would destroy the selection mid-keystroke.
+        if (this.editing && this.editing.sectionId === sectionId) return;
+
         const el = document.querySelector(`[data-section="${sectionId}"] [data-section-content]`);
 
         if (!el) return;
