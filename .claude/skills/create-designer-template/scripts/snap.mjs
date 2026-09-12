@@ -10,7 +10,7 @@
       --pages /,/pricing                (default: every <loc> in /sitemap.xml, else /)
       --reduced-motion                  emulate prefers-reduced-motion: reduce
       --thumbnail                       only a 1440x900 shot of the first page at scroll 0 → <out-dir>/thumbnail.png
-      --chunk 1800                      chunk height for tall pages
+      --chunk 1800                      viewport height per shot (the page is scrolled and shot in steps)
       --settle 800                      ms to wait after the scroll-through, before shooting (raise to ~6000 for a hero beat that resolves)
 
     Needs `npm i playwright` somewhere on NODE_PATH; chromium is provisioned on this Mac.
@@ -112,18 +112,28 @@ for (const width of widths) {
             await new Promise((r) => setTimeout(r, wait));
             return document.documentElement.scrollHeight;
         }, settle);
+        // A revealed element that keeps `filter: blur(0)` holds a compositing layer that
+        // Chromium's tall full-page capture can drop; blur(0) and none look identical.
+        await page.addStyleTag({ content: '[data-reveal].is-visible { filter: none !important; }' });
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         if (overflow > 1) {
             console.log(`WARNING ${p} @${width}: horizontal overflow of ${overflow}px`);
             warnings++;
         }
+        // Scroll-and-shoot rather than a full-page clip: Chromium's full-page capture
+        // drops composited layers (transitions, filters) on very tall pages.
+        // Smooth scrolling (html.scroll-smooth) would leave the capture mid-scroll.
+        await page.addStyleTag({ content: '[data-reveal].is-visible { transition: none !important; } html { scroll-behavior: auto !important; }' });
+        await page.setViewportSize({ width, height: chunk });
         let n = 0;
         for (let y = 0; y < height; y += chunk, n++) {
-            const h = Math.min(chunk, height - y);
+            await page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y);
+            await page.waitForTimeout(300);
             const file = path.join(out, `${slug(p)}-${width}${reduced ? '-rm' : ''}-${String(n).padStart(2, '0')}.png`);
-            await page.screenshot({ path: file, fullPage: true, clip: { x: 0, y, width, height: h } });
+            await page.screenshot({ path: file });
             console.log('shot', file);
         }
+        await page.setViewportSize({ width, height: 900 });
         await page.close();
     }
     await ctx.close();
