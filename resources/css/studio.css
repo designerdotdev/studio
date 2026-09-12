@@ -1107,3 +1107,16 @@ html.studio-light .s-pop-inverse {
     --color-wash-strong: rgba(255, 255, 255, 0.14);
     box-shadow: 0 16px 40px -8px rgba(17, 17, 20, 0.35), 0 2px 6px rgba(17, 17, 20, 0.12);
 }
+
+
+/* An inspector field the canvas just selected — a brief, quiet flash so the
+   eye finds it without the panel jumping around. */
+@keyframes s-field-flash {
+    from { background-color: color-mix(in oklab, var(--color-accent) 22%, transparent); }
+    to   { background-color: transparent; }
+}
+
+.s-field-flash {
+    animation: s-field-flash 900ms ease-out;
+    border-radius: 6px;
+}

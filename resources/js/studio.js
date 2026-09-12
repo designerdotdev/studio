@@ -137,6 +137,10 @@ const StudioEditor = {
                     });
                     break;
 
+                case 'studio:field-selected':
+                    window.dispatchEvent(new CustomEvent('studio:field-focus', { detail: data }));
+                    break;
+
                 case 'studio:navigate':
                     this.navigate(data.path);
                     break;
