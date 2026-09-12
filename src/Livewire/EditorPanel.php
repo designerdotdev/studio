@@ -843,7 +843,7 @@ class EditorPanel extends Component
         }
 
         if ($index !== null && $subKey !== null) {
-            $this->updateRepeaterSubField($sectionId, $key, $index, $subKey, (string) $value);
+            $this->updateRepeaterSubField($sectionId, $key, $index, $subKey, (string) $value, push: false);
 
             return;
         }
@@ -921,12 +921,15 @@ class EditorPanel extends Component
         $this->pushRepeaterToPreview($sectionId, $fieldKey);
     }
 
-    public function updateRepeaterSubField(string $sectionId, string $fieldKey, int $index, string $subField, string $value): void
+    public function updateRepeaterSubField(string $sectionId, string $fieldKey, int $index, string $subField, string $value, bool $push = true): void
     {
         if (isset($this->variables[$sectionId][$fieldKey][$index])) {
             $this->variables[$sectionId][$fieldKey][$index][$subField] = $value;
             $this->saveVariables($sectionId);
-            $this->pushRepeaterToPreview($sectionId, $fieldKey);
+
+            if ($push) {
+                $this->pushRepeaterToPreview($sectionId, $fieldKey);
+            }
         }
     }
 

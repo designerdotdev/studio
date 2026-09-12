@@ -1318,7 +1318,10 @@ const StudioPreview = {
             host,
             wrapper,
             multiline,
-            original: host.innerText,
+            // Normalised the same way commitEdit() reads the final value, so
+            // a field containing an nbsp/extra newlines/trimmable whitespace
+            // doesn't register as "changed" on a mere click-and-blur.
+            original: this.readValue(host),
         };
 
         document.documentElement.classList.add('studio-editing');
@@ -1391,9 +1394,19 @@ const StudioPreview = {
         const { entry, sectionId } = state;
 
         // Keep the client's copy current so a later re-render is correct
-        if (entry.index === null) {
-            this.variables[sectionId] = this.variables[sectionId] || {};
-            this.variables[sectionId][entry.key] = value;
+        this.applyFieldValue(sectionId, entry, value);
+
+        // A global block's other placements on this page share the same
+        // data but don't hear about this edit any other way — the whole
+        // point of setFieldFromCanvas() is that it does NOT dispatch back
+        // to the iframe. Re-render every sibling except the one just
+        // edited: its DOM already shows the truth, and repainting it is
+        // exactly the caret-destroying write this feature exists to avoid.
+        for (const siblingId of this.siblingIds(sectionId)) {
+            if (siblingId === sectionId) continue;
+
+            this.applyFieldValue(siblingId, entry, value);
+            this.render(siblingId);
         }
 
         this.post('studio:field-committed', {
@@ -1405,6 +1418,27 @@ const StudioPreview = {
         });
     },
 
+    /**
+     * Write a committed value into the client-side copy for one section —
+     * shared by the edited section itself and, for a global block, every
+     * other placement that needs re-rendering to catch up.
+     */
+    applyFieldValue(sectionId, entry, value) {
+        this.variables[sectionId] = this.variables[sectionId] || {};
+
+        if (entry.index === null) {
+            this.variables[sectionId][entry.key] = value;
+
+            return;
+        }
+
+        const items = this.variables[sectionId][entry.key];
+
+        if (Array.isArray(items) && items[entry.index]) {
+            items[entry.index][entry.subKey] = value;
+        }
+    },
+
     cancelEdit() {
         const state = this.editing;
 
@@ -1412,6 +1446,7 @@ const StudioPreview = {
 
         this.editing = null;
         state.host.innerText = state.original;
+        state.host.blur();
         this.teardownEdit(state);
     },
 
