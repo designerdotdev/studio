@@ -310,8 +310,22 @@ select at the item tier and edit in the panel.
 
 **Phase 2 — the remaining types.** In-place affordances for image (Library
 picker + drop-to-upload, reusing `Studio.mediaPick()`), url (link popover),
-toggle (switch on the chip), select (dropdown), colorpicker (swatch). Plus
+toggle, select (dropdown), colorpicker (swatch). Plus
 promote-an-echo-to-a-field.
+
+Two clarifications, written after building it:
+
+- **The url affordance had to become a link *popover*, not a separate target.**
+  `at()` returns the smallest rect containing the point, so a link's `href`
+  entry is shadowed by its own text — measured at 39 of 42 links on the home
+  page. So selecting the link's text opens the inline editor for the label
+  *and* a popover for the destination, together.
+- **The toggle affordance is "click the governed element to switch it off",
+  not a switch mounted on the chip.** The chip is `pointer-events: none` by
+  design (it must never block the hover it describes), so no control can live
+  inside it. And a toggle can only be switched *off* from the canvas: when it
+  is false its governed element is not rendered, so there is nothing there to
+  click. Turning one back on stays an inspector action.
 
 **Phase 3 — repeater item operations.** Flanking `+` above/below, drag to
 reorder, delete — the interaction in the second reference screenshot.
@@ -327,7 +341,9 @@ reorder, delete — the interaction in the second reference screenshot.
   a user could point at in any case.
 - Nested repeater children (`nestable: true`). The scanner resolves one loop
   level; a `@foreach ($link->children as $child)` inner loop is not mapped.
-  Panel-only, revisit with Phase 3.
+  Panel-only. Phase 3 did not change this: a canvas item delete removes the
+  parent row *with* its children, and nested child rows get no item box of
+  their own.
 - Value tainting (the rejected Approach 2). It remains a clean, purely
   additive fallback if real-world coverage ever proves thinner than the
   measurement here suggests.
