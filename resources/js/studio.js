@@ -921,7 +921,7 @@ const StudioPreview = {
             if (this.mode === 'preview') return;
             if (!event.dataTransfer?.types?.includes('Files')) return;
 
-            const hit = this.imageHitAt(event.clientX, event.clientY);
+            const hit = this.imageHitAt(event.target, event.clientX, event.clientY);
             if (!hit) return;
 
             event.preventDefault();
@@ -933,7 +933,7 @@ const StudioPreview = {
         document.addEventListener('drop', (event) => {
             if (this.mode === 'preview') return;
 
-            const hit = this.imageHitAt(event.clientX, event.clientY);
+            const hit = this.imageHitAt(event.target, event.clientX, event.clientY);
             this.markDropTarget(null);
 
             if (!hit) return;
@@ -953,24 +953,52 @@ const StudioPreview = {
     },
 
     /**
-     * The image-typed field entry (if any) under a point, across every
-     * section — used by the drag/drop listeners, which have no section
-     * context of their own the way select()/hoverAt() do (those start from
-     * a wrapper's own click/mousemove handler).
+     * The image-typed field entry (if any) under a point — mirrors
+     * resolveHover()'s structure rather than scanning every section on
+     * every tick: `dragover` fires continuously and unthrottled while the
+     * pointer moves (no rAF coalescing here), so a brute-force
+     * querySelectorAll+getBoundingClientRect over every section would
+     * visibly jank on a page with many of them. Start from the DOM
+     * ancestor section — a single bounded hit test — and only fall back to
+     * the elements actually stacked at the point (still bounded: dedupe +
+     * stop at first hit, same shape as tierAtPoint()) when that misses.
      */
-    imageHitAt(x, y) {
-        for (const wrapper of document.querySelectorAll('[data-section]')) {
-            const sectionId = wrapper.dataset.section;
-            const entry = StudioFields.at(sectionId, x, y);
+    imageHitAt(target, x, y) {
+        const wrapper = target?.closest?.('[data-section]');
+        const nearId = wrapper?.dataset.section;
 
-            if (!entry) continue;
-            if (this.editabilityOf(entry, sectionId) === 'code') continue;
-            if (!this.isImageField(entry, sectionId)) continue;
+        if (nearId) {
+            const hit = this.imageEntryAt(nearId, x, y);
+            if (hit) return hit;
+        }
 
-            return { sectionId, entry };
+        const tried = new Set([nearId]);
+
+        for (const el of document.elementsFromPoint(x, y)) {
+            const w = el.closest?.('[data-section]');
+            if (!w) continue;
+
+            const sectionId = w.dataset.section;
+            if (tried.has(sectionId)) continue;
+            tried.add(sectionId);
+
+            const hit = this.imageEntryAt(sectionId, x, y);
+            if (hit) return hit;
         }
 
         return null;
+    },
+
+    /** One section's image-field hit test, shared by imageHitAt()'s
+     * near-ancestor check and its elementsFromPoint() fallback. */
+    imageEntryAt(sectionId, x, y) {
+        const entry = StudioFields.at(sectionId, x, y);
+
+        if (!entry) return null;
+        if (this.editabilityOf(entry, sectionId) === 'code') return null;
+        if (!this.isImageField(entry, sectionId)) return null;
+
+        return { sectionId, entry };
     },
 
     /** The one drop-target highlight, a class on the hit element itself —
