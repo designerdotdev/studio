@@ -332,8 +332,8 @@ cat > "$R/views/components/nav.blade.php" <<'BLADE'
         </button>
     </div>
 
-    <!-- The mobile sheet. Dropdown parents flatten into their children here. -->
-    <div data-mobile-panel class="border-b border-line bg-canvas/95 lg:hidden">
+    <!-- The mobile sheet, absolutely positioned under the bar so the fixed header stays 64px tall (its glass would otherwise blur everything beneath the hidden sheet). Dropdown parents flatten into their children here. -->
+    <div data-mobile-panel class="absolute inset-x-0 top-full max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-line bg-canvas/95 lg:hidden">
         <nav class="mx-auto w-full max-w-6xl px-6 py-4" aria-label="Mobile">
             <ul role="list" class="flex flex-col text-base">
                 @foreach ($links as $link)

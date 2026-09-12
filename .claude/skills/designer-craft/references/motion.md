@@ -65,7 +65,8 @@ touch; Escape and outside clicks dismiss; focus inside holds it open.
 [data-dropdown] .dropdown-caret { transition: rotate .25s var(--ease-out-quart); }
 [data-dropdown].is-open .dropdown-caret { rotate: 180deg; }
 
-/* Header: transparent at rest, glass once scrolled (main.js sets data-scrolled) */
+/* Header: transparent at rest, glass once scrolled (main.js sets data-scrolled). The mobile sheet must be
+   position:absolute under the bar — a hidden sheet in flow makes the fixed header tall, and its blur covers the page. */
 #header { border-bottom: 1px solid transparent; transition: background-color .4s ease, border-color .4s ease, backdrop-filter .4s ease; }
 #header[data-scrolled] { background-color: color-mix(in oklab, var(--color-canvas) 72%, transparent); border-bottom-color: var(--color-line); backdrop-filter: blur(12px); }
 
