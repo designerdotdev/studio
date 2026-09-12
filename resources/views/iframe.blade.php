@@ -181,6 +181,13 @@
                 display: none !important;
             }
 
+            /* A file dragged over an image field — a class on the target
+               element itself, not a second overlay writer. */
+            .studio-drop-target {
+                outline: 2px dashed #4c7dfa !important;
+                outline-offset: -2px;
+            }
+
             /* ---- Inline text editing ---- */
             [data-sf-edit],
             [contenteditable="true"],
