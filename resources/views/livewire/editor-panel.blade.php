@@ -13,53 +13,66 @@
         },
 
         focusToken: 0,
-        focusTimer: null,
+        pendingFocusKey: null,
+        focusFallbackTimer: null,
+
+        // Registered once, when this component's Alpine root initializes —
+        // not per click. Every focus request is applied from here, after
+        // this panel's own morph has settled (see focusField/applyPendingFocus).
+        init() {
+            window.Livewire.hook('morphed', ({ component }) => {
+                if (component.name !== 'studio::editor-panel') return;
+                this.applyPendingFocus();
+            });
+        },
 
         /**
          * The canvas selected a field — bring the matching input into view
          * and flash it, so clicking text on the page and reading its
          * settings are the same gesture.
          *
-         * The canvas click that triggers this also selects the section,
-         * which round-trips through Livewire to re-render the fields — so
-         * the row we want may not exist in the DOM yet. Try immediately
-         * (covers the common case: the section is already selected), then
-         * poll briefly for the round trip to land. A token guards against
-         * a second click landing on an older, still-pending request.
+         * A canvas field click always selects the section too, which is a
+         * Livewire commit that morphs this panel's DOM — whether or not the
+         * row already exists. Applying the flash right away races that
+         * morph: if the row already existed, the morph's server-rendered
+         * `class` attribute overwrites it before it can be seen; if it
+         * didn't exist yet, it isn't there to flash at all. So we never
+         * touch the DOM here — we only arm the pending key/token, and let
+         * the `morphed` hook in init() apply it once this panel's morph has
+         * actually settled, either way. The 600ms fallback covers the rare
+         * case where a focus request has nothing to re-render (no commit
+         * follows at all), so the flash still happens rather than hanging.
          */
         focusField(detail) {
-            const key = detail.key;
+            this.pendingFocusKey = detail.key;
             const token = ++this.focusToken;
 
-            if (this.focusTimer) {
-                clearInterval(this.focusTimer);
-                this.focusTimer = null;
+            clearTimeout(this.focusFallbackTimer);
+            this.focusFallbackTimer = setTimeout(() => {
+                this.focusFallbackTimer = null;
+                if (token === this.focusToken) this.applyPendingFocus();
+            }, 600);
+        },
+
+        applyPendingFocus() {
+            if (this.focusFallbackTimer) {
+                clearTimeout(this.focusFallbackTimer);
+                this.focusFallbackTimer = null;
             }
 
-            const tryFocus = () => {
-                if (token !== this.focusToken) return true; // superseded — stop silently
+            const key = this.pendingFocusKey;
+            this.pendingFocusKey = null;
 
-                const row = this.$root.querySelector(`[data-field-key='${key}']`);
+            if (key === null) return;
 
-                if (!row) return false;
+            const row = this.$root.querySelector(`[data-field-key='${key}']`);
 
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.classList.remove('s-field-flash');
-                void row.offsetWidth;              // restart the animation
-                row.classList.add('s-field-flash');
-                return true;
-            };
+            if (!row) return;
 
-            if (tryFocus()) return;
-
-            const deadline = Date.now() + 1500;
-
-            this.focusTimer = setInterval(() => {
-                if (tryFocus() || Date.now() > deadline) {
-                    clearInterval(this.focusTimer);
-                    this.focusTimer = null;
-                }
-            }, 50);
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.remove('s-field-flash');
+            void row.offsetWidth;              // restart the animation
+            row.classList.add('s-field-flash');
         }
     }"
     x-on:studio:field-focus.window="focusField($event.detail)"
