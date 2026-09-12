@@ -1329,7 +1329,14 @@ const StudioPreview = {
             const inView = visibleHeight >= threshold;
 
             if (!inView) {
-                wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Scroll to the field's own box, not the section wrapper: a
+                // section taller than the viewport (a hero, say) can have a
+                // field near either end that scrollIntoView on the wrapper
+                // would still leave off-screen. box.top is already viewport-
+                // relative, and text entries are Range-based with no element
+                // of their own, so this works for every entry kind alike.
+                const target = window.scrollY + box.top - (window.innerHeight / 2) + (box.height / 2);
+                window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
             }
 
             return;
