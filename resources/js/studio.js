@@ -1318,9 +1318,14 @@ const StudioPreview = {
             host,
             wrapper,
             multiline,
-            // Normalised the same way commitEdit() reads the final value, so
-            // a field containing an nbsp/extra newlines/trimmable whitespace
-            // doesn't register as "changed" on a mere click-and-blur.
+            // Two copies, deliberately not one: `originalRaw` is the literal
+            // pre-edit DOM text, restored verbatim by cancelEdit() so Escape
+            // is a true no-op even when the real content has a leading
+            // space, an nbsp, or 3+ blank lines. `original` is normalised
+            // the same way commitEdit() reads the final value back, so
+            // that comparison stays like-for-like instead of flagging a
+            // mere click-and-blur as a change.
+            originalRaw: host.innerText,
             original: this.readValue(host),
         };
 
@@ -1445,7 +1450,7 @@ const StudioPreview = {
         if (!state) return;
 
         this.editing = null;
-        state.host.innerText = state.original;
+        state.host.innerText = state.originalRaw;
         state.host.blur();
         this.teardownEdit(state);
     },
