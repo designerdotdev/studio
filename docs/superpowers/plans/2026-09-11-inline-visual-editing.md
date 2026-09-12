@@ -16,7 +16,7 @@
 - **Never annotate an `<x-…>` tag.** Injecting `data-sf-attr`/`data-sf-when` into a component tag would become a component prop and change behaviour.
 - **A scanner failure costs inline editing, never the render.** Every instrumentation call is wrapped and falls back to the uninstrumented source.
 - **The scanner never evaluates anything.** Pure text in, text out. An expression it does not recognise produces no reference — never a wrong one.
-- **Measured baseline that must hold** (62 sections across the installed site + `monarch` + `pilot` clones): **365/369 declared fields mapped (98.9%)**, **57/57 renderable sections byte-identical after stripping**, **213 sentinels rendered**. The 4 unmapped are `split.align`, `split.visual` (selects used only in comparisons) and `main.showFooter` ×2 (a toggle whose `@if` wraps `<x-footer>`).
+- **Measured baseline that must hold** (62 sections across the installed site + `monarch` + `pilot` clones): **365/369 declared fields mapped (98.9%)**, **57/57 renderable sections byte-identical after stripping**, **577 sentinels rendered**. The 4 unmapped are `split.align`, `split.visual` (selects used only in comparisons) and `main.showFooter` ×2 (a toggle whose `@if` wraps `<x-footer>`).
 - **Commit style:** end every commit message with the two attribution lines used in the spec commit (`Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_015ipmAu6GRkPd69yKxBdGBX`).
 - **After editing `resources/css` or `resources/js`, run `npm run build`** (or keep `npm run dev` watching), or the editor loads stale assets.
 - **No test runner exists in this package.** The TDD cycle in this plan runs against `php artisan studio:inline:verify`, built in Task 1. Run it from the host app root: `<host-app>`.
@@ -773,7 +773,8 @@ Expected: PASS, with both lines present:
 
 ```
 Coverage: 365/369 fields mapped across 62 sections
-Inertness: 57 identical, 0 diverged, 5 unrenderable, 213 sentinels rendered
+Inertness: 57 identical, 0 diverged, 5 unrenderable, 577 sentinels rendered
+  unrenderable: main, post, main, post, guide
 ```
 
 Any `diverged` count above 0 is a hard stop: read the printed byte offset and the two 90-character windows to see exactly which sentinel changed the output.
