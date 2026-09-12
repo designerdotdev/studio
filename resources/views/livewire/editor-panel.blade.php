@@ -10,8 +10,27 @@
             window.dispatchEvent(new CustomEvent('studio:to-iframe', {
                 detail: { type: 'studio:hover', sectionId, on }
             }));
+        },
+
+        /**
+         * The canvas selected a field — bring the matching input into view
+         * and flash it, so clicking text on the page and reading its
+         * settings are the same gesture.
+         */
+        focusField(detail) {
+            this.$nextTick(() => {
+                const row = this.$root.querySelector(`[data-field-key='${detail.key}']`);
+
+                if (!row) return;
+
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.remove('s-field-flash');
+                void row.offsetWidth;              // restart the animation
+                row.classList.add('s-field-flash');
+            });
         }
     }"
+    x-on:studio:field-focus.window="focusField($event.detail)"
 >
     @php $selected = $this->selectedSection; @endphp
 
@@ -122,7 +141,7 @@
                         $sitePath = \Designer\Studio\Services\CollectionBinder::sitePath($binding);
                     @endphp
 
-                    <div wire:key="field-{{ $selectedId }}-{{ $key }}">
+                    <div wire:key="field-{{ $selectedId }}-{{ $key }}" data-field-key="{{ $key }}">
                         @if(\Designer\Studio\Services\CollectionBinder::isCode($binding))
                             {{-- Written as code in the page file: shown, not edited --}}
                             <span class="s-label">{{ $field['label'] ?? \Illuminate\Support\Str::headline($key) }}</span>
