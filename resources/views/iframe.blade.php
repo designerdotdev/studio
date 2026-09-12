@@ -92,6 +92,7 @@
                 position: fixed;
                 z-index: 2147483003;
                 pointer-events: none;
+                box-sizing: border-box;
                 border-radius: 3px;
                 box-shadow: inset 0 0 0 1.5px #4c7dfa;
                 opacity: 0;
@@ -105,6 +106,13 @@
 
             .studio-fhalo.is-code {
                 box-shadow: inset 0 0 0 1.5px rgba(148, 148, 158, 0.55);
+            }
+
+            /* An undeclared echo — dashed, not solid: there is no field
+               here yet to select, only one the chip offers to create. */
+            .studio-fhalo.is-undeclared {
+                box-shadow: none;
+                border: 1.5px dashed rgba(148, 148, 158, 0.85);
             }
 
             .studio-fhalo.is-on {
@@ -133,6 +141,7 @@
 
             .studio-fchip.is-item { background: #e08c2e; }
             .studio-fchip.is-code { background: rgba(88, 88, 98, 0.92); }
+            .studio-fchip.is-undeclared { background: rgba(88, 88, 98, 0.92); }
             .studio-fchip.is-on { opacity: 1; }
 
             .studio-fchip-src {
@@ -223,6 +232,25 @@
                 padding: 0;
                 border: none;
                 background: none;
+            }
+
+            /* The add-field control: a button, not an input — promoting an
+               undeclared echo has no value to type. */
+            .studio-control button {
+                height: 26px;
+                padding: 0 10px;
+                border-radius: 6px;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                background: #4c7dfa;
+                color: #fff;
+                font: inherit;
+                font-weight: 600;
+                white-space: nowrap;
+                cursor: pointer;
+            }
+
+            .studio-control button:hover {
+                background: #3d6ae0;
             }
 
             html.studio-preview .studio-control { display: none !important; }

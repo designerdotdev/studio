@@ -16,7 +16,12 @@ final class Instrumenter
 
     public function weave(string $source, array $fields): string
     {
-        return $this->apply($source, $this->scanner->scan($source, $fields));
+        $refs = array_merge(
+            $this->scanner->scan($source, $fields),
+            $this->scanner->scanUndeclared($source, $fields)
+        );
+
+        return $this->apply($source, $refs);
     }
 
     /** @param list<EchoRef> $refs */
@@ -30,6 +35,16 @@ final class Instrumenter
         foreach ($refs as $ref) {
             if ($ref->context === 'text') {
                 $edits[] = [$ref->offset, '<!--sf:' . $ref->path . '@' . $ref->line . '-->', false];
+                $edits[] = [(int) $ref->end, '<!--/sf-->', true];
+
+                continue;
+            }
+
+            // An undeclared echo — same closing sentinel as `text`, but a
+            // `sf?:` opener marks it as one the canvas can only offer to
+            // declare, never edit.
+            if ($ref->context === 'undeclared') {
+                $edits[] = [$ref->offset, '<!--sf?:' . $ref->path . '@' . $ref->line . '-->', false];
                 $edits[] = [(int) $ref->end, '<!--/sf-->', true];
 
                 continue;
@@ -73,7 +88,7 @@ final class Instrumenter
      */
     public function strip(string $html): string
     {
-        $html = (string) preg_replace('/<!--sf:[^>]*?-->|<!--\/sf-->/', '', $html);
+        $html = (string) preg_replace('/<!--sf\??:[^>]*?-->|<!--\/sf-->/', '', $html);
 
         return (string) preg_replace('/ data-sf-(?:attr|when)="[^"]*"/', '', $html);
     }

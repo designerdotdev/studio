@@ -17,7 +17,7 @@ final class EchoRef
         public readonly string $key,
         /** Sentinel path — a repeater echo carries a live `{{ $loop->index }}`. */
         public readonly string $path,
-        /** `text` | `attr` | `when` */
+        /** `text` | `attr` | `when` | `undeclared` */
         public readonly string $context,
         public readonly int $offset,
         public readonly ?int $end,

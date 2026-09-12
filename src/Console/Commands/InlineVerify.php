@@ -209,7 +209,9 @@ class InlineVerify extends Command
                 continue;
             }
 
-            $sentinels += substr_count($marked, '<!--sf:');
+            // Both forms count: `<!--sf:` for a declared field, `<!--sf?:`
+            // for an undeclared echo the canvas only offers to promote.
+            $sentinels += preg_match_all('/<!--sf\??:/', $marked);
 
             $stripped = $instrumenter->strip($marked);
 
