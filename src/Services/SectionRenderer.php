@@ -53,10 +53,13 @@ class SectionRenderer
      * `$bindings` is the instance's `{field: "collections.<name>"}` map —
      * bound repeaters take the collection's rows instead of stored values.
      */
-    public function render(ComponentData $component, array $variables, array $bindings = []): string
+    public function render(ComponentData $component, array $variables, array $bindings = [], bool $instrument = false): string
     {
         try {
-            return NestedBlade::render($component->html, $this->context($this->binder->apply($variables, $bindings)));
+            return NestedBlade::render(
+                $this->source($component->html, $component->fields, $instrument),
+                $this->context($this->binder->apply($variables, $bindings))
+            );
         } catch (\Throwable $e) {
             report($e);
 
@@ -65,14 +68,37 @@ class SectionRenderer
     }
 
     /** Render raw Blade with the same context (previews, ad-hoc markup). */
-    public function renderHtml(string $html, array $variables, string $label = 'section'): string
+    public function renderHtml(string $html, array $variables, string $label = 'section', array $fields = [], bool $instrument = false): string
     {
         try {
-            return NestedBlade::render($html, $this->context($variables));
+            return NestedBlade::render($this->source($html, $fields, $instrument), $this->context($variables));
         } catch (\Throwable $e) {
             report($e);
 
             return $this->failed($label, $e->getMessage());
+        }
+    }
+
+    /**
+     * The source to compile. Canvas renders get inline-editing sentinels
+     * woven in; every other path gets the section exactly as written.
+     *
+     * A scanner that trips over an unusual template costs that section its
+     * inline editing, never its render — so the failure is reported and the
+     * original source is used.
+     */
+    protected function source(string $html, array $fields, bool $instrument): string
+    {
+        if (!$instrument || $fields === []) {
+            return $html;
+        }
+
+        try {
+            return app(\Designer\Studio\Services\Inline\Instrumenter::class)->weave($html, $fields);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $html;
         }
     }
 

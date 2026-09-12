@@ -220,6 +220,9 @@ class StudioController extends Controller
                     'ref' => $component->name,
                     'title' => $component->title,
                     'html' => $component->html,
+                    // The field contract travels with the section so the
+                    // canvas can be rendered with inline-editing sentinels.
+                    'fields' => $component->fields,
                     'fixed' => $component->fixed,
                     'hidden' => (bool) ($instance['hidden'] ?? false),
                     'scope' => $scope,
