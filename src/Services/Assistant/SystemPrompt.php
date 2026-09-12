@@ -28,7 +28,7 @@ class SystemPrompt
 
     /**
      * @param  array{page?: ?string, section?: ?array, element?: ?array}  $context
-     *         section: {id, ref, title, scope}; element: {path, tag, text}
+     *         section: {id, ref, title, scope}; element: {path, tag, text, field, itemIndex, subKey, source}
      */
     public function build(array $context = []): string
     {
@@ -131,11 +131,45 @@ class SystemPrompt
 
         if ($element) {
             $lines[] = '- Element inside it: `' . ($element['path'] ?? '') . '`' . (!empty($element['text']) ? ' with text "' . mb_substr($element['text'], 0, 120) . '"' : '') . '. "This"/"it" in the request refers to this element.';
+
+            $field = $this->selectedField($element);
+
+            if ($field !== '') {
+                $lines[] = $field;
+            }
         }
 
         $lines[] = '';
 
         return $lines;
+    }
+
+    /**
+     * The exact field the user pointed at with the crosshair.
+     *
+     * Without this an edit turn has to guess which prop produced the text
+     * under the cursor; with it the turn can go straight to the right key
+     * in the right file.
+     */
+    protected function selectedField(array $selection): string
+    {
+        if (empty($selection['field'])) {
+            return '';
+        }
+
+        $path = $selection['field'];
+
+        if (($selection['itemIndex'] ?? null) !== null && !empty($selection['subKey'])) {
+            $path .= '[' . $selection['itemIndex'] . '].' . $selection['subKey'];
+        }
+
+        $line = "The user pointed at the field `{$path}`";
+
+        if (!empty($selection['source'])) {
+            $line .= ", rendered by resources/designer/views/components/{$selection['source']}";
+        }
+
+        return $line . ".\n";
     }
 
     protected function relative(string $absolute): string

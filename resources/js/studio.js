@@ -1861,12 +1861,20 @@ const StudioPreview = {
                     node = node.parentElement;
                 }
 
+                const sectionId = section?.dataset.section || null;
+                const entry = sectionId ? StudioFields.at(sectionId, event.clientX, event.clientY) : null;
+                const source = sectionId ? StudioFields.sourceFor(sectionId) : null;
+
                 this.post('studio:element-selected', {
-                    sectionId: section?.dataset.section || null,
+                    sectionId,
                     ref: section?.dataset.ref || null,
                     path: path.join(' > '),
                     tag: event.target.tagName.toLowerCase(),
                     text: (event.target.innerText || '').trim().slice(0, 160),
+                    field: entry ? entry.key : null,
+                    itemIndex: entry ? entry.index : null,
+                    subKey: entry ? entry.subKey : null,
+                    source: entry && source ? source + '.blade.php:' + entry.line : null,
                 });
 
                 this.setElementSelect(false);
