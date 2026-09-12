@@ -18,27 +18,32 @@
     id="studio-dock"
     class="s-dock"
     :class="{
-        'is-vertical': $store.studio.dock.edge === 'left' || $store.studio.dock.edge === 'right',
+        'is-vertical': edge === 'left' || edge === 'right',
         'is-hidden': $store.studio.dockHidden && !peek,
         'is-dragging': dragging,
-        ['at-' + $store.studio.dock.edge]: true,
+        ['at-' + edge]: true,
     }"
     :style="style"
     aria-label="Editor"
     x-data="{
         dragging: false,
-        drag: null,      // pointer offset inside the dock while dragging
+        drag: null,      // while dragging: pointer offset inside the dock + the edge it rides
         peek: false,
         over: false,
         peekTimer: null,
         style: '',
+
+        // The edge the dock is on right now: the one it rides mid-drag, else the saved one
+        get edge() {
+            return this.dragging && this.drag ? this.drag.edge : $store.studio.dock.edge;
+        },
 
         // Position from the store: the dock's centre sits `along` the edge
         place() {
             if (this.dragging) return;
             const { edge, along } = $store.studio.dock;
             const gap = 12;
-            const w = this.$el.offsetWidth, h = this.$el.offsetHeight;
+            const w = this.$root.offsetWidth, h = this.$root.offsetHeight;
             const W = window.innerWidth, H = window.innerHeight;
             let left, top;
             if (edge === 'bottom' || edge === 'top') {
@@ -51,26 +56,61 @@
             this.style = `left:${left}px; top:${top}px`;
         },
 
+        // Dragging: the dock stays glued to its edge and slides along it
+        // freely (x on top/bottom, y on left/right). Pulling it clearly
+        // away from that edge hops it to whichever edge is nearest.
         startDrag(event) {
             event.preventDefault();
             this.dragging = true;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            const rect = this.$el.getBoundingClientRect();
-            this.drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+            const rect = this.$root.getBoundingClientRect();
+            this.drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, edge: $store.studio.dock.edge };
         },
         moveDrag(event) {
             if (!this.dragging) return;
-            this.style = `left:${Math.round(event.clientX - this.drag.dx)}px; top:${Math.round(event.clientY - this.drag.dy)}px`;
-        },
-        endDrag(event) {
-            if (!this.dragging) return;
-            this.dragging = false;
             const x = event.clientX, y = event.clientY;
             const W = window.innerWidth, H = window.innerHeight;
-            // Snap to the nearest edge; keep the position along it
             const d = { left: x, right: W - x, top: y, bottom: H - y };
-            const edge = Object.keys(d).reduce((a, k) => d[k] < d[a] ? k : a, 'bottom');
-            const along = (edge === 'bottom' || edge === 'top') ? x / W : y / H;
+            if (d[this.drag.edge] > 80) {
+                const nearest = Object.keys(d).reduce((a, k) => d[k] < d[a] ? k : a, 'bottom');
+                if (nearest !== this.drag.edge) {
+                    // Hop: re-measure once the orientation class has applied,
+                    // then carry the dock centred under the pointer
+                    this.drag.edge = nearest;
+                    this.$nextTick(() => {
+                        this.drag.dx = this.$root.offsetWidth / 2;
+                        this.drag.dy = this.$root.offsetHeight / 2;
+                        this.slide(x, y);
+                    });
+                    return;
+                }
+            }
+            this.slide(x, y);
+        },
+        slide(x, y) {
+            const gap = 12;
+            const w = this.$root.offsetWidth, h = this.$root.offsetHeight;
+            const W = window.innerWidth, H = window.innerHeight;
+            const edge = this.drag.edge;
+            let left, top;
+            if (edge === 'bottom' || edge === 'top') {
+                left = Math.min(W - gap - w, Math.max(gap, x - this.drag.dx));
+                top = edge === 'bottom' ? H - gap - h : gap;
+            } else {
+                top = Math.min(H - gap - h, Math.max(gap, y - this.drag.dy));
+                left = edge === 'left' ? gap : W - gap - w;
+            }
+            this.style = `left:${Math.round(left)}px; top:${Math.round(top)}px`;
+            this.$dispatch('studio:dock-moved'); // an open popover follows live
+        },
+        endDrag() {
+            if (!this.dragging) return;
+            const edge = this.drag.edge;
+            const rect = this.$root.getBoundingClientRect();
+            this.dragging = false;
+            // Remember the dock's own centre along its edge, any pixel
+            const along = (edge === 'bottom' || edge === 'top')
+                ? (rect.left + rect.width / 2) / window.innerWidth
+                : (rect.top + rect.height / 2) / window.innerHeight;
             $store.studio.setDock(edge, along);
             this.$nextTick(() => this.place());
         },
@@ -84,15 +124,17 @@
          not a window-level watch. --}}
     @mouseenter="over = true; clearTimeout(peekTimer)"
     @mouseleave="over = false; if (!dragging) peek = false"
+    {{-- Moves and the release are tracked on the window: with the shield
+         over the canvas iframe, the parent document sees every event --}}
+    @pointermove.window="moveDrag($event)"
+    @pointerup.window="endDrag($event)"
+    @pointercancel.window="if (dragging) { dragging = false; place() }"
 >
     <span
         class="s-dock-grip"
         title="Drag to move the dock"
         aria-label="Drag to move the dock"
         @pointerdown="startDrag($event)"
-        @pointermove="moveDrag($event)"
-        @pointerup="endDrag($event)"
-        @pointercancel="dragging = false; place()"
     >
         <svg viewBox="0 0 8 14" width="8" height="14" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.3"/><circle cx="6" cy="2" r="1.3"/><circle cx="2" cy="7" r="1.3"/><circle cx="6" cy="7" r="1.3"/><circle cx="2" cy="12" r="1.3"/><circle cx="6" cy="12" r="1.3"/></svg>
     </span>
@@ -150,6 +192,13 @@
     </div>
 
     {{ $actions ?? '' }}
+
+    {{-- While dragging, a shield covers the window (and the canvas iframe,
+         which would otherwise swallow pointer events) so the drag stays
+         fluid wherever the pointer goes --}}
+    <template x-teleport="body">
+        <div x-show="dragging" x-cloak class="s-drag-shield" aria-hidden="true"></div>
+    </template>
 
     {{-- Hidden dock (⌘.): a hot strip on its edge peeks it back --}}
     <template x-teleport="body">

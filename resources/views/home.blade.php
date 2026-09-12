@@ -71,7 +71,7 @@
 
                     /* --- the dock ----------------------------------------
                        Where the floating bar sits: which window edge, and how
-                       far along it (0..1, the dock's centre). Snaps on drag. */
+                       far along it (0..1, the dock's centre). Slides freely along the edge. */
                     dock: (() => {
                         try {
                             const saved = JSON.parse(localStorage.getItem('studio.dock') || 'null');

@@ -419,6 +419,15 @@ html.studio-light {
         @apply fixed z-40;
     }
 
+    /* Under the dock, over everything else (incl. the canvas iframe) while it is dragged */
+    .s-drag-shield {
+        @apply fixed inset-0;
+        z-index: 39;
+        cursor: grabbing;
+        touch-action: none;
+        user-select: none;
+    }
+
     .s-dock-grip {
         @apply flex shrink-0 cursor-grab items-center justify-center rounded-md text-faint;
         width: 18px;

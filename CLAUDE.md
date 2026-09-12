@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Designer Studio is a Laravel package (not a standalone app) that provides a visual page builder for Laravel applications. **The site it edits is a set of ordinary files in the host app** — a DevDojo site-template installed into `resources/designer` + `public/designer` and served by `app/Providers/DesignerServiceProvider.php`, a runtime Studio writes into the app that has no dependency on the package (remove Studio and the site keeps working). Studio itself keeps JSON documents (no database) as its working model — a mirror of those files plus a draft — and uses Livewire 3 for the editor panel and an iframe canvas rendered server-side. The host app for local development is the repo two levels up (`<host-app>`), which path-symlinks this package via composer.
+Designer Studio is a Laravel package (not a standalone app) that provides a visual page builder for Laravel applications. **The site it edits is a set of ordinary files in the host app** — a DevDojo site-template installed into `resources/designer` + `public/designer` and served by `app/Providers/DesignerServiceProvider.php`, a runtime Studio writes into the app that has no dependency on the package (remove Studio and the site keeps working). Studio itself keeps JSON documents (no database) as its working model — a mirror of those files plus a draft — and uses Livewire 3 for the editor panel and an iframe canvas rendered server-side. The host app for local development is the Laravel app that contains this package at `packages/designer/studio` (three levels up), which path-symlinks it via composer.
 
 ## Build Commands
 

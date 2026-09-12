@@ -83,10 +83,14 @@
                             const b = button.getBoundingClientRect();
                             const d = dock.getBoundingClientRect();
                             const edge = $store.studio.dock.edge;
-                            const w = $store.studio.floatWidth;
+                            let w = $store.studio.floatWidth;
                             let left, top, maxH;
                             if (edge === 'bottom' || edge === 'top') {
-                                left = b.left + b.width / 2 - w / 2;
+                                // Along a horizontal edge the popover takes the
+                                // dock's own width and shares its edges, so the
+                                // two read as one object
+                                w = Math.max(w, Math.round(d.width));
+                                left = d.left + d.width / 2 - w / 2;
                                 maxH = Math.min(H * 0.7, H - d.height - gap - edgePad * 2);
                                 top = edge === 'bottom' ? d.top - gap - maxH : d.bottom + gap;
                             } else {
