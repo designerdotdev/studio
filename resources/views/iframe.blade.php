@@ -505,6 +505,17 @@
                 color: #fff;
             }
 
+            /* Edit fields — the one accented button: it opens the inspector */
+            .studio-toolbar button.studio-toolbar-primary {
+                background: rgba(76, 125, 250, 0.22);
+                color: #b7c8ff;
+            }
+
+            .studio-toolbar button.studio-toolbar-primary:hover {
+                background: rgba(76, 125, 250, 0.4);
+                color: #fff;
+            }
+
             .studio-toolbar button.studio-danger:hover {
                 background: rgba(243, 114, 114, 0.18);
                 color: #f37272;
@@ -1163,6 +1174,10 @@
 
                 {{-- Toolbar --}}
                 <div class="studio-toolbar" onclick="event.stopPropagation()">
+                    <button type="button" class="studio-toolbar-primary" onclick="Studio.preview.openInspector('{{ $section['id'] }}', event)" title="Edit fields (E)">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h9M15 6h2M3 14h2M8 14h9"/><circle cx="13" cy="6" r="2"/><circle cx="6" cy="14" r="2"/></svg>
+                    </button>
+                    <span class="studio-toolbar-sep"></span>
                     <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-up', event)" title="Move up" {{ $section['docFirst'] ? 'disabled' : '' }}>
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25Z" clip-rule="evenodd"/></svg>
                     </button>
