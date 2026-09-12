@@ -145,9 +145,43 @@
                 font-variant-numeric: tabular-nums;
             }
 
+            /* ---- Oversized type cursor ---- */
+            .studio-cursor {
+                position: fixed;
+                top: 0;
+                left: 0;
+                z-index: 2147483006;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 26px;
+                margin: 14px 0 0 14px;
+                border-radius: 8px 8px 8px 2px;
+                background: #4c7dfa;
+                color: #fff;
+                box-shadow: 0 4px 12px -2px rgba(12, 12, 20, 0.4);
+                pointer-events: none;
+                opacity: 0;
+                transform: translate3d(-100px, -100px, 0) scale(0.8);
+                transition: opacity 90ms ease, transform 90ms ease, background-color 120ms ease;
+                will-change: transform;
+            }
+
+            .studio-cursor.is-on {
+                opacity: 1;
+            }
+
+            .studio-cursor.is-item { background: #e08c2e; border-radius: 8px 8px 2px 8px; }
+            .studio-cursor.is-code { background: rgba(70, 70, 80, 0.92); }
+
+            .studio-cursor svg { width: 14px; height: 14px; }
+            .studio-cursor span { font-size: 13px; font-weight: 700; line-height: 1; }
+
             /* Preview mode owns the canvas — no field chrome at all */
             html.studio-preview .studio-fhalo,
-            html.studio-preview .studio-fchip {
+            html.studio-preview .studio-fchip,
+            html.studio-preview .studio-cursor {
                 display: none !important;
             }
 
@@ -942,4 +976,5 @@
     {{-- Field/item tier overlay, positioned from JS --}}
     <div class="studio-fhalo" id="studio-fhalo"></div>
     <div class="studio-fchip" id="studio-fchip"></div>
+    <div class="studio-cursor" id="studio-cursor"></div>
 </x-studio::layouts.iframe>

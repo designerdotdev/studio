@@ -654,6 +654,8 @@ const StudioPreview = {
 
         StudioFields.init(paths, contracts);
 
+        this.cursor.mount();
+
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
             if (!event.data || typeof event.data.type !== 'string') return;
@@ -733,8 +735,15 @@ const StudioPreview = {
 
         document.addEventListener('submit', (event) => event.preventDefault(), true);
 
-        document.addEventListener('mousemove', (event) => this.hoverAt(event), { passive: true });
-        document.addEventListener('mouseleave', () => this.clearHover());
+        document.addEventListener('mousemove', (event) => {
+            this.cursor.track(event);
+            this.hoverAt(event);
+        }, { passive: true });
+
+        document.addEventListener('mouseleave', () => {
+            this.clearHover();
+            this.cursor.hide();
+        });
 
         // Click on empty canvas space deselects (and closes the context menu)
         document.addEventListener('click', () => {
@@ -959,7 +968,7 @@ const StudioPreview = {
         if (!box || box.width === 0) return this.clearHover();
 
         this.hovered = { kind, hit };
-        this.queuePaint({ kind, box, label, source });
+        this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind) });
     },
 
     /**
@@ -979,7 +988,7 @@ const StudioPreview = {
         });
     },
 
-    /** The single place that writes halo/chip style, class and text. */
+    /** The single place that writes halo/chip/cursor style, class and text. */
     flushPaint() {
         const halo = document.getElementById('studio-fhalo');
         const chip = document.getElementById('studio-fchip');
@@ -992,10 +1001,11 @@ const StudioPreview = {
         if (!job) {
             halo.classList.remove('is-on');
             chip.classList.remove('is-on');
+            this.cursor.hide();
             return;
         }
 
-        const { kind, box, label, source } = job;
+        const { kind, box, label, source, cursorKind } = job;
 
         halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
         halo.style.left = box.left + 'px';
@@ -1016,11 +1026,102 @@ const StudioPreview = {
 
         chip.style.left = box.left + 'px';
         chip.style.top = Math.max(0, box.top - 18) + 'px';
+
+        this.cursor.show(cursorKind);
     },
 
     clearHover() {
         this.hovered = null;
         this.queuePaint(null);
+    },
+
+    /**
+     * The oversized type cursor: one badge that follows the pointer and
+     * names what is under it. The native cursor is kept — an I-beam over
+     * text is correct while editing — so this reads as a type indicator
+     * rather than a cursor replacement.
+     *
+     * show()/hide() are writes (innerHTML, className) and are only ever
+     * called from flushPaint() — the same single rAF-batched write phase
+     * that owns the halo/chip — so the badge never touches the DOM more
+     * than once per frame, and stays in lockstep with whatever the halo/
+     * chip are showing (including a scroll-driven rehover() re-resolve,
+     * which flows through the same paintHalo -> queuePaint -> flushPaint
+     * path). track() is the one exception: it only ever writes a single
+     * `transform`, coalesced through its own rAF at pointer frequency, so
+     * merging it into queuePaint would gain nothing.
+     */
+    cursor: {
+        el: null,
+        kind: null,
+        x: 0,
+        y: 0,
+        queued: false,
+
+        glyphs: {
+            text: '<span>T</span>',
+            image: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 14.5v-9Zm3 1.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm8.5 7.75-3.6-4.5-2.6 3.1-1.4-1.6L5 15h9.5Z"/></svg>',
+            url: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4h6a1 1 0 0 1 0 2H8.9l6.8 6.8a1 1 0 0 1-1.4 1.4L7.5 7.4v3.6a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1Z"/></svg>',
+            toggle: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 5.5h6a4.5 4.5 0 1 1 0 9H7a4.5 4.5 0 1 1 0-9Zm6 7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>',
+            select: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5.2 7.7a1 1 0 0 1 1.4 0L10 11.1l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 9.1a1 1 0 0 1 0-1.4Z"/></svg>',
+            color: '<svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="6"/></svg>',
+            item: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 4.5h13v3h-13v-3Zm0 4.75h13v3h-13v-3Zm0 4.75h13v3h-13v-3Z"/></svg>',
+            code: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 5.2a1 1 0 0 1 .2 1.4L5.25 10l2.55 3.4a1 1 0 1 1-1.6 1.2l-3-4a1 1 0 0 1 0-1.2l3-4a1 1 0 0 1 1.4-.2Zm4.8 0a1 1 0 0 1 1.4.2l3 4a1 1 0 0 1 0 1.2l-3 4a1 1 0 1 1-1.6-1.2L14.75 10 12.2 6.6a1 1 0 0 1 .2-1.4Z"/></svg>',
+        },
+
+        mount() {
+            this.el = document.getElementById('studio-cursor');
+        },
+
+        show(kind) {
+            if (!this.el) return;
+
+            if (kind !== this.kind) {
+                this.kind = kind;
+                this.el.innerHTML = this.glyphs[kind] || this.glyphs.text;
+                this.el.className = 'studio-cursor is-on'
+                    + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
+            }
+
+            this.el.classList.add('is-on');
+        },
+
+        hide() {
+            this.kind = null;
+            this.el?.classList.remove('is-on');
+        },
+
+        track(event) {
+            this.x = event.clientX;
+            this.y = event.clientY;
+
+            if (this.queued || !this.el) return;
+
+            this.queued = true;
+            requestAnimationFrame(() => {
+                this.queued = false;
+                this.el.style.transform = `translate3d(${this.x}px, ${this.y}px, 0) scale(1)`;
+            });
+        },
+    },
+
+    /** Which cursor glyph a hovered field deserves. */
+    cursorKind(hit, kind) {
+        if (kind === 'item') return 'item';
+        if (kind === 'code') return 'code';
+
+        const entry = hit.entry;
+
+        if (entry.kind === 'when') return 'toggle';
+
+        if (entry.kind === 'attr') {
+            if (entry.attribute === 'src' || entry.attribute === 'srcset') return 'image';
+            if (entry.attribute === 'href') return 'url';
+
+            return 'text';
+        }
+
+        return 'text';
     },
 
     sectionIdAt(event) {
