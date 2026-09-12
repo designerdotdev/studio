@@ -141,6 +141,11 @@ const StudioEditor = {
                     window.dispatchEvent(new CustomEvent('studio:field-focus', { detail: data }));
                     break;
 
+                case 'studio:open-code-at':
+                    window.Alpine?.store('studio')?.setMode('code');
+                    window.Alpine?.store('code')?.openFileAt(data.path, data.line);
+                    break;
+
                 case 'studio:navigate':
                     this.navigate(data.path);
                     break;
@@ -705,6 +710,10 @@ const StudioPreview = {
                     document.documentElement.classList.toggle('studio-devmode', !!data.on);
                     break;
 
+                case 'studio:highlight-field':
+                    this.highlightLine(data.source, data.line);
+                    break;
+
                 case 'studio:mode':
                     // Code hides the canvas entirely; while it is on screen at
                     // all (the split) it stays selectable, like Edit.
@@ -819,6 +828,21 @@ const StudioPreview = {
             const hit = this.tierAt(sectionId, event.clientX, event.clientY);
 
             if (hit.tier === 'field') {
+                // ⌥-click jumps to the line of Blade that rendered this text
+                if (event.altKey && document.documentElement.classList.contains('studio-devmode')) {
+                    const source = StudioFields.sourceFor(sectionId);
+
+                    if (source) {
+                        event.preventDefault();
+                        this.post('studio:open-code-at', {
+                            path: 'resources/designer/views/components/' + source + '.blade.php',
+                            line: hit.entry.line,
+                        });
+
+                        return;
+                    }
+                }
+
                 this.applySelection(sectionId, false);
                 this.selectField(hit.entry, sectionId);
                 this.post('studio:section-selected', { sectionId });
@@ -1231,6 +1255,49 @@ const StudioPreview = {
 
     selectItem(item, sectionId) {
         this.selection = { tier: 'item', sectionId, path: item.id, key: item.key, index: item.index };
+    },
+
+    /**
+     * The caret moved onto a line of a section file — halo whatever that
+     * line renders, so the code and the page point at each other.
+     *
+     * This runs on every Monaco cursor move, so it stays cheap: the caller
+     * (home.blade.php) already bails before posting unless the active file
+     * matches the section-source path regex, and here each iteration is
+     * just a dataset read + one string compare against StudioFields.paths
+     * (no DOM re-query per section — see sourceFor()) until a section's
+     * source matches; only then is that one section's entries array
+     * scanned. Nothing here re-scans every section's fields.
+     */
+    highlightLine(source, line) {
+        if (this.mode === 'preview') return;
+
+        for (const wrapper of document.querySelectorAll('[data-section]')) {
+            const ref = wrapper.dataset.ref;
+
+            if (!ref || StudioFields.paths[ref] !== source) continue;
+
+            const sectionId = wrapper.dataset.section;
+            const entry = StudioFields.entriesFor(sectionId).find((candidate) => candidate.line === line);
+
+            if (!entry) continue;
+
+            const box = StudioFields.box(entry);
+
+            if (!box) continue;
+
+            this.queuePaint({
+                kind: 'field',
+                box,
+                label: this.labelFor(entry, sectionId),
+                source: '',
+                cursorKind: this.cursorKind({ entry }, 'field'),
+            });
+
+            wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            return;
+        }
     },
 
     /* --- inline text editing -------------------------------------- */

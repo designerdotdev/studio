@@ -1418,6 +1418,27 @@
                         studioCodeBuffers.mounting = (async () => {
                             const wrapper = await window.Studio.codeEditor(this.host, { language: 'html' });
                             studioCodeBuffers.editor = wrapper.editor;
+
+                            // Code → canvas: moving the caret inside a section
+                            // file haloes the text that line renders. Bails
+                            // immediately for every file that isn't a section
+                            // source, so a keystroke in any other buffer costs
+                            // one regex test and nothing else.
+                            studioCodeBuffers.editor.onDidChangeCursorPosition((event) => {
+                                const path = this.active || '';
+                                const match = path.match(/^resources\/designer\/views\/components\/(.+)\.blade\.php$/);
+
+                                if (!match) return;
+
+                                window.dispatchEvent(new CustomEvent('studio:to-iframe', {
+                                    detail: {
+                                        type: 'studio:highlight-field',
+                                        source: match[1],
+                                        line: event.position.lineNumber,
+                                    },
+                                }));
+                            });
+
                             wrapper.editor.onDidChangeModelContent(() => this.track());
                         })().catch((error) => {
                             studioCodeBuffers.mounting = null; // let the next open retry
@@ -1464,6 +1485,23 @@
                     } catch (e) {
                         this.error = e.message;
                     }
+                },
+
+                /**
+                 * Open a file and put the caret on one line — the landing
+                 * half of ⌥-clicking a field on the canvas.
+                 */
+                async openFileAt(path, line) {
+                    await this.openFile(path);
+
+                    const editor = studioCodeBuffers.editor;
+
+                    if (!editor || !line) return;
+
+                    editor.revealLineInCenter(line);
+                    editor.setPosition({ lineNumber: line, column: 1 });
+                    editor.setSelection({ startLineNumber: line, startColumn: 1, endLineNumber: line + 1, endColumn: 1 });
+                    editor.focus();
                 },
 
                 addTab(path, display = null) {
