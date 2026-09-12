@@ -3,6 +3,7 @@
 namespace Designer\Studio;
 
 use Designer\Studio\Console\Commands\DevReset;
+use Designer\Studio\Console\Commands\InlineVerify;
 use Designer\Studio\Console\Commands\PublishAssets;
 use Designer\Studio\Console\Commands\SyncDesigns;
 use Designer\Studio\Console\Commands\TemplatesImport;
@@ -56,6 +57,7 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(\Designer\Studio\Services\Site\SiteInstaller::class);
         $this->app->singleton(\Designer\Studio\Services\Site\RuntimeInstaller::class);
         $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
+        $this->app->singleton(\Designer\Studio\Services\Inline\EchoScanner::class);
     }
 
     public function boot(): void
@@ -89,6 +91,7 @@ class StudioServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 DevReset::class,
+                InlineVerify::class,
                 PublishAssets::class,
                 SyncDesigns::class,
                 TemplatesImport::class,
