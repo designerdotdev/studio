@@ -1,4 +1,25 @@
 <div class="flex h-full min-h-0 flex-col">
+    {{-- The open page: what the URL bar used to show (host / slug, open
+         the draft or live page in a new tab) --}}
+    @php
+        $homeSlug = \Designer\Studio\Support\SiteUrls::homeSlug();
+        $currentPath = $pageSlug === $homeSlug ? '' : $pageSlug;
+        $host = parse_url(url('/'), PHP_URL_HOST);
+        $draft = (bool) config('studio.draft_mode', true);
+        $openUrl = $draft
+            ? route('studio.preview.home') . ($currentPath ? '/' . $currentPath : '')
+            : \Designer\Studio\Support\SiteUrls::pageUrl($pageSlug);
+    @endphp
+    <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-line bg-raised/40 px-3 text-[12px]">
+        <span class="min-w-0 flex-1 truncate">
+            <span class="text-soft">{{ $host }}</span>
+            <span class="mx-1 text-faint">/</span><span class="font-mono text-[11.5px] text-ink">{{ $currentPath }}</span>
+        </span>
+        <a href="{{ $openUrl }}" target="_blank" class="s-icon-btn !h-6 !w-6" title="{{ $draft ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}" aria-label="{{ $draft ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}">
+            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+        </a>
+    </div>
+
     {{-- Header --}}
     <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
         <p class="s-microlabel flex-1">Pages</p>
