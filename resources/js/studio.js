@@ -589,6 +589,16 @@ const StudioPreview = {
     refs: {},
     blocks: {},
     selectedId: null,
+    // Three tiers: the section (today's behaviour), a repeater item, and a
+    // single field. Esc walks up one tier at a time.
+    selection: { tier: 'section', sectionId: null, path: null, key: null, index: null },
+    hovered: null,
+    // Hover geometry is read (getClientRects/getBoundingClientRect) on every
+    // mousemove, but the halo/chip are only ever written from a single
+    // rAF-batched flush below — see queuePaint()/flushPaint() — so a flurry
+    // of pointer events never forces more than one layout write per frame.
+    pendingPaint: undefined,
+    paintFrame: null,
     renderUrl: null,
     csrf: null,
     // Per-section render state: an in-flight request, plus the newest
@@ -719,6 +729,9 @@ const StudioPreview = {
 
         document.addEventListener('submit', (event) => event.preventDefault(), true);
 
+        document.addEventListener('mousemove', (event) => this.hoverAt(event), { passive: true });
+        document.addEventListener('mouseleave', () => this.clearHover());
+
         // Click on empty canvas space deselects (and closes the context menu)
         document.addEventListener('click', () => {
             if (this.mode === 'preview') return;
@@ -734,6 +747,13 @@ const StudioPreview = {
             if (event.key === 'Escape' && this.menu) {
                 event.preventDefault();
                 this.closeMenu();
+                return;
+            }
+
+            // Then Escape walks up the selection tiers before the editor
+            // ever sees it as "deselect the section".
+            if (event.key === 'Escape' && this.walkUp()) {
+                event.preventDefault();
                 return;
             }
 
@@ -769,6 +789,29 @@ const StudioPreview = {
         // inline onclick handlers must not reach past it.
         if (this.mode === 'preview') return;
 
+        // A click resolves to the deepest tier under the pointer; only a
+        // click on section chrome selects the section itself.
+        if (event) {
+            const hit = this.tierAt(sectionId, event.clientX, event.clientY);
+
+            if (hit.tier === 'field') {
+                this.applySelection(sectionId, false);
+                this.selectField(hit.entry, sectionId);
+                this.post('studio:section-selected', { sectionId });
+
+                return;
+            }
+
+            if (hit.tier === 'item') {
+                this.applySelection(sectionId, false);
+                this.selectItem(hit.item, sectionId);
+                this.post('studio:section-selected', { sectionId });
+
+                return;
+            }
+        }
+
+        this.selection = { tier: 'section', sectionId, path: null, key: null, index: null };
         this.applySelection(sectionId, false);
         this.post('studio:section-selected', { sectionId });
     },
@@ -805,6 +848,216 @@ const StudioPreview = {
         document.querySelectorAll('[data-section].is-selected').forEach((el) => {
             el.classList.remove('is-selected');
         });
+    },
+
+    /* --- field + item tiers --------------------------------------- */
+
+    /** The tier under a point: a field beats an item beats the section. */
+    tierAt(sectionId, x, y) {
+        const entry = StudioFields.at(sectionId, x, y);
+
+        if (entry) return { tier: 'field', entry };
+
+        const item = StudioFields.itemAt(sectionId, x, y);
+
+        if (item) return { tier: 'item', item };
+
+        return { tier: 'section' };
+    },
+
+    /** Paint the hover halo + chip for whatever is under the pointer. */
+    hoverAt(event) {
+        if (this.mode === 'preview') return this.clearHover();
+
+        const wrapper = event.target.closest?.('[data-section]');
+
+        if (!wrapper) return this.clearHover();
+
+        const sectionId = wrapper.dataset.section;
+        const hit = this.tierAt(sectionId, event.clientX, event.clientY);
+
+        if (hit.tier === 'section') {
+            // Inside the rendered markup but on nothing Studio owns
+            const inContent = !!event.target.closest?.('[data-section-content]');
+
+            return inContent ? this.paintHalo(null, 'code', event) : this.clearHover();
+        }
+
+        this.paintHalo(hit, hit.tier, event);
+    },
+
+    /**
+     * Resolve the halo/chip geometry for whatever is under the pointer.
+     * Everything here is a READ (StudioFields.box()/getBoundingClientRect
+     * touch layout) — nothing here writes to the DOM. The result is handed
+     * to queuePaint(), which is the only place that ever assigns style or
+     * className, batched into a single requestAnimationFrame. This keeps
+     * mousemove — read layout, read layout, ... — from ever being
+     * interleaved with a write that would force a synchronous reflow.
+     */
+    paintHalo(hit, kind, event) {
+        let box = null;
+        let label = 'Set in code';
+        let source = '';
+
+        if (kind === 'field') {
+            const sectionId = this.sectionIdAt(event);
+            box = StudioFields.box(hit.entry);
+            label = this.labelFor(hit.entry, sectionId);
+            const path = StudioFields.sourceFor(sectionId);
+            source = path ? path.split('/').pop() + ':' + hit.entry.line : '';
+        } else if (kind === 'item') {
+            const rect = hit.item.el.getBoundingClientRect();
+            box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+            label = this.itemLabel(hit.item);
+        } else {
+            const rect = event.target.getBoundingClientRect?.();
+            if (rect) box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+        }
+
+        if (!box || box.width === 0) return this.clearHover();
+
+        this.hovered = { kind, hit };
+        this.queuePaint({ kind, box, label, source });
+    },
+
+    /**
+     * Queue a halo/chip write for the next animation frame. At most one
+     * frame is ever pending: a burst of mousemove events during that frame
+     * just replaces `pendingPaint` with the latest geometry, so the DOM is
+     * touched once per frame no matter how fast the pointer moves.
+     */
+    queuePaint(job) {
+        this.pendingPaint = job;
+
+        if (this.paintFrame) return;
+
+        this.paintFrame = requestAnimationFrame(() => {
+            this.paintFrame = null;
+            this.flushPaint();
+        });
+    },
+
+    /** The single place that writes halo/chip style, class and text. */
+    flushPaint() {
+        const halo = document.getElementById('studio-fhalo');
+        const chip = document.getElementById('studio-fchip');
+
+        if (!halo || !chip) return;
+
+        const job = this.pendingPaint;
+        this.pendingPaint = undefined;
+
+        if (!job) {
+            halo.classList.remove('is-on');
+            chip.classList.remove('is-on');
+            return;
+        }
+
+        const { kind, box, label, source } = job;
+
+        halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
+        halo.style.left = box.left + 'px';
+        halo.style.top = box.top + 'px';
+        halo.style.width = box.width + 'px';
+        halo.style.height = box.height + 'px';
+
+        chip.className = 'studio-fchip is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : '');
+        chip.innerHTML = '';
+        chip.appendChild(document.createTextNode(label));
+
+        if (source && document.documentElement.classList.contains('studio-devmode')) {
+            const span = document.createElement('span');
+            span.className = 'studio-fchip-src';
+            span.textContent = source;
+            chip.appendChild(span);
+        }
+
+        chip.style.left = box.left + 'px';
+        chip.style.top = Math.max(0, box.top - 18) + 'px';
+    },
+
+    clearHover() {
+        this.hovered = null;
+        this.queuePaint(null);
+    },
+
+    sectionIdAt(event) {
+        return event.target.closest?.('[data-section]')?.dataset.section || null;
+    },
+
+    /**
+     * The chip's wording. The author's own yml label wins — it is what the
+     * inspector shows, so the canvas and the panel name the same thing the
+     * same way. A repeater sub-field and an undeclared key fall back to a
+     * humanised key.
+     */
+    labelFor(entry, sectionId) {
+        if (entry.index === null) {
+            const contract = StudioFields.contractFor(sectionId, entry.key);
+
+            if (contract?.label) return contract.label;
+        }
+
+        const key = entry.subKey || entry.key;
+        const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+
+        return words.charAt(0).toUpperCase() + words.slice(1);
+    },
+
+    itemLabel(item) {
+        const singular = item.key.replace(/ies$/, 'y').replace(/s$/, '');
+
+        return singular.charAt(0).toUpperCase() + singular.slice(1);
+    },
+
+    selectField(entry, sectionId) {
+        this.selection = {
+            tier: 'field',
+            sectionId,
+            path: entry.path,
+            key: entry.key,
+            index: entry.index,
+        };
+
+        this.post('studio:field-selected', {
+            sectionId,
+            key: entry.key,
+            index: entry.index,
+            subKey: entry.subKey,
+            path: entry.path,
+            line: entry.line,
+            source: StudioFields.sourceFor(sectionId),
+            label: this.labelFor(entry, sectionId),
+        });
+    },
+
+    selectItem(item, sectionId) {
+        this.selection = { tier: 'item', sectionId, path: item.id, key: item.key, index: item.index };
+    },
+
+    /** Esc: field → item (when the field is in one) → section → nothing. */
+    walkUp() {
+        const { tier, sectionId, key, index } = this.selection;
+
+        if (tier === 'field' && index !== null) {
+            const item = (StudioFields.maps[sectionId]?.items || []).find((i) => i.key === key && i.index === index);
+
+            if (item) {
+                this.selectItem(item, sectionId);
+
+                return true;
+            }
+        }
+
+        if (tier === 'field' || tier === 'item') {
+            this.selection = { tier: 'section', sectionId, path: null, key: null, index: null };
+            this.clearHover();
+
+            return true;
+        }
+
+        return false;   // already at section tier — the editor deselects
     },
 
     /* --- section actions (overlay buttons) ------------------------ */
