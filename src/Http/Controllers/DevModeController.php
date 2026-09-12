@@ -306,21 +306,19 @@ class DevModeController extends Controller
 
         // A hand-written array's last entry may have no trailing comma yet
         // (valid PHP — one is only required BEFORE a further element): find
-        // the last significant character before the closing bracket and add
-        // one if it isn't already a comma, or the new entry would run
-        // straight into it as a syntax error. This has to be quote- and
-        // comment-aware — a regex stripping "//" would truncate a URL
-        // default (`'https://…'`) and either splice a comma into the
-        // middle of the string or miss a real trailing comma sitting after
-        // one, so it reuses the same character-scanning technique
-        // findBracketedArray() already uses for the brackets themselves.
-        $before = substr($blade, $openBracket + 1, $insertAt - $openBracket - 1);
-        $sig = $this->lastSignificantChar($before);
+        // where one needs to go, or the new entry would run straight into
+        // it as a syntax error. This has to recognise every PHP comment
+        // form (`//`, `#`, `/* … */`) and never mistake a comma or a `//`
+        // sitting inside a string value for the array's own separator —
+        // exactly the ground a hand-rolled scanner keeps losing, so this
+        // asks PHP's own tokenizer instead (see `missingCommaOffset()`).
+        $arrayText = substr($blade, $openBracket, $closeBracket - $openBracket + 1);
+        $commaOffset = $this->missingCommaOffset($arrayText);
 
         $entry = $indent . "'{$key}' => '',\n";
 
-        if ($sig !== null && $sig[0] !== ',') {
-            $commaAt = $openBracket + 1 + $sig[1] + 1;
+        if ($commaOffset !== null) {
+            $commaAt = $openBracket + $commaOffset;
             $blade = substr($blade, 0, $commaAt) . ',' . substr($blade, $commaAt);
             $insertAt++;
         }
@@ -329,78 +327,92 @@ class DevModeController extends Controller
     }
 
     /**
-     * The last character in `$text` that is neither inside a string
-     * literal nor a `//` line comment, ignoring whitespace — plus its byte
-     * offset. Quote- and comment-aware, so a comma or a `//` sitting
-     * inside a string value is never mistaken for the array's own trailing
-     * comma or a comment marker, and a real trailing comment doesn't hide
-     * a comma that already exists before it.
+     * Where a trailing comma needs to be inserted in `$arrayText` (a full
+     * `[...]` array literal, brackets included) — the byte offset, within
+     * `$arrayText`, right after the last meaningful token inside it — or
+     * null when one is already there (or the array is empty).
      *
-     * @return array{0: string, 1: int}|null [character, offset]
+     * Built on `token_get_all()` rather than hand-rolled scanning: three
+     * rounds of this feature's own history is proof that a scanner which
+     * only knows about slash-slash and quotes keeps reopening the same
+     * failure mode for the comment form or literal it wasn't told about
+     * (a hash comment, a block comment, a `//` inside a URL string). The
+     * tokenizer already knows all of PHP's comment and string syntax, by
+     * definition, so nothing here has to.
      */
-    protected function lastSignificantChar(string $text): ?array
+    protected function missingCommaOffset(string $arrayText): ?int
     {
-        $inString = null;
-        $inComment = false;
-        $last = null;
+        $prefix = '<?php $x = ';
+        $raw = token_get_all($prefix . $arrayText . ';');
 
-        for ($i = 0, $len = strlen($text); $i < $len; $i++) {
-            $char = $text[$i];
+        $tokens = [];
+        $pos = 0;
 
-            if ($inComment) {
-                if ($char === "\n") {
-                    $inComment = false;
-                }
-
-                continue;
-            }
-
-            if ($inString !== null) {
-                if ($char === '\\') {
-                    $i++;
-
-                    continue;
-                }
-
-                if ($char === $inString) {
-                    $inString = null;
-                    $last = [$char, $i];
-                }
-
-                continue;
-            }
-
-            if ($char === "'" || $char === '"') {
-                $inString = $char;
-
-                continue;
-            }
-
-            if ($char === '/' && ($text[$i + 1] ?? '') === '/') {
-                $inComment = true;
-                $i++;
-
-                continue;
-            }
-
-            if (trim($char) === '') {
-                continue;
-            }
-
-            $last = [$char, $i];
+        foreach ($raw as $token) {
+            $text = is_array($token) ? $token[1] : $token;
+            $id = is_array($token) ? $token[0] : $token;
+            $tokens[] = [$id, $text, $pos];
+            $pos += strlen($text);
         }
 
-        return $last;
+        $arrayStart = strlen($prefix);
+        $arrayEnd = $arrayStart + strlen($arrayText);
+
+        $inRange = array_values(array_filter(
+            $tokens,
+            fn (array $t): bool => $t[2] >= $arrayStart && $t[2] < $arrayEnd
+        ));
+
+        if ($inRange === []) {
+            return null;
+        }
+
+        // The array's own closing `]` — drop it so what remains is only
+        // what's actually inside the brackets. Anything else here (e.g. an
+        // unterminated string/heredoc swallowing the rest) means this
+        // isn't the plain `[...]` shape expected, so bail rather than
+        // guess at an offset.
+        $closing = array_pop($inRange);
+
+        if ($closing[1] !== ']') {
+            return null;
+        }
+
+        while ($inRange !== [] && in_array(end($inRange)[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+            array_pop($inRange);
+        }
+
+        if ($inRange === []) {
+            return null;
+        }
+
+        [, $lastText, $lastPos] = end($inRange);
+
+        if ($lastText === ',') {
+            return null;
+        }
+
+        return $lastPos + strlen($lastText) - $arrayStart;
     }
 
     /**
-     * Bracket-depth (and quote-aware) scan for the `[...]` array right
-     * after `@props(` — a naive search for the first `]` would stop short
-     * of a default value that contains its own `[]` (an empty repeater
-     * default, say). Returns `[openBracket, closeBracket]` byte offsets
-     * into `$blade`, or null if the array has no matching close.
+     * Bracket-depth scan for the `[...]` array right after `@props(` — a
+     * naive search for the first `]` would stop short of a default value
+     * that contains its own `[]` (an empty repeater default, say).
+     * Returns `[openBracket, closeBracket]` byte offsets into `$blade`, or
+     * null if the array has no matching close.
      *
-     * @return array{0: int, 1: int}|null
+     * This one stays a bounded character scan rather than a full
+     * `token_get_all()` pass (unlike `missingCommaOffset()` and
+     * `arrayTokenizesCleanly()`, which tokenize an already-extracted,
+     * already-bounded array): the file after `@props(` is Blade/HTML, not
+     * PHP, so there is no safe upper bound on how much of it a tokenizer
+     * would have to consume looking for the array's true close. It does
+     * still have to recognise every PHP comment form (single/double-quoted
+     * strings, a slash-slash comment, a hash comment, a block comment) —
+     * an apostrophe inside a block comment used to be read as opening a
+     * string, desyncing the whole scan, which is exactly the bug this
+     * replaced.
      */
     protected function findBracketedArray(string $blade, int $propsAt): ?array
     {
@@ -412,9 +424,28 @@ class DevModeController extends Controller
 
         $depth = 0;
         $inString = null;
+        $inLineComment = false;
+        $inBlockComment = false;
 
         for ($i = $openBracket, $len = strlen($blade); $i < $len; $i++) {
             $char = $blade[$i];
+
+            if ($inLineComment) {
+                if ($char === "\n") {
+                    $inLineComment = false;
+                }
+
+                continue;
+            }
+
+            if ($inBlockComment) {
+                if ($char === '*' && ($blade[$i + 1] ?? '') === '/') {
+                    $inBlockComment = false;
+                    $i++;
+                }
+
+                continue;
+            }
 
             if ($inString !== null) {
                 if ($char === '\\') {
@@ -432,6 +463,26 @@ class DevModeController extends Controller
 
             if ($char === "'" || $char === '"') {
                 $inString = $char;
+
+                continue;
+            }
+
+            if ($char === '/' && ($blade[$i + 1] ?? '') === '/') {
+                $inLineComment = true;
+                $i++;
+
+                continue;
+            }
+
+            if ($char === '#') {
+                $inLineComment = true;
+
+                continue;
+            }
+
+            if ($char === '/' && ($blade[$i + 1] ?? '') === '*') {
+                $inBlockComment = true;
+                $i++;
 
                 continue;
             }
@@ -500,7 +551,26 @@ class DevModeController extends Controller
             return $isLiteral && is_array($value) && array_key_exists($key, $value);
         }
 
-        return str_contains($newArrayText, "'{$key}' => ''");
+        // The array carries something PhpLiteral can't evaluate (a helper
+        // call, a constant) elsewhere — that's fine, but the rewrite still
+        // has to be syntactically real PHP. TOKEN_PARSE makes the
+        // tokenizer itself enforce that (it throws on exactly the missing-
+        // comma shape this feature exists to guard against), which is a
+        // genuine syntax check rather than a substring guess.
+        return $this->arrayTokenizesCleanly($newArrayText)
+            && str_contains($newArrayText, "'{$key}' => ''");
+    }
+
+    /** Whether `$arrayText` (a `[...]` array literal) is syntactically valid PHP. */
+    protected function arrayTokenizesCleanly(string $arrayText): bool
+    {
+        try {
+            token_get_all('<?php $x = ' . $arrayText . ';', TOKEN_PARSE);
+
+            return true;
+        } catch (\ParseError) {
+            return false;
+        }
     }
 
     /**
