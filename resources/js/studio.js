@@ -822,7 +822,7 @@ const StudioPreview = {
                 // Text fields become editable straight away; every other type
                 // selects and lets the inspector own the input.
                 if (hit.entry.kind === 'text') {
-                    this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId));
+                    this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
                 }
 
                 return;
@@ -1243,7 +1243,7 @@ const StudioPreview = {
      * Otherwise the range is wrapped in a transient span — safe, because it
      * exists only while the caret is in it and is unwrapped on exit.
      */
-    beginEdit(entry, sectionId, multiline) {
+    beginEdit(entry, sectionId, multiline, x, y) {
         if (this.editing) this.commitEdit();
 
         if (entry.kind !== 'text' || !entry.range) return false;
@@ -1281,10 +1281,35 @@ const StudioPreview = {
         host.focus();
 
         // Put the caret where the user clicked rather than selecting all
+        let caret = null;
+
+        if (typeof x === 'number' && typeof y === 'number') {
+            if (document.caretRangeFromPoint) {
+                caret = document.caretRangeFromPoint(x, y);            // Chrome/Safari
+            } else if (document.caretPositionFromPoint) {
+                const pos = document.caretPositionFromPoint(x, y);     // Firefox
+
+                if (pos) {
+                    caret = document.createRange();
+                    caret.setStart(pos.offsetNode, pos.offset);
+                }
+            }
+        }
+
+        // The point can resolve to nothing, or to a node outside this host
+        // (a neighbouring field sharing the same line) — collapsing to the
+        // end is the safe fallback: worst case the caret lands in the wrong
+        // spot, never that the field's contents get selected and replaced.
+        if (!caret || !host.contains(caret.startContainer)) {
+            caret = document.createRange();
+            caret.selectNodeContents(host);
+            caret.collapse(false);
+        } else {
+            caret.collapse(true);
+        }
+
         const selection = window.getSelection();
         selection.removeAllRanges();
-        const caret = document.createRange();
-        caret.selectNodeContents(host);
         selection.addRange(caret);
 
         this.editing = {
