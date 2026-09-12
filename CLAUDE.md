@@ -118,6 +118,7 @@ Sections are the installed site's own components: `resources/designer/views/comp
 - `GET /studio/api/code/tree`, `GET|PUT|DELETE /studio/api/code/file`, `POST /studio/api/code/section` — Code mode's workspace (404 unless `DevMode::enabled()`)
 - `GET|POST|PATCH|DELETE /studio/api/media…` — media library
 - `GET /studio/api/assistant/engines`, `POST /studio/api/assistant/turn`, `GET|DELETE /studio/api/assistant/stream/{turn}` — the Assistant (dev mode only)
+- `GET /template`, `/template/{slug}/{path?}` (no `studio` prefix; local only, when `STUDIO_TEMPLATE_PREVIEW_PATH` names a folder of template repos) — previews a template straight from its working tree without installing it (`Services/Templates/TemplatePreview`: swaps Blade's anonymous component paths for the render, inlines its `resources/css` for Tailwind's browser build, moves public files under `/template/{slug}/_files`)
 
 ### Artisan Commands
 
@@ -149,8 +150,6 @@ php artisan studio:uninstall        # Remove Studio's editor data (--keep-data);
 - **Never put a Monaco editor or model inside an Alpine store or `x-data`.** Alpine deep-proxies what it holds, and Monaco's object graphs are large and getter-heavy — doing so hangs `openFile()` silently. Code mode keeps them in the plain `studioCodeBuffers` object beside the store (`home.blade.php`); only serialisable state (tabs, active path, dirty flags) is reactive.
 - The compiled asset list lives in several places that must stay in sync when files are added: `StudioAssets::FILES` (drives `studio:publish` + the provider's `studio-assets` publish tag), `AssetController::$allowedFiles` (adds MIME types), Vite's `ASSET_FILES` (`vite.config.js`), and `MONACO_FILES` in `esbuild.monaco.mjs`.
 
-## Skills (`.claude/skills/`)
+## Skills
 
-- `designer-craft` — the shared design contract for anything rendered by Designer: canonical `@theme` tokens, the motion vocabulary, the Higgsfield imagery pipeline, copy rules, and `scripts/lint-site.py` (props ↔ yml parity, palette literals, reduced-motion guards). Read it before writing a section.
-- `create-designer-template` — build a premium site template in the site-templates format (workspace `~/Sites/site-templates/<slug>`), verified through a throwaway lab app (`scripts/lab.sh`, `scripts/snap.mjs`, the round-trip invariant) — never the host app.
-- `create-block` — convert a screenshot, a Relume/shadcnblocks block, or a brief into a library section (`~/Sites/designer-blocks`) with its own copy, imagery, and one interaction; `scripts/install-block.sh` drops it into a site.
+The Designer template and block skills — `designer-craft` (tokens, motion, imagery, copy incl. the US-only locale rule, and `scripts/lint-site.py`), `create-designer-template`, `create-template-batch`, and `create-block` — live with the templates in `~/Sites/designer-templates/.claude/skills`; start Claude Code in `~/Sites/designer-templates` to use them. They read this package's `docs/` and `config/studio.php`, and `lab.sh` installs this package into its throwaway lab apps (`DESIGNER_STUDIO` overrides the path). `/template` (above) previews those templates without installing them.
