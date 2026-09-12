@@ -4,6 +4,7 @@ namespace Designer\Studio\Console\Commands;
 
 use Designer\Studio\Services\Inline\EchoScanner;
 use Designer\Studio\Services\Inline\Instrumenter;
+use Designer\Studio\Support\DataBag;
 use Designer\Studio\Support\SitePaths;
 use Illuminate\Console\Command;
 use Symfony\Component\Yaml\Yaml;
@@ -103,7 +104,7 @@ class InlineVerify extends Command
     {
         $identical = 0;
         $diverged = [];
-        $unrenderable = 0;
+        $unrenderable = [];
         $sentinels = 0;
 
         foreach ($sections as $base => $fields) {
@@ -132,8 +133,9 @@ class InlineVerify extends Command
                             // Include children for nestable repeaters.
                             $row['children'] = [];
 
-                            // Convert to object for template access ($item->key syntax).
-                            $rows[] = (object) $row;
+                            // Wrap with DataBag to support both array and object access,
+                            // matching SectionRenderer::context() behavior exactly.
+                            $rows[] = DataBag::wrap($row);
                         }
 
                         $variables[$key] = $rows;
@@ -150,7 +152,7 @@ class InlineVerify extends Command
             if ($plain === null) {
                 // Layout files need $site/$slot globals a bare render has no
                 // way to supply; they are not canvas sections.
-                $unrenderable++;
+                $unrenderable[] = basename($base);
 
                 continue;
             }
@@ -193,9 +195,13 @@ class InlineVerify extends Command
             'Inertness: %d identical, %d diverged, %d unrenderable, %d sentinels rendered',
             $identical,
             count($diverged),
-            $unrenderable,
+            count($unrenderable),
             $sentinels
         ));
+
+        if ($unrenderable !== []) {
+            $this->line('  unrenderable: ' . implode(', ', $unrenderable));
+        }
 
         foreach ($diverged as $line) {
             $this->error('  ' . $line);
