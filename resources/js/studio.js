@@ -96,9 +96,16 @@ const StudioEditor = {
             switch (type) {
                 case 'studio:section-selected':
                     this.selectedId = data.sectionId;
-                    // Selecting on the canvas always lands in the Sections panel
-                    window.Alpine?.store('studio')?.setRail?.('sections', true);
+                    // Selecting never opens the panel — the inspector is on
+                    // request (the toolbar's Edit fields, E). Livewire still
+                    // tracks the selection so an open panel follows it.
                     window.Livewire?.dispatch('studio:select-section', { id: data.sectionId });
+                    break;
+
+                case 'studio:open-inspector':
+                    this.selectedId = data.sectionId;
+                    window.Livewire?.dispatch('studio:select-section', { id: data.sectionId });
+                    window.Alpine?.store('studio')?.openInspector?.();
                     break;
 
                 case 'studio:deselected':
@@ -327,6 +334,12 @@ const StudioEditor = {
         }
 
         if (key === 'Escape') {
+            // An open panel closes first; the next Escape deselects
+            const studio = window.Alpine?.store('studio');
+            if (studio?.sidebar) {
+                studio.closePanel();
+                return;
+            }
             if (this.selectedId) {
                 this.selectedId = null;
                 this.send('studio:deselect');
@@ -336,6 +349,14 @@ const StudioEditor = {
         }
 
         if (!this.selectedId) return;
+
+        // E — the inspector for the selected section
+        if (!meta && (key === 'e' || key === 'E')) {
+            preventDefault();
+            window.Livewire?.dispatch('studio:select-section', { id: this.selectedId });
+            window.Alpine?.store('studio')?.openInspector?.();
+            return;
+        }
 
         if (meta && (key === 'd' || key === 'D')) {
             preventDefault();
@@ -1039,6 +1060,8 @@ const StudioPreview = {
             const relevant = event.key === 'Escape'
                 || event.key === 'Backspace'
                 || event.key === 'Delete'
+                // E opens the inspector for the selection (outside a field)
+                || (!(event.metaKey || event.ctrlKey) && (event.key === 'e' || event.key === 'E') && !isTyping(document))
                 || ((event.metaKey || event.ctrlKey) && ['b', 'B', 'd', 'D', 's', 'S', 'k', 'K', 'ArrowUp', 'ArrowDown'].includes(event.key));
 
             if (!relevant) return;
@@ -2823,12 +2846,21 @@ const StudioPreview = {
         this.post('studio:open-code', { ref, title });
     },
 
+    // The inspector, on request: the toolbar's Edit fields button, the
+    // context menu, or E. Selecting alone never opens it.
+    openInspector(sectionId, event) {
+        if (event) event.stopPropagation();
+        if (this.mode === 'preview' || !sectionId) return;
+        this.post('studio:open-inspector', { sectionId });
+    },
+
     /* --- context menu ---------------------------------------------- */
 
     menu: null,
     menuCloseTimer: null,
 
     MENU_ICONS: {
+        fields: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h9M15 6h2M3 14h2M8 14h9"/><circle cx="13" cy="6" r="2"/><circle cx="6" cy="14" r="2"/></svg>',
         up: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25Z" clip-rule="evenodd"/></svg>',
         down: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.53 13.53a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 1.06-1.06L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25Z" clip-rule="evenodd"/></svg>',
         plusAbove: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 6.75a.75.75 0 0 0-1.5 0v2.5h-2.5a.75.75 0 0 0 0 1.5h2.5v2.5a.75.75 0 0 0 1.5 0v-2.5h2.5a.75.75 0 0 0 0-1.5h-2.5v-2.5Z"/><path d="M3.75 2a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H3.75Z"/></svg>',
@@ -2911,6 +2943,8 @@ const StudioPreview = {
 
         const items = [
             { header: `${d.title} — ${scopeTag}` },
+            { label: 'Edit fields', icon: 'fields', kbd: 'E', onClick: () => this.openInspector(id) },
+            'sep',
             { label: 'Move up', icon: 'up', kbd: '⌘↑', disabled: d.docFirst === '1', onClick: () => this.action(id, 'move-up') },
             { label: 'Move down', icon: 'down', kbd: '⌘↓', disabled: d.docLast === '1', onClick: () => this.action(id, 'move-down') },
             'sep',
