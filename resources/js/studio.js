@@ -740,10 +740,7 @@ const StudioPreview = {
             this.hoverAt(event);
         }, { passive: true });
 
-        document.addEventListener('mouseleave', () => {
-            this.clearHover();
-            this.cursor.hide();
-        });
+        document.addEventListener('mouseleave', () => this.clearHover());
 
         // Click on empty canvas space deselects (and closes the context menu)
         document.addEventListener('click', () => {
@@ -924,7 +921,17 @@ const StudioPreview = {
         if (!wrapper) return this.clearHover();
 
         const sectionId = wrapper.dataset.section;
-        const hit = this.tierAt(sectionId, x, y);
+        let hit = this.tierAt(sectionId, x, y);
+
+        // The DOM-ancestor section is usually right, but its box can come
+        // up empty while a *different* section's field geometrically
+        // covers this same point (e.g. an absolutely positioned image
+        // whose ancestor section doesn't lay out over it). Before calling
+        // it code, check every other section actually stacked at this
+        // point — still a read, still bounded (dedupe + stop at first hit).
+        if (hit.tier === 'section') {
+            hit = this.tierAtPoint(x, y, sectionId) || hit;
+        }
 
         if (hit.tier === 'section') {
             // Inside the rendered markup but on nothing Studio owns
@@ -934,6 +941,39 @@ const StudioPreview = {
         }
 
         this.paintHalo(hit, hit.tier, { target });
+    },
+
+    /**
+     * Fallback for resolveHover(): walk every element actually stacked at
+     * (x, y) — elementsFromPoint(), the plural, returns the full z-order —
+     * and try tierAt() for each distinct [data-section] among them, in
+     * front-to-back order, skipping the section already tried. Keeps the
+     * first hit. Section-scoping itself stays (it protects against
+     * occluded entries from an off-screen section whose rects still lay
+     * out over the hero, e.g. a collapsed nav menu) — this only widens the
+     * search to sections genuinely present at the point when the nearest
+     * ancestor's own box misses.
+     */
+    tierAtPoint(x, y, skipSectionId) {
+        const stack = document.elementsFromPoint(x, y);
+        const tried = new Set([skipSectionId]);
+
+        for (const el of stack) {
+            const wrapper = el.closest?.('[data-section]');
+
+            if (!wrapper) continue;
+
+            const sectionId = wrapper.dataset.section;
+
+            if (tried.has(sectionId)) continue;
+            tried.add(sectionId);
+
+            const hit = this.tierAt(sectionId, x, y);
+
+            if (hit.tier !== 'section') return hit;
+        }
+
+        return null;
     },
 
     /**
@@ -1062,9 +1102,6 @@ const StudioPreview = {
             text: '<span>T</span>',
             image: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 14.5v-9Zm3 1.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm8.5 7.75-3.6-4.5-2.6 3.1-1.4-1.6L5 15h9.5Z"/></svg>',
             url: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4h6a1 1 0 0 1 0 2H8.9l6.8 6.8a1 1 0 0 1-1.4 1.4L7.5 7.4v3.6a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1Z"/></svg>',
-            toggle: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 5.5h6a4.5 4.5 0 1 1 0 9H7a4.5 4.5 0 1 1 0-9Zm6 7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>',
-            select: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5.2 7.7a1 1 0 0 1 1.4 0L10 11.1l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 9.1a1 1 0 0 1 0-1.4Z"/></svg>',
-            color: '<svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="6"/></svg>',
             item: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 4.5h13v3h-13v-3Zm0 4.75h13v3h-13v-3Zm0 4.75h13v3h-13v-3Z"/></svg>',
             code: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 5.2a1 1 0 0 1 .2 1.4L5.25 10l2.55 3.4a1 1 0 1 1-1.6 1.2l-3-4a1 1 0 0 1 0-1.2l3-4a1 1 0 0 1 1.4-.2Zm4.8 0a1 1 0 0 1 1.4.2l3 4a1 1 0 0 1 0 1.2l-3 4a1 1 0 1 1-1.6-1.2L14.75 10 12.2 6.6a1 1 0 0 1 .2-1.4Z"/></svg>',
         },
@@ -1111,8 +1148,6 @@ const StudioPreview = {
         if (kind === 'code') return 'code';
 
         const entry = hit.entry;
-
-        if (entry.kind === 'when') return 'toggle';
 
         if (entry.kind === 'attr') {
             if (entry.attribute === 'src' || entry.attribute === 'srcset') return 'image';
