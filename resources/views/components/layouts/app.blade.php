@@ -45,53 +45,74 @@
         </div>
 
         <div class="flex h-dvh flex-col">
-            {{-- The topbar spans the full width: menu first, then the page's own chrome --}}
-            @isset($topbar)
-                <header class="s-topbar">
-                    @isset($menu)
-                        {{ $menu }}
-                    @endisset
-                    {{ $topbar }}
-                </header>
-            @endisset
-
             @isset($sidebar)
-                {{-- The workspace: the sidebar and the canvas are rounded cards
-                     inset on the shell, so the topbar flows around them. The
-                     activity bar (panel switcher) sits where the user put it:
-                     across the sidebar's top (default) or bottom — both collapse
-                     with it for a full-page canvas — as a strip to its left,
-                     or hidden. --}}
-                <div class="s-workspace" x-data>
-                    <template x-if="$store.studio.activityBar === 'left'">
-                        @include('studio::partials.activity-bar', ['orientation' => 'vertical'])
-                    </template>
+                {{-- The site is the screen: the stage fills the window. --}}
+                <main class="s-stage">
+                    {{ $slot }}
+                </main>
 
-                    <aside
-                        class="s-card s-sidebar"
-                        :class="!$store.studio.sidebar && 'is-collapsed'"
-                        :aria-hidden="!$store.studio.sidebar"
-                        :inert="!$store.studio.sidebar"
-                    >
-                        <div class="flex h-full w-[320px] shrink-0 flex-col overflow-hidden">
-                            <template x-if="$store.studio.activityBar === 'top'">
-                                @include('studio::partials.activity-bar', ['orientation' => 'horizontal', 'class' => 'is-top'])
-                            </template>
+                {{-- Behind a sheet only --}}
+                <div
+                    x-data
+                    x-show="$store.studio.sidebar && $store.studio.frame === 'sheet'"
+                    x-cloak
+                    x-transition.opacity.duration.150ms
+                    class="s-scrim"
+                    @click="$store.studio.closePanel()"
+                ></div>
 
-                            <div class="flex min-h-0 flex-1 flex-col">
-                                {{ $sidebar }}
-                            </div>
+                {{-- The floating surface: every panel lives here, one visible
+                     at a time. Anchored to its dock button (popover) or
+                     centred (sheet). The height is fixed to what fits so the
+                     panels' own scroll regions keep working. --}}
+                <aside
+                    class="s-float"
+                    :class="$store.studio.frame === 'sheet' && 'is-sheet'"
+                    {{-- An object binding: a string would replace the style
+                         attribute and wipe the display:none x-show sets --}}
+                    :style="$store.studio.frame === 'popover' ? style : {}"
+                    x-data="{
+                        style: {},
+                        place() {
+                            if ($store.studio.frame !== 'popover') return;
+                            const button = document.querySelector(`#studio-dock [data-panel='${$store.studio.rail}']`);
+                            const dock = document.getElementById('studio-dock');
+                            if (!button || !dock) return;
+                            const gap = 12, edgePad = 12;
+                            const W = window.innerWidth, H = window.innerHeight;
+                            const b = button.getBoundingClientRect();
+                            const d = dock.getBoundingClientRect();
+                            const edge = $store.studio.dock.edge;
+                            const w = $store.studio.floatWidth;
+                            let left, top, maxH;
+                            if (edge === 'bottom' || edge === 'top') {
+                                left = b.left + b.width / 2 - w / 2;
+                                maxH = Math.min(H * 0.7, H - d.height - gap - edgePad * 2);
+                                top = edge === 'bottom' ? d.top - gap - maxH : d.bottom + gap;
+                            } else {
+                                maxH = Math.min(H * 0.7, H - edgePad * 2);
+                                top = b.top + b.height / 2 - maxH / 2;
+                                left = edge === 'left' ? d.right + gap : d.left - gap - w;
+                            }
+                            left = Math.round(Math.max(edgePad, Math.min(left, W - w - edgePad)));
+                            top = Math.round(Math.max(edgePad, Math.min(top, H - maxH - edgePad)));
+                            this.style = { left: `${left}px`, top: `${top}px`, width: `${w}px`, height: `${Math.round(maxH)}px` };
+                        },
+                    }"
+                    x-effect="$store.studio.rail; $store.studio.sidebar; $store.studio.dock; $store.studio.mode; $nextTick(() => place())"
+                    @resize.window.debounce.50ms="place()"
+                    @studio:dock-moved.window="place()"
+                    x-show="$store.studio.sidebar"
+                    x-cloak
+                    :aria-hidden="!$store.studio.sidebar"
+                    :inert="!$store.studio.sidebar"
+                >
+                    <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+                        {{ $sidebar }}
+                    </div>
+                </aside>
 
-                            <template x-if="$store.studio.activityBar === 'bottom'">
-                                @include('studio::partials.activity-bar', ['orientation' => 'horizontal', 'class' => 'is-bottom'])
-                            </template>
-                        </div>
-                    </aside>
-
-                    <main class="s-card s-stage">
-                        {{ $slot }}
-                    </main>
-                </div>
+                @include('studio::partials.dock')
             @else
                 <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
                     {{ $slot }}

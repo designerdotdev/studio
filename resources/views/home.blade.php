@@ -14,7 +14,7 @@
     {{-- ============================================================ --}}
     {{-- Topbar                                                        --}}
     {{-- ============================================================ --}}
-    <x-slot:topbar>
+    <x-slot:actions>
         <script>
             // Preview mode follows links inside the canvas. The editor is
             // bound to one page, so StudioEditor.navigate() resolves a clicked
@@ -161,6 +161,26 @@
                 });
             });
 
+            // Position a popover (menu, publish) beside its dock button,
+            // opening away from the dock's edge and clamped to the window.
+            window.StudioDock = {
+                anchor(pop, button, width) {
+                    const edge = Alpine.store('studio').dock.edge;
+                    const b = button.getBoundingClientRect();
+                    const gap = 10, pad = 12;
+                    const W = window.innerWidth, H = window.innerHeight;
+                    const h = pop.offsetHeight || 320;
+                    let left, top;
+                    if (edge === 'bottom') { left = b.left; top = b.top - gap - h; }
+                    else if (edge === 'top') { left = b.left; top = b.bottom + gap; }
+                    else if (edge === 'left') { left = b.right + gap; top = b.top; }
+                    else { left = b.left - gap - width; top = b.top; }
+                    left = Math.max(pad, Math.min(left, W - width - pad));
+                    top = Math.max(pad, Math.min(top, H - h - pad));
+                    return `left:${Math.round(left)}px; top:${Math.round(top)}px; width:${width}px`;
+                },
+            };
+
             window.addEventListener('studio:toast', (event) => {
                 const { message, type, action } = event.detail;
 
@@ -176,245 +196,6 @@
             });
         </script>
 
-        {{-- Sidebar toggle — always visible beside the menu button --}}
-        <div x-data class="shrink-0">
-            <button
-                @click="$store.studio.toggleSidebar()"
-                class="s-box-btn"
-                :class="$store.studio.sidebar ? 's-panel-collapse' : 's-panel-expand'"
-                :title="$store.studio.sidebar ? 'Hide sidebar' : 'Show sidebar'"
-                :aria-label="$store.studio.sidebar ? 'Hide sidebar' : 'Show sidebar'"
-                aria-label="Toggle sidebar"
-            >
-                <svg class="h-4 w-4" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" clip-rule="evenodd" d="M4.5498 2.30001C3.68785 2.30001 2.8612 2.64242 2.25171 3.25191C1.64221 3.8614 1.2998 4.68805 1.2998 5.55001C1.2998 6.41196 1.3 10.45 1.3 10.45C1.3 10.8768 1.38406 11.2994 1.54739 11.6937C1.71072 12.088 1.95011 12.4463 2.2519 12.7481C2.8614 13.3576 3.68805 13.7 4.55 13.7L11.4498 13.7C11.8766 13.7 12.2992 13.6159 12.6935 13.4526C13.0878 13.2893 13.4461 13.0499 13.7479 12.7481C14.0497 12.4463 14.2891 12.088 14.4524 11.6937C14.6157 11.2994 14.6998 10.8768 14.6998 10.45C14.6998 8.30212 14.6998 7.69789 14.6998 5.55C14.6998 5.12321 14.6157 4.70059 14.4524 4.30628C14.2891 3.91197 14.0497 3.5537 13.7479 3.25191C13.4461 2.95012 13.0878 2.71072 12.6935 2.54739C12.2992 2.38407 11.8766 2.3 11.4498 2.3L4.5498 2.30001ZM2.4998 5.50001C2.4998 4.96957 2.71052 4.46087 3.08559 4.08579C3.46066 3.71072 3.96937 3.50001 4.4998 3.50001H11.4998C12.0302 3.50001 12.5389 3.71072 12.914 4.08579C13.2891 4.46087 13.4998 4.96957 13.4998 5.50001V10.5C13.4998 11.0304 13.2891 11.5391 12.914 11.9142C12.5389 12.2893 12.0302 12.5 11.4998 12.5H4.4998C3.96937 12.5 3.46066 12.2893 3.08559 11.9142C2.71052 11.5391 2.4998 11.0304 2.4998 10.5V5.50001Z"></path>
-                    <rect class="s-panel-icon-bar" x="3.9" y="5" width="4.5" height="6" rx="0.75"></rect>
-                </svg>
-            </button>
-        </div>
-
-        {{-- Browser navigation --}}
-        <div x-data class="flex shrink-0 items-center">
-            <button class="s-nav-btn" title="Back" aria-label="Back" @click="history.back()">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
-            </button>
-            <button class="s-nav-btn" title="Forward" aria-label="Forward" @click="history.forward()">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
-            </button>
-            <button class="s-nav-btn" title="Reload preview" aria-label="Reload preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
-            </button>
-        </div>
-
-        {{-- URL bar — centered, capped width, doubles as the page switcher --}}
-        @php $displayHost = parse_url(url('/'), PHP_URL_HOST); @endphp
-        <div class="flex min-w-0 flex-1 justify-center px-1">
-        <div
-            class="relative w-full min-w-0 max-w-xl"
-            x-data="{
-                state: 'idle',
-                pagesOpen: false,
-                slug: @js($page->slug),
-                homeSlug: @js($homeSlug),
-                get path() { return this.slug === this.homeSlug ? '' : this.slug },
-                get liveUrl() { return @js(rtrim(url('/'), '/')) + '/' + this.path },
-                get openUrl() {
-                    @if($draftMode)
-                    return @js(route('studio.preview.home')) + (this.path ? '/' + this.path : '');
-                    @else
-                    return this.liveUrl;
-                    @endif
-                },
-            }"
-            @studio:status.window="state = $event.detail.state"
-            @studio:page-meta-updated.window="
-                if ($event.detail.slug && $event.detail.slug !== slug) {
-                    slug = $event.detail.slug;
-                    history.replaceState({}, '', '{{ route('studio.index') }}?page=' + slug);
-                }
-            "
-            @click.outside="pagesOpen = false"
-            @keydown.escape.window="pagesOpen = false"
-        >
-            <div
-                class="s-urlbar w-full"
-                :class="pagesOpen && 'is-open'"
-                role="button"
-                tabindex="0"
-                :aria-expanded="pagesOpen"
-                aria-haspopup="menu"
-                title="Switch page"
-                @click="pagesOpen = !pagesOpen"
-                @keydown.enter.prevent="pagesOpen = !pagesOpen"
-                @keydown.space.prevent="pagesOpen = !pagesOpen"
-            >
-                <span
-                    class="s-status-dot shrink-0 transition-colors duration-300"
-                    :class="{
-                        'bg-ok': state === 'idle' || state === 'saved',
-                        'bg-warn animate-pulse': state === 'saving',
-                        'bg-danger': state === 'error',
-                    }"
-                ></span>
-                <span class="min-w-0 flex-1 truncate text-[12.5px]">
-                    <span class="text-soft">{{ $displayHost }}</span>
-                    <span class="mx-1 text-faint">/</span><span class="font-mono text-xs text-ink" x-text="path">{{ $page->slug === $homeSlug ? '' : $page->slug }}</span>
-                </span>
-                <span class="flex shrink-0 items-center gap-1">
-                    <span class="mr-1 text-[11px] text-faint">
-                        <span x-show="state === 'saving'" x-cloak>Saving…</span>
-                        <span x-show="state === 'saved'" x-cloak class="text-ok/80">Saved</span>
-                        <span x-show="state === 'error'" x-cloak class="text-danger">Offline</span>
-                    </span>
-                    <span class="s-urlbar-action" :class="pagesOpen && 'is-active'">
-                        <svg class="h-3.5 w-3.5 transition-transform duration-150" :class="pagesOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
-                    </span>
-                    @if($liveUrl || $draftMode)
-                        <a
-                            :href="openUrl"
-                            href="{{ $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl }}"
-                            target="_blank"
-                            class="s-urlbar-action"
-                            title="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
-                            aria-label="{{ $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab' }}"
-                            @click.stop
-                        >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
-                        </a>
-                    @endif
-                </span>
-            </div>
-
-            {{-- Pages dropdown --}}
-            <div
-                x-show="pagesOpen"
-                x-cloak
-                x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.99]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                x-transition:leave="transition ease-in duration-100"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute inset-x-0 top-full z-50 mt-1.5 origin-top"
-                role="menu"
-                aria-label="Pages"
-            >
-                <p class="s-microlabel px-2.5 pb-1 pt-2">Pages</p>
-                <div class="flex flex-col gap-0.5">
-                @foreach($pages as $p)
-                    <a
-                        href="{{ route('studio.index', ['page' => $p->slug]) }}"
-                        class="s-menu-item {{ $p->slug === $page->slug ? 'bg-wash !text-ink' : '' }}"
-                        role="menuitem"
-                    >
-                        <svg class="h-3.5 w-3.5 shrink-0 {{ $p->slug === $page->slug ? 'text-accent' : 'text-transparent' }}" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="min-w-0 flex-1 truncate">{{ $p->title }}</span>
-                        <span class="font-mono text-[10.5px] text-faint">/{{ $p->slug === $homeSlug ? '' : $p->slug }}</span>
-                    </a>
-                @endforeach
-                </div>
-
-                <div class="s-divider my-1"></div>
-
-                <button @click="pagesOpen = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item" role="menuitem">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
-                    </svg>
-                    New page
-                </button>
-            </div>
-        </div>
-        </div>
-
-        {{-- Mode switch — Preview / Edit, plus Code while dev mode is on.
-             Preview is the default: the canvas behaves like the real site. --}}
-        <div x-data class="s-seg shrink-0">
-            <button
-                type="button"
-                class="s-seg-btn"
-                :class="$store.studio.mode === 'preview' && 'is-active'"
-                @click="$store.studio.setMode('preview')"
-                title="Preview — browse the site as a visitor"
-                aria-label="Preview mode"
-            >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M2.9 12h18.2M12 2.75c2.2 2.5 3.3 5.6 3.3 9.25S14.2 18.75 12 21.25C9.8 18.75 8.7 15.65 8.7 12S9.8 5.25 12 2.75Z"/></svg>
-            </button>
-            <button
-                type="button"
-                class="s-seg-btn"
-                :class="$store.studio.mode === 'edit' && 'is-active'"
-                @click="$store.studio.setMode('edit')"
-                title="Edit — select and change sections"
-                aria-label="Edit mode"
-            >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.86 4.49l1.69-1.69a1.875 1.875 0 1 1 2.65 2.65L6.83 19.82a4.5 4.5 0 0 1-1.9 1.13l-2.68.8.8-2.69a4.5 4.5 0 0 1 1.13-1.9L16.86 4.49Z"/></svg>
-            </button>
-            <button
-                x-show="$store.studio.codeAvailable"
-                x-cloak
-                type="button"
-                class="s-seg-btn"
-                :class="$store.studio.mode === 'code' && 'is-active'"
-                @click="$store.studio.setMode('code')"
-                title="Code — edit the section and site source files"
-                aria-label="Code mode"
-            >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
-            </button>
-        </div>
-
-        {{-- Split the code pane with the live preview (Code mode only) --}}
-        <div x-data x-show="$store.studio.mode === 'code'" x-cloak class="shrink-0">
-            <button
-                type="button"
-                class="s-nav-btn"
-                :class="$store.studio.codeSplit && '!bg-wash-strong !text-ink'"
-                @click="$store.studio.toggleCodeSplit()"
-                :title="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
-                :aria-label="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
-            >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M12 4.75v14.5"/></svg>
-            </button>
-        </div>
-
-        {{-- Device switcher --}}
-        <div x-data x-show="$store.studio.canvasVisible" class="shrink-0">
-            <div class="s-seg">
-                <button
-                    type="button"
-                    class="s-seg-btn"
-                    :class="$store.studio.device === 'desktop' && 'is-active'"
-                    @click="$store.studio.device = 'desktop'"
-                    title="Desktop preview"
-                    aria-label="Desktop preview"
-                >
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v8.5A2.25 2.25 0 0 1 15.75 15h-3.105a3.501 3.501 0 0 0 1.1 1.677A.75.75 0 0 1 13.26 18H6.74a.75.75 0 0 1-.484-1.323A3.501 3.501 0 0 0 7.355 15H4.25A2.25 2.25 0 0 1 2 12.75v-8.5Zm1.5 0a.75.75 0 0 1 .75-.75h11.5a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-.75.75H4.25a.75.75 0 0 1-.75-.75v-7.5Z" clip-rule="evenodd"/></svg>
-                </button>
-                <button
-                    type="button"
-                    class="s-seg-btn"
-                    :class="$store.studio.device === 'tablet' && 'is-active'"
-                    @click="$store.studio.device = 'tablet'"
-                    title="Tablet preview — 768px"
-                    aria-label="Tablet preview"
-                >
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 1a2.5 2.5 0 0 0-2.5 2.5v13A2.5 2.5 0 0 0 5 19h10a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 15 1H5ZM4 3.5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13Zm5 11.75a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5H9Z" clip-rule="evenodd"/></svg>
-                </button>
-                <button
-                    type="button"
-                    class="s-seg-btn"
-                    :class="$store.studio.device === 'mobile' && 'is-active'"
-                    @click="$store.studio.device = 'mobile'"
-                    title="Mobile preview — 390px"
-                    aria-label="Mobile preview"
-                >
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7 1a2.5 2.5 0 0 0-2.5 2.5v13A2.5 2.5 0 0 0 7 19h6a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 13 1H7ZM6 3.5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-13Zm3 11.75a.75.75 0 0 0 0 1.5h2a.75.75 0 0 0 0-1.5H9Z" clip-rule="evenodd"/></svg>
-                </button>
-            </div>
-        </div>
-
         {{-- Publish --}}
         <div class="relative" x-data="{
             open: false,
@@ -422,6 +203,7 @@
             draftMode: @js($draftMode),
             status: @js($publishStatus),
             busy: false,
+            popStyle: '',
 
             copyUrl() {
                 // navigator.clipboard only exists in secure contexts (https/localhost);
@@ -511,14 +293,17 @@
         @studio:status.window="if ($event.detail.state === 'saved' && status) status.dirty = true"
         @studio:open-publish.window="open = true; refreshStatus()"
         >
-            <button @click="open = !open; if (open) refreshStatus()" class="s-btn-primary relative">
-                Publish
-                <span
-                    x-show="draftMode && status?.dirty"
-                    x-cloak
-                    x-transition.opacity
-                    class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-shell"
-                ></span>
+            <button
+                @click="open = !open; if (open) refreshStatus()"
+                class="s-dock-publish"
+                x-data="{ state: 'idle' }"
+                @studio:status.window="state = $event.detail.state"
+                :title="state === 'saving' ? 'Saving…' : state === 'error' ? 'Offline — changes are not being saved' : 'All changes saved'"
+                aria-label="Publish"
+            >
+                <span class="s-dock-status" :class="{ 'is-saving': state === 'saving', 'is-error': state === 'error' }"></span>
+                <span class="s-dock-publish-label">Publish</span>
+                <span x-show="draftMode && status?.dirty" x-cloak x-transition.opacity class="s-dock-dirty"></span>
             </button>
 
             <div
@@ -530,7 +315,9 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute right-0 top-full mt-1.5 w-80 origin-top-right p-3"
+                class="s-pop fixed z-50 w-80 p-3"
+                :style="popStyle"
+                x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 320) })"
             >
                 @if($draftMode)
                     {{-- Unpublished changes --}}
@@ -614,7 +401,7 @@
             </div>
         </div>
 
-    </x-slot:topbar>
+    </x-slot:actions>
 
     {{-- ============================================================ --}}
     {{-- Menu — the layout renders it first in the topbar             --}}
@@ -624,7 +411,8 @@
             class="relative"
             x-data="{
                 open: false,
-        
+                popStyle: '',
+
                 async duplicatePage() {
                     this.open = false;
                     try {
@@ -649,7 +437,7 @@
             @click.outside="open = false"
             @keydown.escape.window="open = false"
         >
-            <button @click="open = !open" class="s-box-btn s-logo-btn" :class="open && 'is-open'" title="Menu" aria-label="Menu">
+            <button @click="open = !open" class="s-dock-btn is-menu s-logo-btn" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu">
                 <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
                 <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
@@ -663,7 +451,9 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop s-pop-inverse absolute left-0 top-full z-50 mt-1.5 w-60 origin-top-left"
+                class="s-pop s-pop-inverse fixed z-50 w-60"
+                :style="popStyle"
+                x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 240) })"
             >
                 <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
                     <svg class="h-[17px] w-auto -translate-y-0.5 text-ink" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
@@ -702,21 +492,41 @@
                     </span>
                     <span class="s-chip" :class="$store.studio.theme === 'light' && '!border-accent/50 !text-accent'" x-text="$store.studio.theme === 'light' ? 'On' : 'Off'"></span>
                 </button>
-                {{-- Activity bar placement — a row of little window diagrams --}}
+                {{-- Canvas width --}}
                 <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
                     <span class="flex items-center gap-2.5">
-                        @include('studio::partials.activity-bar-glyph', ['position' => 'top'])
-                        Activity bar
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="1.75" y="2.25" width="12.5" height="11.5" rx="2.25"/><path d="M5.5 13.75v-2.5m5 2.5v-2.5"/></svg>
+                        Canvas width
                     </span>
-                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Activity bar position">
-                        @foreach(['left' => 'Left', 'top' => 'Top', 'bottom' => 'Bottom', 'hidden' => 'Hidden'] as $value => $label)
+                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Canvas width">
+                        @foreach(['desktop' => 'Desktop', 'tablet' => 'Tablet — 768px', 'mobile' => 'Mobile — 390px'] as $value => $label)
+                            <button
+                                type="button"
+                                class="flex h-6 cursor-pointer items-center justify-center rounded-md px-1.5 text-[11px] transition-colors duration-150"
+                                :class="$store.studio.device === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
+                                @click="$store.studio.device = '{{ $value }}'"
+                                role="radio"
+                                :aria-checked="$store.studio.device === '{{ $value }}'"
+                                title="{{ $label }}"
+                            >{{ ucfirst($value) }}</button>
+                        @endforeach
+                    </span>
+                </div>
+                {{-- Dock placement — a row of little window diagrams --}}
+                <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
+                    <span class="flex items-center gap-2.5">
+                        @include('studio::partials.activity-bar-glyph', ['position' => 'bottom'])
+                        Dock
+                    </span>
+                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Dock position">
+                        @foreach(['bottom' => 'Bottom', 'left' => 'Left', 'right' => 'Right', 'top' => 'Top'] as $value => $label)
                             <button
                                 type="button"
                                 class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
-                                :class="$store.studio.activityBar === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
-                                @click="$store.studio.setActivityBar('{{ $value }}')"
+                                :class="$store.studio.dock.edge === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
+                                @click="$store.studio.setDock('{{ $value }}')"
                                 role="radio"
-                                :aria-checked="$store.studio.activityBar === '{{ $value }}'"
+                                :aria-checked="$store.studio.dock.edge === '{{ $value }}'"
                                 title="{{ $label }}"
                                 aria-label="{{ $label }}"
                             >
@@ -724,6 +534,22 @@
                             </button>
                         @endforeach
                     </span>
+                </div>
+                <div class="s-divider my-1"></div>
+                {{-- Browser-style navigation --}}
+                <div class="flex items-center gap-1 px-1.5 py-0.5">
+                    <button type="button" class="s-menu-item flex-1 !justify-center" @click="open = false; history.back()" title="Back">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+                        Back
+                    </button>
+                    <button type="button" class="s-menu-item flex-1 !justify-center" @click="open = false; history.forward()" title="Forward">
+                        Forward
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+                    </button>
+                    <button type="button" class="s-menu-item flex-1 !justify-center" @click="open = false; window.dispatchEvent(new CustomEvent('studio:refresh-preview'))" title="Reload the preview">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
+                        Reload
+                    </button>
                 </div>
                 @if($liveUrl)
                     <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
@@ -756,13 +582,6 @@
         <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'media'" x-cloak>
             <livewire:studio::media-panel />
         </div>
-        @if($devModeAvailable)
-            {{-- Code mode's file tree. It owns the sidebar while Code mode is
-                 on, and is unreachable otherwise. --}}
-            <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'files'" x-cloak>
-                @include('studio::partials.file-tree')
-            </div>
-        @endif
     </x-slot:sidebar>
 
     {{-- ============================================================ --}}
@@ -797,13 +616,14 @@
                     { label: 'Media panel', hint: 'Panel', run: () => studio.setRail('media', true) },
                     @if($devModeAvailable)
                     { label: 'Assistant panel', hint: 'Panel', run: () => studio.setRail('assistant', true) },
-                    { label: 'Files panel', hint: 'Panel', when: studio.mode === 'code', run: () => studio.setRail('files', true) },
+                    { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
                     @endif
-                    { label: studio.sidebar ? 'Hide the sidebar' : 'Show the sidebar', hint: 'Layout', run: () => studio.toggleSidebar() },
-                    { label: 'Activity bar: top', hint: 'Layout', when: studio.activityBar !== 'top', run: () => studio.setActivityBar('top') },
-                    { label: 'Activity bar: left', hint: 'Layout', when: studio.activityBar !== 'left', run: () => studio.setActivityBar('left') },
-                    { label: 'Activity bar: bottom', hint: 'Layout', when: studio.activityBar !== 'bottom', run: () => studio.setActivityBar('bottom') },
-                    { label: 'Activity bar: hidden', hint: 'Layout', when: studio.activityBar !== 'hidden', run: () => studio.setActivityBar('hidden') },
+                    { label: studio.sidebar ? 'Close the panel' : 'Open the panel', hint: 'Layout', run: () => studio.toggleSidebar() },
+                    { label: 'Dock: bottom', hint: 'Layout', when: studio.dock.edge !== 'bottom', run: () => studio.setDock('bottom') },
+                    { label: 'Dock: left', hint: 'Layout', when: studio.dock.edge !== 'left', run: () => studio.setDock('left') },
+                    { label: 'Dock: right', hint: 'Layout', when: studio.dock.edge !== 'right', run: () => studio.setDock('right') },
+                    { label: 'Dock: top', hint: 'Layout', when: studio.dock.edge !== 'top', run: () => studio.setDock('top') },
+                    { label: studio.dockHidden ? 'Show the dock' : 'Hide the dock', hint: 'Layout', run: () => studio.toggleDock() },
                     { label: 'Preview: desktop', hint: 'Device', run: () => studio.device = 'desktop' },
                     { label: 'Preview: tablet', hint: 'Device', run: () => studio.device = 'tablet' },
                     { label: 'Preview: mobile', hint: 'Device', run: () => studio.device = 'mobile' },
