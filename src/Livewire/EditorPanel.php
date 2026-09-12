@@ -852,6 +852,32 @@ class EditorPanel extends Component
         $this->saveVariables($sectionId);
     }
 
+    /**
+     * A non-text field resolved on the canvas (an image pick, a colour, a
+     * select). Unlike {@see setFieldFromCanvas()} these types want the
+     * repaint, so this goes through setVariable(), which echoes to the
+     * iframe as well as persisting.
+     */
+    #[On('studio:set-field-value')]
+    public function setFieldValueFromCanvas(string $sectionId, string $key, $value): void
+    {
+        if (!isset($this->variables[$sectionId])) {
+            return;
+        }
+
+        $this->setVariable($sectionId, $key, $value);
+    }
+
+    #[On('studio:set-repeater-sub-field')]
+    public function setRepeaterSubFieldFromCanvas(string $sectionId, string $fieldKey, int $index, string $subField, $value): void
+    {
+        if (!isset($this->variables[$sectionId])) {
+            return;
+        }
+
+        $this->updateRepeaterSubField($sectionId, $fieldKey, $index, $subField, (string) $value);
+    }
+
     /* ------------------------------------------------------------ */
     /*  Repeater fields                                              */
     /* ------------------------------------------------------------ */

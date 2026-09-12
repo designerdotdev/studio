@@ -141,6 +141,14 @@ const StudioEditor = {
                     window.dispatchEvent(new CustomEvent('studio:field-focus', { detail: data }));
                     break;
 
+                case 'studio:field-action':
+                    this.resolveFieldAction(data);
+                    break;
+
+                case 'studio:field-upload':
+                    this.uploadFieldFile(data);
+                    break;
+
                 case 'studio:open-code-at':
                     window.Alpine?.store('studio')?.setMode('code');
                     window.Alpine?.store('code')?.openFileAt(data.path, data.line);
@@ -318,6 +326,53 @@ const StudioEditor = {
                 });
             });
         });
+    },
+
+    /**
+     * Resolve a canvas field action in the editor window, then persist it
+     * and hand the value back to the canvas.
+     *
+     * Unlike a text edit, these types want the repaint — so this goes
+     * through EditorPanel::setVariable / updateRepeaterSubField, which
+     * persist AND echo to the iframe.
+     */
+    async resolveFieldAction({ sectionId, key, index, subKey, type, action }) {
+        let value = null;
+
+        if (action === 'pick-media') {
+            value = await window.Studio.mediaPick();
+        }
+
+        if (value === null || value === undefined) return;
+
+        if (index !== null && subKey) {
+            window.Livewire?.dispatch('studio:set-repeater-sub-field', { sectionId, fieldKey: key, index, subField: subKey, value });
+        } else {
+            window.Livewire?.dispatch('studio:set-field-value', { sectionId, key, value });
+        }
+
+        this.send('studio:field-value', { sectionId, key, index, subKey, value });
+    },
+
+    /** A file dropped straight onto an image field — upload, then treat it
+     * exactly like a resolved field action once the URL comes back. */
+    async uploadFieldFile({ sectionId, key, index, subKey, file }) {
+        try {
+            const url = await window.Studio.upload(file, {
+                url: window.__studioUploadUrl,
+                csrf: document.querySelector('meta[name=csrf-token]').content,
+            });
+
+            if (index !== null && subKey) {
+                window.Livewire?.dispatch('studio:set-repeater-sub-field', { sectionId, fieldKey: key, index, subField: subKey, value: url });
+            } else {
+                window.Livewire?.dispatch('studio:set-field-value', { sectionId, key, value: url });
+            }
+
+            this.send('studio:field-value', { sectionId, key, index, subKey, value: url });
+        } catch (e) {
+            window.Studio.toast(e.message || 'Upload failed', 'error');
+        }
     },
 };
 
@@ -772,6 +827,10 @@ const StudioPreview = {
                 case 'studio:menu-close':
                     this.closeMenu();
                     break;
+
+                case 'studio:field-value':
+                    this.applyIncomingValue(data);
+                    break;
             }
         });
 
@@ -856,6 +915,71 @@ const StudioPreview = {
                 typing: isTyping(document),
             });
         });
+
+        // Drop an image file straight onto an image field
+        document.addEventListener('dragover', (event) => {
+            if (this.mode === 'preview') return;
+            if (!event.dataTransfer?.types?.includes('Files')) return;
+
+            const hit = this.imageHitAt(event.clientX, event.clientY);
+            if (!hit) return;
+
+            event.preventDefault();
+            this.markDropTarget(hit);
+        });
+
+        document.addEventListener('dragleave', () => this.markDropTarget(null));
+
+        document.addEventListener('drop', (event) => {
+            if (this.mode === 'preview') return;
+
+            const hit = this.imageHitAt(event.clientX, event.clientY);
+            this.markDropTarget(null);
+
+            if (!hit) return;
+
+            const file = event.dataTransfer?.files?.[0];
+            if (!file) return;
+
+            event.preventDefault();
+            this.post('studio:field-upload', {
+                sectionId: hit.sectionId,
+                key: hit.entry.key,
+                index: hit.entry.index,
+                subKey: hit.entry.subKey,
+                file,
+            });
+        });
+    },
+
+    /**
+     * The image-typed field entry (if any) under a point, across every
+     * section — used by the drag/drop listeners, which have no section
+     * context of their own the way select()/hoverAt() do (those start from
+     * a wrapper's own click/mousemove handler).
+     */
+    imageHitAt(x, y) {
+        for (const wrapper of document.querySelectorAll('[data-section]')) {
+            const sectionId = wrapper.dataset.section;
+            const entry = StudioFields.at(sectionId, x, y);
+
+            if (!entry) continue;
+            if (this.editabilityOf(entry, sectionId) === 'code') continue;
+            if (!this.isImageField(entry, sectionId)) continue;
+
+            return { sectionId, entry };
+        }
+
+        return null;
+    },
+
+    /** The one drop-target highlight, a class on the hit element itself —
+     * not a second overlay writer alongside queuePaint()/flushPaint(). */
+    markDropTarget(hit) {
+        document.querySelectorAll('.studio-drop-target').forEach((el) => el.classList.remove('studio-drop-target'));
+
+        const el = hit?.entry?.el;
+        if (el) el.classList.add('studio-drop-target');
     },
 
     post(type, payload = {}) {
@@ -902,6 +1026,66 @@ const StudioPreview = {
         if (entry.textHost === false) return 'select';
 
         return 'edit';
+    },
+
+    /**
+     * Whether a field's value comes from a collection row rather than this
+     * instance — `collections.*` bindings are read-only from the canvas
+     * (the value lives in Content), so no action here may ever write one.
+     * editabilityOf() already collapses this into its 'select' tier
+     * alongside plain non-editable-type fields; this reads the same
+     * `bindings` it does, for callers that need the finer answer.
+     */
+    isCollectionBound(sectionId, key) {
+        return !!this.bindings[sectionId]?.[key]?.startsWith('collections.');
+    },
+
+    /**
+     * Whether a field entry is image-typed and actionable from the canvas:
+     * an `<img src>`/`<source srcset>` attribute, or a field whose declared
+     * type is `image`. Excludes a collections-bound field — it still
+     * selects (via editabilityOf's 'select' tier) but pick-media must
+     * never fire for it.
+     */
+    isImageField(entry, sectionId) {
+        if (this.isCollectionBound(sectionId, entry.key)) return false;
+        if (entry.kind === 'attr' && (entry.attribute === 'src' || entry.attribute === 'srcset')) return true;
+
+        return StudioFields.typeFor(sectionId, entry) === 'image';
+    },
+
+    /**
+     * A non-text field asking the editor window to resolve a value.
+     *
+     * Text fields edit in place; every other type needs something the
+     * canvas iframe cannot host — the media library, an upload, a colour
+     * input. So the canvas posts the request, the editor resolves it, and
+     * the value comes back through `studio:field-value`.
+     */
+    fieldAction(entry, sectionId, action) {
+        if (this.mode === 'preview') return;
+        if (this.editabilityOf(entry, sectionId) === 'code') return;
+
+        this.post('studio:field-action', {
+            sectionId,
+            key: entry.key,
+            index: entry.index,
+            subKey: entry.subKey,
+            type: StudioFields.typeFor(sectionId, entry),
+            action,
+        });
+    },
+
+    /** The editor resolved a value for a non-text field. */
+    applyIncomingValue({ sectionId, key, index, subKey, value }) {
+        if (value === null || value === undefined) return;
+
+        const entry = { key, index, subKey };
+
+        for (const id of this.siblingIds(sectionId)) {
+            this.applyFieldValue(id, entry, value);
+            this.render(id);
+        }
     },
 
     /* --- selection ------------------------------------------------ */
@@ -953,6 +1137,8 @@ const StudioPreview = {
                     // but never takes free text on the canvas.
                     if (editability === 'edit') {
                         this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
+                    } else if (this.isImageField(hit.entry, sectionId)) {
+                        this.fieldAction(hit.entry, sectionId, 'pick-media');
                     }
 
                     return;

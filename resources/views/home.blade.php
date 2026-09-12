@@ -21,6 +21,9 @@
             // path against this list and moves the window to that page.
             window.__studioEditorUrl = @js(route('studio.index'));
             window.__studioPageSlug = @js($page->slug);
+            // Same endpoint the image field partial posts to — used by
+            // StudioEditor.uploadFieldFile() for a file dropped on the canvas.
+            window.__studioUploadUrl = @js(route('studio.api.upload'));
             window.__studioPages = @js($pages->map(fn ($p) => [
                 'slug' => $p->slug,
                 'path' => $p->slug === $homeSlug ? '' : $p->slug,
