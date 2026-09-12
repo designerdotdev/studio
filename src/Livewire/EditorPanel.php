@@ -965,6 +965,10 @@ class EditorPanel extends Component
     #[On('studio:item-action')]
     public function handleItemAction(string $sectionId, string $key, int $index, string $action, ?int $toIndex = null): void
     {
+        if (!isset($this->variables[$sectionId])) {
+            return;
+        }
+
         match ($action) {
             'add-before' => $this->insertRepeaterItemAt($sectionId, $key, $index),
             'add-after' => $this->insertRepeaterItemAt($sectionId, $key, $index + 1),
