@@ -294,14 +294,16 @@ const StudioEditor = {
         document.addEventListener('keydown', (event) => {
             this.handleShortcut({
                 key: event.key,
+                code: event.code,
                 meta: event.metaKey || event.ctrlKey,
+                alt: event.altKey,
                 typing: isTyping(),
                 preventDefault: () => event.preventDefault(),
             });
         });
     },
 
-    handleShortcut({ key, meta, typing, preventDefault = () => {} }) {
+    handleShortcut({ key, code = '', meta, alt = false, typing, preventDefault = () => {} }) {
         // The dev-mode code modal owns the keyboard while open (its own
         // window-level handlers run after this document-level one)
         if (window.Studio?.codeModalOpen) return;
@@ -320,6 +322,22 @@ const StudioEditor = {
         if (meta && (key === 'k' || key === 'K')) {
             preventDefault();
             window.dispatchEvent(new CustomEvent('studio:open-palette'));
+            return;
+        }
+
+        // Cmd/Ctrl+. — hide or show the dock (the site, and nothing else)
+        if (meta && key === '.') {
+            preventDefault();
+            window.Alpine?.store('studio')?.toggleDock?.();
+            return;
+        }
+
+        // Option+1/2/3 — canvas width (⌘1-3 belong to the browser's tabs;
+        // `code` because Option changes `key` on a Mac keyboard)
+        if (alt && !meta && /^Digit[123]$/.test(code)) {
+            preventDefault();
+            const studio = window.Alpine?.store('studio');
+            if (studio) studio.device = { Digit1: 'desktop', Digit2: 'tablet', Digit3: 'mobile' }[code];
             return;
         }
 

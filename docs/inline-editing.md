@@ -140,6 +140,11 @@ uses `setVariable()` instead.
   change.
 - **repeater items** — hover a row for flanking add-before/after, drag to reorder, delete with
   Undo. Not offered for a `collections.*`-bound repeater.
+- **the inspector** — never opened by a click. Selecting a section only tells Livewire
+  (`studio:section-selected`), so an already-open panel follows the selection and a closed one
+  stays closed. The toolbar's leading Edit-fields button, the context menu's first item and `E`
+  post `studio:open-inspector`, which selects *and* opens the Sections panel in its inspector
+  state. One editor at a time: inline on the canvas, or the panel on request.
 
 ## Provenance (dev mode)
 
