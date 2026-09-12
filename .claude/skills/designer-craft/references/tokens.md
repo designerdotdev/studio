@@ -106,7 +106,7 @@ CSS. A block may use `data-reveal` and `reveal-N` freely.
 html { background-color: var(--color-canvas); color-scheme: light; }
 body { overflow-x: clip; }
 ::selection { background-color: var(--color-ink); color: var(--color-canvas); }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 3px; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 h1, h2, h3, h4 { font-family: var(--font-display); }
 ```
 
