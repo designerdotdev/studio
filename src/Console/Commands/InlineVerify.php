@@ -25,7 +25,6 @@ class InlineVerify extends Command
 
     /** The measured baseline these numbers must not fall below. */
     protected const EXPECT_MAPPED = 365;
-    protected const EXPECT_FIELDS = 369;
 
     public function handle(EchoScanner $scanner, Instrumenter $instrumenter): int
     {

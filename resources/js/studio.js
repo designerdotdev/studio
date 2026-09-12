@@ -404,7 +404,20 @@ const StudioFields = {
                     continue;
                 }
 
-                entries.push({ ...this.parsePath(raw), line, kind: 'text', range, el: null });
+                entries.push({
+                    ...this.parsePath(raw),
+                    line,
+                    kind: 'text',
+                    range,
+                    el: null,
+                    // A raw echo (`{!! !!}`) is scanned the same as an
+                    // escaped one and gets the same `kind: 'text'` sentinel,
+                    // but when it renders markup (an <svg> icon, say) rather
+                    // than a text node, editing it would read an empty
+                    // innerText and wipe the field. Computed once here,
+                    // not per hover/click — see editabilityOf().
+                    textHost: this.isTextRange(range),
+                });
             }
         }
 
@@ -583,6 +596,40 @@ const StudioFields = {
         return (ref && this.contracts[ref]?.[key]) || null;
     },
 
+    /**
+     * The declared type for one entry — a repeater's own contract type
+     * ("repeater") says nothing about a specific sub-field, so a repeater
+     * entry (entry.index !== null) resolves through its parent's
+     * `sub_fields` instead. Returns null when nothing is declared (an
+     * undeclared field, or a sub-field the yml doesn't list), which
+     * editabilityOf() treats as "no type to conflict with".
+     */
+    typeFor(sectionId, entry) {
+        const contract = this.contractFor(sectionId, entry.key);
+
+        if (!contract) return null;
+
+        if (entry.index !== null) {
+            return contract.sub_fields?.[entry.subKey]?.type || null;
+        }
+
+        return contract.type || null;
+    },
+
+    /**
+     * Whether a Range's contents are a plain text host — no child element
+     * — rather than markup (`{!! !!}` echoing an `<svg>` icon, say).
+     * cloneContents() is cheap here: it runs once per field per paint
+     * (from index()), never per hover/click.
+     */
+    isTextRange(range) {
+        try {
+            return !range.cloneContents().querySelector('*');
+        } catch (e) {
+            return true;
+        }
+    },
+
     debug() {
         const rows = [];
 
@@ -611,7 +658,6 @@ const StudioPreview = {
     // Three tiers: the section (today's behaviour), a repeater item, and a
     // single field. Esc walks up one tier at a time.
     selection: { tier: 'section', sectionId: null, path: null, key: null, index: null },
-    hovered: null,
     // The last { source, line } highlightLine() painted — lets a Monaco
     // cursor move that only advances the column skip the rescan/scroll.
     lastHighlight: null,
@@ -816,6 +862,48 @@ const StudioPreview = {
         window.parent.postMessage({ type, ...payload }, window.location.origin);
     },
 
+    /**
+     * The single decision point for how a 'field'-tier hit behaves —
+     * inline editing inherited the field contract but not the binding
+     * contract, so both are folded in here (plus the text-host check)
+     * rather than scattered across select()/resolveHover(). Both call
+     * sites must agree, so hover and click never disagree about a field.
+     *
+     * Returns:
+     *   'code'   — bound in the section's own PHP/Blade (`php:`/`blade:`).
+     *              Not a Studio-owned field at all: no select, no edit.
+     *   'select' — selectable (inspector focus / "Edit in Content"), but
+     *              never opens for inline typing: a collection-bound
+     *              field (the value lives in Content, not on the page),
+     *              a non-text-typed field (select/colorpicker/image/…),
+     *              or a raw echo whose host isn't plain text (an <svg>
+     *              icon, say — committing would read an empty innerText
+     *              and wipe the field).
+     *   'edit'   — genuinely inline-editable: no binding, or a `site.*`
+     *              binding (EditorPanel::saveSiteValues persists those
+     *              for real), a declared text/textarea type (or no
+     *              declared type at all), and a plain text host.
+     */
+    editabilityOf(entry, sectionId) {
+        const binding = this.bindings[sectionId]?.[entry.key];
+
+        if (binding) {
+            if (binding.startsWith('php:') || binding.startsWith('blade:')) return 'code';
+            if (binding.startsWith('collections.')) return 'select';
+            // 'site.*' falls through — fully editable, not gated here.
+        }
+
+        if (entry.kind !== 'text') return 'select';
+
+        const type = StudioFields.typeFor(sectionId, entry);
+
+        if (type && type !== 'text' && type !== 'textarea') return 'select';
+
+        if (entry.textHost === false) return 'select';
+
+        return 'edit';
+    },
+
     /* --- selection ------------------------------------------------ */
 
     select(sectionId, event) {
@@ -831,7 +919,9 @@ const StudioPreview = {
             const hit = this.tierAt(sectionId, event.clientX, event.clientY);
 
             if (hit.tier === 'field') {
-                // ⌥-click jumps to the line of Blade that rendered this text
+                // ⌥-click jumps to the line of Blade that rendered this
+                // value — a source lookup, not an edit, so it fires
+                // regardless of how the field is bound.
                 if (event.altKey && document.documentElement.classList.contains('studio-devmode')) {
                     const source = StudioFields.sourceFor(sectionId);
 
@@ -846,20 +936,28 @@ const StudioPreview = {
                     }
                 }
 
-                this.applySelection(sectionId, false);
-                this.selectField(hit.entry, sectionId);
-                this.post('studio:section-selected', { sectionId });
+                const editability = this.editabilityOf(hit.entry, sectionId);
 
-                // Text fields become editable straight away; every other type
-                // selects and lets the inspector own the input.
-                if (hit.entry.kind === 'text') {
-                    this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
+                // A php:/blade:-bound value is set in code — Studio never
+                // owns it as a field, so a click here falls through to a
+                // plain section selection, same as clicking any other
+                // code-rendered content.
+                if (editability !== 'code') {
+                    this.applySelection(sectionId, false);
+                    this.selectField(hit.entry, sectionId);
+                    this.post('studio:section-selected', { sectionId });
+
+                    // Only a genuinely inline-editable field opens for
+                    // typing — a collection-bound or non-text-typed field
+                    // still selects (inspector focus / "Edit in Content")
+                    // but never takes free text on the canvas.
+                    if (editability === 'edit') {
+                        this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
+                    }
+
+                    return;
                 }
-
-                return;
-            }
-
-            if (hit.tier === 'item') {
+            } else if (hit.tier === 'item') {
                 this.applySelection(sectionId, false);
                 this.selectItem(hit.item, sectionId);
                 this.post('studio:section-selected', { sectionId });
@@ -987,6 +1085,13 @@ const StudioPreview = {
             return inContent ? this.paintHalo(null, 'code', { target }) : this.clearHover();
         }
 
+        // A php:/blade:-bound field hovers exactly like code-owned content
+        // — the click and the hover must agree on this (editabilityOf is
+        // the single source both consult).
+        if (hit.tier === 'field' && this.editabilityOf(hit.entry, sectionId) === 'code') {
+            return this.paintHalo(hit, 'code', { target, sectionId });
+        }
+
         this.paintHalo(hit, hit.tier, { target });
     },
 
@@ -1047,6 +1152,12 @@ const StudioPreview = {
             const rect = hit.item.el.getBoundingClientRect();
             box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
             label = this.itemLabel(hit.item);
+        } else if (kind === 'code' && hit?.entry) {
+            // A code-bound field routed here by resolveHover()/select() —
+            // halo its own precise box (not the event target's, which can
+            // be a whole paragraph around several fields), keep the default
+            // "Set in code" label.
+            box = StudioFields.box(hit.entry);
         } else {
             const rect = event.target.getBoundingClientRect?.();
             if (rect) box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
@@ -1054,7 +1165,6 @@ const StudioPreview = {
 
         if (!box || box.width === 0) return this.clearHover();
 
-        this.hovered = { kind, hit };
         this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind) });
     },
 
@@ -1124,7 +1234,6 @@ const StudioPreview = {
     },
 
     clearHover() {
-        this.hovered = null;
         this.queuePaint(null);
     },
 
@@ -1348,6 +1457,11 @@ const StudioPreview = {
     // The section whose markup must not be repainted: its DOM is the truth
     // while the caret is in it.
     editing: null,
+
+    // sectionId → markup: a render that landed while that section was being
+    // edited, deferred by paint() and applied by teardownEdit() once
+    // editing ends.
+    pendingMarkup: {},
 
     /**
      * Make a text field editable in place.
@@ -1585,8 +1699,19 @@ const StudioPreview = {
         document.documentElement.classList.remove('studio-editing');
         window.getSelection()?.removeAllRanges();
 
-        // The DOM moved under the map — rebuild it for this section
-        StudioFields.index(document.querySelector(`[data-section="${state.sectionId}"]`));
+        // A render that landed while the caret was in this section was
+        // stashed by paint() rather than discarded — apply it now that
+        // editing is over. applyMarkup() already reindexes the section, so
+        // the plain reindex below only runs when nothing was queued.
+        const pending = this.pendingMarkup[state.sectionId];
+
+        if (pending !== undefined) {
+            delete this.pendingMarkup[state.sectionId];
+            this.applyMarkup(state.sectionId, pending);
+        } else {
+            // The DOM moved under the map — rebuild it for this section
+            StudioFields.index(document.querySelector(`[data-section="${state.sectionId}"]`));
+        }
     },
 
     /**
@@ -1997,10 +2122,21 @@ const StudioPreview = {
     },
 
     paint(sectionId, markup) {
-        // The caret is in this section — its DOM already shows the truth, and
-        // replacing innerHTML would destroy the selection mid-keystroke.
-        if (this.editing && this.editing.sectionId === sectionId) return;
+        // The caret is in this section — its DOM already shows the truth,
+        // and replacing innerHTML would destroy the selection mid-keystroke.
+        // The markup isn't lost, just deferred: stash it and teardownEdit()
+        // applies it once editing ends, so a render that lands mid-type
+        // isn't stale forever.
+        if (this.editing && this.editing.sectionId === sectionId) {
+            this.pendingMarkup[sectionId] = markup;
+            return;
+        }
 
+        this.applyMarkup(sectionId, markup);
+    },
+
+    /** The one place that actually writes rendered section markup into the DOM. */
+    applyMarkup(sectionId, markup) {
         const el = document.querySelector(`[data-section="${sectionId}"] [data-section-content]`);
 
         if (!el) return;
