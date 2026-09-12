@@ -90,7 +90,52 @@ class InlineVerify extends Command
             return self::FAILURE;
         }
 
+        $this->newLine();
+
+        if (!$this->leakCheck()) {
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
+    }
+
+    /**
+     * Sentinels belong to the canvas and nowhere else. A leak into the draft
+     * preview would mean one is a keystroke away from a published page file.
+     */
+    protected function leakCheck(): bool
+    {
+        $renderer = app(\Designer\Studio\Services\SectionRenderer::class);
+        $components = app(\Designer\Studio\Services\Storage\ComponentRepository::class);
+        $component = collect($components->all())->first(fn ($c) => $c->fields !== []);
+
+        if (!$component) {
+            $this->warn('Leak check skipped: no section with fields in the library.');
+
+            return true;
+        }
+
+        $variables = $component->resolveVariables();
+        $plain = $renderer->render($component, $variables);
+        $canvas = $renderer->render($component, $variables, [], instrument: true);
+
+        $ok = true;
+
+        if (str_contains($plain, '<!--sf:') || str_contains($plain, 'data-sf-')) {
+            $this->error('LEAK: the default (uninstrumented) render contains sentinels.');
+            $ok = false;
+        }
+
+        if (!str_contains($canvas, '<!--sf:')) {
+            $this->error('The canvas render contains no sentinels — instrumentation is not reaching it.');
+            $ok = false;
+        }
+
+        if ($ok) {
+            $this->info('Leak check: sentinels appear only when instrumentation is asked for.');
+        }
+
+        return $ok;
     }
 
     /**

@@ -66,7 +66,8 @@ class RenderController extends Controller
                     $component->resolveVariables($section['variables'] ?? []),
                     $section['bindings'] ?? [],
                     $given
-                )
+                ),
+                instrument: true,
             );
         }
 

@@ -710,7 +710,13 @@
 
             @php
                 $rendered = app(\Designer\Studio\Services\SectionRenderer::class)
-                    ->renderHtml($section['html'], $componentVariables[$section['id']] ?? [], $section['ref']);
+                    ->renderHtml(
+                        $section['html'],
+                        $componentVariables[$section['id']] ?? [],
+                        $section['ref'],
+                        $section['fields'] ?? [],
+                        instrument: true,
+                    );
                 $isLayout = $section['scope'] === 'layout';
                 $isBlock = !empty($section['block']);
             @endphp
