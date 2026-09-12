@@ -2694,7 +2694,8 @@ Claude-Session: https://claude.ai/code/session_015ipmAu6GRkPd69yKxBdGBX"
 
 **Files:**
 - Modify: `resources/js/studio.js` (`StudioPreview.setElementSelect` handler — enrich the payload)
-- Modify: `src/Services/Assistant/SystemPrompt.php`
+- Modify: `resources/views/livewire/assistant-panel.blade.php` (`send()` — widen the element whitelist)
+- Modify: `src/Services/Assistant/SystemPrompt.php` (`selectionContext()` at ~line 110, and the `@param` shape docblock at ~line 30)
 
 **Interfaces:**
 - Consumes: `StudioFields.at()`, `sourceFor()` (Task 4).
@@ -2724,9 +2725,45 @@ and in the posted object:
                     source: entry && source ? source + '.blade.php:' + entry.line : null,
 ```
 
-- [ ] **Step 3: State it in the system prompt**
+- [ ] **Step 3: Let the new keys reach the turn**
 
-In `src/Services/Assistant/SystemPrompt.php`, find where the current selection is described and extend that block so a field-level selection is stated exactly. Add this method and call it where the selection is rendered:
+`assistant-panel.blade.php`'s `send()` copies the element context key by key, so
+anything not named there is dropped before it reaches the server. Find the line:
+
+```js
+            if (this.element) context.element = { path: this.element.path, tag: this.element.tag, text: this.element.text };
+```
+
+and widen it:
+
+```js
+            if (this.element) context.element = {
+                path: this.element.path,
+                tag: this.element.tag,
+                text: this.element.text,
+                field: this.element.field,
+                itemIndex: this.element.itemIndex,
+                subKey: this.element.subKey,
+                source: this.element.source,
+            };
+```
+
+Update the shape comment on the `element:` property near the top of the same
+`x-data` block to match:
+
+```js
+        element: null,          // {sectionId, ref, path, tag, text, field, itemIndex, subKey, source}
+```
+
+- [ ] **Step 4: State it in the system prompt**
+
+In `src/Services/Assistant/SystemPrompt.php` the selection is described by
+`selectionContext(array $context): array` (~line 110), which already handles
+`$context['element']`. Add the method below and call it from there — append its
+line to `$lines` inside the existing `if ($element) {` block, right after the
+existing `- Element inside it:` line. Also extend the `@param` shape docblock at
+~line 30 from `element: {path, tag, text}` to
+`element: {path, tag, text, field, itemIndex, subKey, source}`.
 
 ```php
     /**
@@ -2758,7 +2795,7 @@ In `src/Services/Assistant/SystemPrompt.php`, find where the current selection i
     }
 ```
 
-- [ ] **Step 4: Build and verify it passes**
+- [ ] **Step 5: Build and verify it passes**
 
 ```bash
 cd <host-app>/packages/designer/studio && npm run build
@@ -2766,11 +2803,11 @@ cd <host-app>/packages/designer/studio && npm run build
 
 With dev mode on: open the Assistant, click the crosshair, click the lime highlighted words in the hero. The context chip appears. Send `what field is this?` and confirm the reply names `headingHighlight` and the source file. Then click a team member's name in a repeater and confirm the reply names the field with its row index.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 cd <host-app>/packages/designer/studio
-git add resources/js/studio.js src/Services/Assistant/SystemPrompt.php dist
+git add resources/js/studio.js resources/views/livewire/assistant-panel.blade.php src/Services/Assistant/SystemPrompt.php dist
 git commit -m "Tell the Assistant which field the crosshair hit
 
 The sentinels already know, so the crosshair now reports the field key,
