@@ -167,9 +167,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); }
 /* The mobile sheet slides down under the header. */
 [data-mobile-panel] {
     opacity: 0; translate: 0 -8px; visibility: hidden;
+    backdrop-filter: none;
     transition: opacity .28s var(--ease-out-quart), translate .28s var(--ease-out-quart), visibility 0s linear .28s;
 }
-.menu-open [data-mobile-panel] { opacity: 1; translate: 0 0; visibility: visible; transition: opacity .32s var(--ease-out-quart), translate .32s var(--ease-out-quart), visibility 0s; }
+.menu-open [data-mobile-panel] { opacity: 1; translate: 0 0; visibility: visible; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .32s var(--ease-out-quart), translate .32s var(--ease-out-quart), visibility 0s; }
 .menu-open { overflow: hidden; }
 
 /* Smooth <details> opening (Chrome; instant elsewhere). */
@@ -332,7 +333,7 @@ cat > "$R/views/components/nav.blade.php" <<'BLADE'
     </div>
 
     <!-- The mobile sheet. Dropdown parents flatten into their children here. -->
-    <div data-mobile-panel class="border-b border-line bg-canvas/95 backdrop-blur-xl lg:hidden">
+    <div data-mobile-panel class="border-b border-line bg-canvas/95 lg:hidden">
         <nav class="mx-auto w-full max-w-6xl px-6 py-4" aria-label="Mobile">
             <ul role="list" class="flex flex-col text-base">
                 @foreach ($links as $link)

@@ -26,7 +26,7 @@ visible, still, and instant. This is tested in every workflow skill.
 | Dropdown close | 150–180ms | `ease-in` or same ease | exits are faster than entrances |
 | Mobile sheet | 280–320ms | `--ease-out-quart` | translate −8px + opacity; lock body scroll |
 | Accordion (`<details>`) | 300–350ms | `--ease-out-quart` | `interpolate-size: allow-keywords` + `::details-content` |
-| Scroll reveal | 700–900ms | `--ease-spring` | opacity 0→1, translate 18px→0, optional blur 6px→0 |
+| Scroll reveal | 700–900ms | `--ease-spring` | opacity 0→1, translate 18px→0 (a blur 6px→0 is optional; it leaves a compositing layer that tall Playwright captures can drop — `snap.mjs` neutralises it) |
 | Arrival cascade (hero) | 70ms steps, ≤ 6 steps | `--ease-spring` | `.reveal-1 … .reveal-6` delays |
 | Marquee / ticker | 30–60s loop | `linear` | pause on hover; hide under reduced motion; clone the track with JS, not a second `@foreach` |
 | Number count-up | 900–1400ms | `--ease-out-quart` | only on a signature stat; final value in the markup |
