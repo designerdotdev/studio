@@ -33,21 +33,25 @@
                 Alpine.store('studio', {
                     device: 'desktop',
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
-                    sidebar: localStorage.getItem('studio.sidebar') !== '0',
+                    // A panel is open (the floating surface is showing). Off
+                    // on first run: the site is the screen until you ask.
+                    sidebar: localStorage.getItem('studio.sidebar') === '1',
                     toggleSidebar() {
                         this.sidebar = !this.sidebar;
                         localStorage.setItem('studio.sidebar', this.sidebar ? '1' : '0');
                     },
-                    // The rail: which panel the sidebar shows. 'files' belongs to
-                    // Code mode and is never restored on its own — entering
-                    // Code mode selects it.
-                    rail: (s => s === 'files' ? 'sections' : s)(localStorage.getItem('studio.rail') || 'sections'),
+                    closePanel() {
+                        if (!this.sidebar) return;
+                        this.sidebar = false;
+                        localStorage.setItem('studio.sidebar', '0');
+                    },
+                    // The rail: which panel the floating surface shows.
+                    rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) ? s : 'sections')(localStorage.getItem('studio.rail')),
                     setRail(name, force = false) {
-                        // A left activity bar outlives the sidebar, so its active
-                        // item collapses the panel (VS Code). Top/bottom bars
-                        // live inside the sidebar: there it's just a tab.
+                        // Every dock button toggles its own panel; a forced
+                        // call (picker, palette, inspector) always opens it.
                         if (!force && this.rail === name && this.sidebar) {
-                            if (this.activityBar === 'left') this.toggleSidebar();
+                            this.closePanel();
                             return;
                         }
                         this.rail = name;
@@ -55,13 +59,44 @@
                         if (!this.sidebar) this.toggleSidebar();
                         window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name } }));
                     },
-                    // Where the activity bar (the panel switcher) sits: across
-                    // the sidebar's top (default) or bottom, a strip to its
-                    // left, or hidden (panels stay reachable from ⌘K)
-                    activityBar: (p => ['left', 'top', 'bottom', 'hidden'].includes(p) ? p : 'top')(localStorage.getItem('studio.activity-bar')),
-                    setActivityBar(position) {
-                        this.activityBar = position;
-                        localStorage.setItem('studio.activity-bar', position);
+                    // The inspector is the Sections panel in its selected
+                    // state — the toolbar's Edit-fields button lands here.
+                    openInspector() {
+                        this.setRail('sections', true);
+                    },
+                    // Which frame the open panel takes: the two data screens
+                    // are sheets, everything else a popover on the dock.
+                    get frame() { return ['content', 'media'].includes(this.rail) ? 'sheet' : 'popover' },
+                    get floatWidth() { return this.rail === 'assistant' ? 380 : 320 },
+
+                    /* --- the dock ----------------------------------------
+                       Where the floating bar sits: which window edge, and how
+                       far along it (0..1, the dock's centre). Snaps on drag. */
+                    dock: (() => {
+                        try {
+                            const saved = JSON.parse(localStorage.getItem('studio.dock') || 'null');
+                            if (saved && ['bottom', 'left', 'right', 'top'].includes(saved.edge)) {
+                                return { edge: saved.edge, along: Math.min(1, Math.max(0, Number(saved.along) || 0.5)) };
+                            }
+                        } catch (e) { /* fall through */ }
+                        return { edge: 'bottom', along: 0.5 };
+                    })(),
+                    setDock(edge, along = null) {
+                        if (!['bottom', 'left', 'right', 'top'].includes(edge)) return;
+                        this.dock = { edge, along: along === null ? 0.5 : Math.min(1, Math.max(0, along)) };
+                        localStorage.setItem('studio.dock', JSON.stringify(this.dock));
+                        window.dispatchEvent(new CustomEvent('studio:dock', { detail: this.dock }));
+                    },
+                    dockHidden: localStorage.getItem('studio.dock-hidden') === '1',
+                    toggleDock() {
+                        this.dockHidden = !this.dockHidden;
+                        localStorage.setItem('studio.dock-hidden', this.dockHidden ? '1' : '0');
+                    },
+                    // Code mode's file tree column (inside the code pane)
+                    filesOpen: localStorage.getItem('studio.files') !== '0',
+                    toggleFiles() {
+                        this.filesOpen = !this.filesOpen;
+                        localStorage.setItem('studio.files', this.filesOpen ? '1' : '0');
                     },
                     // Editor chrome theme: dark by default, 'light' mirrors the Sites builder
                     theme: document.documentElement.classList.contains('studio-light') ? 'light' : 'dark',
@@ -100,9 +135,6 @@
                     })(),
                     setMode(name) {
                         if (name === 'code' && !this.codeAvailable) return;
-                        // The Files panel belongs to Code mode; leaving it
-                        // hands the sidebar back to the sections list.
-                        if (name !== 'code' && this.rail === 'files') this.setRail('sections', true);
                         this.mode = name;
                         localStorage.setItem('studio.mode', name);
                         window.dispatchEvent(new CustomEvent('studio:to-iframe', {
@@ -1358,7 +1390,6 @@
 
                 /** Entering Code mode: show the tree and take the sidebar. */
                 boot() {
-                    Alpine.store('studio').setRail('files', true);
                     if (!this.booted) {
                         this.booted = true;
                         this.loadTree();
