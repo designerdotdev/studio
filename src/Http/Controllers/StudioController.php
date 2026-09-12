@@ -270,6 +270,7 @@ class StudioController extends Controller
                     $contract = [
                         'label' => $config['label'] ?? \Illuminate\Support\Str::headline($key),
                         'type' => $config['type'] ?? 'text',
+                        'options' => $config['options'] ?? null,
                     ];
 
                     // A repeater's own type ("repeater") tells the canvas

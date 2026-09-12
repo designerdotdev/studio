@@ -128,6 +128,34 @@ const StudioEditor = {
                     break;
 
                 case 'studio:field-committed':
+                    // A plain text commit (no `echo`) must not repaint — it
+                    // would destroy the caret — so it keeps going through
+                    // setFieldFromCanvas(), byte-identical to before. A
+                    // resolved non-text value (link/select/colour, from the
+                    // canvas control) sets `echo: true`: the canvas already
+                    // shows the new value, so this only needs to persist —
+                    // through the same repainting path resolveFieldAction()
+                    // uses for an image pick, which already branches on a
+                    // repeater sub-field the same way.
+                    if (data.echo) {
+                        if (data.index !== null && data.subKey) {
+                            window.Livewire?.dispatch('studio:set-repeater-sub-field', {
+                                sectionId: data.sectionId,
+                                fieldKey: data.key,
+                                index: data.index,
+                                subField: data.subKey,
+                                value: data.value,
+                            });
+                        } else {
+                            window.Livewire?.dispatch('studio:set-field-value', {
+                                sectionId: data.sectionId,
+                                key: data.key,
+                                value: data.value,
+                            });
+                        }
+                        break;
+                    }
+
                     window.Livewire?.dispatch('studio:set-field', {
                         sectionId: data.sectionId,
                         key: data.key,
@@ -778,6 +806,7 @@ const StudioPreview = {
         StudioFields.init(paths, contracts);
 
         this.cursor.mount();
+        this.control.mount();
 
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
@@ -873,9 +902,14 @@ const StudioPreview = {
 
         document.addEventListener('mouseleave', () => this.clearHover());
 
-        // Click on empty canvas space deselects (and closes the context menu)
-        document.addEventListener('click', () => {
+        // Click on empty canvas space deselects (and closes the context menu).
+        // A click inside the floating control (its input/select isn't a
+        // section wrapper, so nothing upstream stopped it) must not count
+        // as "empty canvas" — that would close the control the instant a
+        // click focuses its own input.
+        document.addEventListener('click', (event) => {
             if (this.mode === 'preview') return;
+            if (this.control.el && this.control.el.contains(event.target)) return;
 
             this.closeMenu();
             this.clearSelection();
@@ -1116,6 +1150,106 @@ const StudioPreview = {
         }
     },
 
+    /**
+     * A small floating control for field types that need a widget rather
+     * than typing: a link's href, a select's options, a colour swatch.
+     *
+     * Deliberately its own element with its own lifecycle — the chip is
+     * pointer-events:none by design (it must never block the hover it
+     * describes), so an interactive control cannot live inside it.
+     */
+    control: {
+        el: null,
+        entry: null,
+        sectionId: null,
+
+        mount() { this.el = document.getElementById('studio-control'); },
+
+        open(kind, entry, sectionId, box, options) {
+            if (!this.el) return;
+
+            this.entry = entry;
+            this.sectionId = sectionId;
+            this.el.innerHTML = '';
+
+            const commit = (value) => {
+                StudioPreview.fieldValue(entry, sectionId, value);
+                this.close();
+            };
+
+            if (kind === 'url') {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = StudioPreview.currentValue(sectionId, entry) || '';
+                input.placeholder = 'https://… or /path';
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); commit(input.value); }
+                    if (e.key === 'Escape') { e.preventDefault(); this.close(); }
+                });
+                this.el.appendChild(input);
+            }
+
+            if (kind === 'select') {
+                const select = document.createElement('select');
+                for (const [value, label] of Object.entries(options || {})) {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    select.appendChild(opt);
+                }
+                select.value = StudioPreview.currentValue(sectionId, entry) || '';
+                select.addEventListener('change', () => commit(select.value));
+                this.el.appendChild(select);
+            }
+
+            if (kind === 'color') {
+                const input = document.createElement('input');
+                input.type = 'color';
+                input.value = StudioPreview.currentValue(sectionId, entry) || '#000000';
+                input.addEventListener('change', () => commit(input.value));
+                this.el.appendChild(input);
+            }
+
+            this.el.classList.add('is-on');
+            this.el.style.left = Math.max(8, box.left) + 'px';
+            this.el.style.top = Math.max(8, box.top - 38) + 'px';
+            this.el.querySelector('input,select')?.focus();
+        },
+
+        close() {
+            this.entry = null;
+            this.sectionId = null;
+            this.el?.classList.remove('is-on');
+            if (this.el) this.el.innerHTML = '';
+        },
+    },
+
+    /** The value the canvas currently holds for a field. */
+    currentValue(sectionId, entry) {
+        const vars = this.variables[sectionId] || {};
+
+        if (entry.index === null) return vars[entry.key];
+
+        return (vars[entry.key] || [])[entry.index]?.[entry.subKey];
+    },
+
+    /** Persist a resolved non-text value (shared by the control and Task 1). */
+    fieldValue(entry, sectionId, value) {
+        for (const id of this.siblingIds(sectionId)) {
+            this.applyFieldValue(id, entry, value);
+            this.render(id);
+        }
+
+        this.post('studio:field-committed', {
+            sectionId,
+            key: entry.key,
+            index: entry.index,
+            subKey: entry.subKey,
+            value,
+            echo: true,
+        });
+    },
+
     /* --- selection ------------------------------------------------ */
 
     select(sectionId, event) {
@@ -1124,6 +1258,12 @@ const StudioPreview = {
         // Preview mode has no selection — the chrome is hidden, and the
         // inline onclick handlers must not reach past it.
         if (this.mode === 'preview') return;
+
+        // Every fresh click starts from a closed control — the branch
+        // below reopens it when the new hit warrants one, so a click that
+        // lands on a different field (or a text/image field, or the
+        // section itself) never leaves a stale control from the last one.
+        this.control.close();
 
         // A click resolves to the deepest tier under the pointer; only a
         // click on section chrome selects the section itself.
@@ -1167,6 +1307,26 @@ const StudioPreview = {
                         this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
                     } else if (this.isImageField(hit.entry, sectionId)) {
                         this.fieldAction(hit.entry, sectionId, 'pick-media');
+                    } else if (!this.isCollectionBound(sectionId, hit.entry.key)) {
+                        // A collections.*-bound field only ever selects
+                        // (inspector focus / "Edit in Content") — its value
+                        // lives in Content, and EditorPanel::saveVariables()
+                        // silently discards a canvas-side write to it, so
+                        // the control must never open for one.
+                        const type = (hit.entry.kind === 'attr' && hit.entry.attribute === 'href')
+                            ? 'url'
+                            : StudioFields.typeFor(sectionId, hit.entry);
+                        const box = StudioFields.box(hit.entry);
+
+                        if (box && (type === 'url' || type === 'select' || type === 'colorpicker')) {
+                            this.control.open(
+                                type === 'colorpicker' ? 'color' : type,
+                                hit.entry,
+                                sectionId,
+                                box,
+                                StudioFields.contractFor(sectionId, hit.entry.key)?.options
+                            );
+                        }
                     }
 
                     return;
@@ -1224,6 +1384,7 @@ const StudioPreview = {
         // no longer matches anything on screen.
         this.selection = { tier: 'section', sectionId: null, path: null, key: null, index: null };
         this.clearHover();
+        this.control.close();
     },
 
     /* --- field + item tiers --------------------------------------- */
@@ -1355,9 +1516,10 @@ const StudioPreview = {
         let box = null;
         let label = 'Set in code';
         let source = '';
+        let sectionId = null;
 
         if (kind === 'field') {
-            const sectionId = this.sectionIdAt(event);
+            sectionId = this.sectionIdAt(event);
             box = StudioFields.box(hit.entry);
             label = this.labelFor(hit.entry, sectionId);
             const path = StudioFields.sourceFor(sectionId);
@@ -1379,7 +1541,7 @@ const StudioPreview = {
 
         if (!box || box.width === 0) return this.clearHover();
 
-        this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind) });
+        this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind, sectionId) });
     },
 
     /**
@@ -1478,6 +1640,8 @@ const StudioPreview = {
             text: '<span>T</span>',
             image: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 14.5v-9Zm3 1.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm8.5 7.75-3.6-4.5-2.6 3.1-1.4-1.6L5 15h9.5Z"/></svg>',
             url: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4h6a1 1 0 0 1 0 2H8.9l6.8 6.8a1 1 0 0 1-1.4 1.4L7.5 7.4v3.6a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1Z"/></svg>',
+            select: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5.2 7.7a1 1 0 0 1 1.4 0L10 11.1l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 9.1a1 1 0 0 1 0-1.4Z"/></svg>',
+            color: '<svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="6"/></svg>',
             item: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 4.5h13v3h-13v-3Zm0 4.75h13v3h-13v-3Zm0 4.75h13v3h-13v-3Z"/></svg>',
             code: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 5.2a1 1 0 0 1 .2 1.4L5.25 10l2.55 3.4a1 1 0 1 1-1.6 1.2l-3-4a1 1 0 0 1 0-1.2l3-4a1 1 0 0 1 1.4-.2Zm4.8 0a1 1 0 0 1 1.4.2l3 4a1 1 0 0 1 0 1.2l-3 4a1 1 0 1 1-1.6-1.2L14.75 10 12.2 6.6a1 1 0 0 1 .2-1.4Z"/></svg>',
         },
@@ -1518,8 +1682,18 @@ const StudioPreview = {
         },
     },
 
-    /** Which cursor glyph a hovered field deserves. */
-    cursorKind(hit, kind) {
+    /**
+     * Which cursor glyph a hovered field deserves — named after what a
+     * click will actually do, not just "text" for everything else.
+     *
+     * `sectionId` is passed in explicitly rather than read off
+     * `this.selection.sectionId`: this is called from paintHalo() (the
+     * read phase, driven by mousemove), so `selection` still names
+     * whatever was last *selected*, not what's under the pointer right
+     * now — reading it here would show the wrong glyph whenever the
+     * hover and the selection are on different sections.
+     */
+    cursorKind(hit, kind, sectionId) {
         if (kind === 'item') return 'item';
         if (kind === 'code') return 'code';
 
@@ -1528,9 +1702,14 @@ const StudioPreview = {
         if (entry.kind === 'attr') {
             if (entry.attribute === 'src' || entry.attribute === 'srcset') return 'image';
             if (entry.attribute === 'href') return 'url';
-
-            return 'text';
         }
+
+        const type = StudioFields.typeFor(sectionId, entry);
+
+        if (type === 'image') return 'image';
+        if (type === 'url') return 'url';
+        if (type === 'select') return 'select';
+        if (type === 'colorpicker') return 'color';
 
         return 'text';
     },
