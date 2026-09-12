@@ -281,6 +281,7 @@ class StudioController extends Controller
                             ->map(fn ($sub, $subKey) => [
                                 'label' => $sub['label'] ?? \Illuminate\Support\Str::headline($subKey),
                                 'type' => $sub['type'] ?? 'text',
+                                'options' => $sub['options'] ?? null,
                             ])
                             ->all();
                     }

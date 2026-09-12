@@ -414,7 +414,7 @@ const StudioEditor = {
      * through EditorPanel::setVariable / updateRepeaterSubField, which
      * persist AND echo to the iframe.
      */
-    async resolveFieldAction({ sectionId, key, index, subKey, type, action }) {
+    async resolveFieldAction({ sectionId, key, index, subKey, action }) {
         let value = null;
 
         if (action === 'pick-media') {
@@ -1054,22 +1054,30 @@ const StudioPreview = {
             });
         });
 
-        // Drop an image file straight onto an image field
+        // Drop an image file straight onto an image field. A file drag
+        // must never be allowed to fall through to the browser's own
+        // handling anywhere on the canvas — that navigates the iframe to
+        // the dropped file — so both listeners swallow it unconditionally
+        // the moment a file is being dragged, regardless of whether the
+        // point under the pointer is a real image-field hit; only a real
+        // hit gets the drop-target affordance / actually uploads.
         document.addEventListener('dragover', (event) => {
             if (this.mode === 'preview') return;
             if (!event.dataTransfer?.types?.includes('Files')) return;
 
-            const hit = this.imageHitAt(event.target, event.clientX, event.clientY);
-            if (!hit) return;
-
             event.preventDefault();
-            this.markDropTarget(hit);
+
+            const hit = this.imageHitAt(event.target, event.clientX, event.clientY);
+            this.markDropTarget(hit || null);
         });
 
         document.addEventListener('dragleave', () => this.markDropTarget(null));
 
         document.addEventListener('drop', (event) => {
             if (this.mode === 'preview') return;
+            if (!event.dataTransfer?.types?.includes('Files')) return;
+
+            event.preventDefault();
 
             const hit = this.imageHitAt(event.target, event.clientX, event.clientY);
             this.markDropTarget(null);
@@ -1079,7 +1087,6 @@ const StudioPreview = {
             const file = event.dataTransfer?.files?.[0];
             if (!file) return;
 
-            event.preventDefault();
             this.post('studio:field-upload', {
                 sectionId: hit.sectionId,
                 key: hit.entry.key,
@@ -1403,7 +1410,7 @@ const StudioPreview = {
      * this side of the canvas already, so there's no server round trip to
      * wire up.
      */
-    openToggle(entry, sectionId, box) {
+    openToggle(entry, sectionId) {
         const on = String(this.currentValue(sectionId, entry) ?? '1') !== '0';
 
         // The canvas can only turn a toggle OFF: when it is false the
@@ -1424,6 +1431,17 @@ const StudioPreview = {
     select(sectionId, event) {
         if (event) event.stopPropagation();
 
+        // The mouseup ending an item drag almost always lands off the
+        // toolbar, so the browser's own click synthesis re-enters here on
+        // whatever section wrapper is underneath — reopening a caret or
+        // control the instant the item is dropped. One-shot: consumed by
+        // the very next click, wherever it lands (see dragItemEnd()).
+        if (this.suppressNextClick) {
+            this.suppressNextClick = false;
+
+            return;
+        }
+
         // Preview mode has no selection — the chrome is hidden, and the
         // inline onclick handlers must not reach past it.
         if (this.mode === 'preview') return;
@@ -1437,7 +1455,19 @@ const StudioPreview = {
         // A click resolves to the deepest tier under the pointer; only a
         // click on section chrome selects the section itself.
         if (event) {
-            const hit = this.tierAt(sectionId, event.clientX, event.clientY);
+            let hit = this.tierAt(sectionId, event.clientX, event.clientY);
+
+            // Mirror resolveHover()'s cross-section fallback: the DOM
+            // ancestor's own box can come up empty while a *different*
+            // section's field geometrically covers this same point, and a
+            // click must never resolve more conservatively than the hover
+            // that preceded it — editabilityOf() is consulted identically
+            // on both paths, but only agrees when fed the same hit (a
+            // destructive click, like turning a toggle off, must never
+            // fire just because the click-side hit test gave up early).
+            if (hit.tier === 'section') {
+                hit = this.tierAtPoint(event.clientX, event.clientY, sectionId) || hit;
+            }
 
             if (hit.tier === 'field') {
                 // ⌥-click jumps to the line of Blade that rendered this
@@ -1466,6 +1496,9 @@ const StudioPreview = {
                 // code-owned content.
                 if (hit.entry.kind === 'undeclared' && document.documentElement.classList.contains('studio-devmode')) {
                     this.applySelection(sectionId, false);
+                    this.selectField(hit.entry, sectionId);
+                    this.post('studio:section-selected', { sectionId });
+
                     const box = StudioFields.box(hit.entry);
                     if (box) this.control.open('add-field', hit.entry, sectionId, box);
 
@@ -1506,12 +1539,15 @@ const StudioPreview = {
                                 const hrefBox = StudioFields.box(hrefEntry);
 
                                 if (hrefBox) {
+                                    // The 'url' kind never reads an options
+                                    // list (only 'select' does) — nothing to
+                                    // pass here but the placement config.
                                     this.control.open(
                                         'url',
                                         hrefEntry,
                                         sectionId,
                                         hrefBox,
-                                        StudioFields.contractFor(sectionId, hrefEntry.key)?.options,
+                                        undefined,
                                         { placement: 'below', focus: false }
                                     );
                                 }
@@ -1562,7 +1598,7 @@ const StudioPreview = {
                     && this.editabilityOf(toggleEntry, sectionId) !== 'code'
                     && !this.isCollectionBound(sectionId, toggleEntry.key)
                 ) {
-                    this.openToggle(toggleEntry, sectionId, StudioFields.box(toggleEntry));
+                    this.openToggle(toggleEntry, sectionId);
                 }
             }
         }
@@ -1681,14 +1717,27 @@ const StudioPreview = {
         const sectionId = wrapper.dataset.section;
         let hit = this.tierAt(sectionId, x, y);
 
+        // The section a resolved hit actually belongs to — the DOM
+        // ancestor by default, but tierAtPoint() below can find one
+        // elsewhere (e.g. an absolutely positioned image whose ancestor
+        // section doesn't lay out over it). paintHalo() derives
+        // itemControls.sectionId from whatever is passed here, so an item
+        // resolved that way must anchor its toolbar to the section it was
+        // actually found in, not the nearest ancestor's.
+        let hitSectionId = sectionId;
+
         // The DOM-ancestor section is usually right, but its box can come
         // up empty while a *different* section's field geometrically
-        // covers this same point (e.g. an absolutely positioned image
-        // whose ancestor section doesn't lay out over it). Before calling
-        // it code, check every other section actually stacked at this
-        // point — still a read, still bounded (dedupe + stop at first hit).
+        // covers this same point. Before calling it code, check every
+        // other section actually stacked at this point — still a read,
+        // still bounded (dedupe + stop at first hit).
         if (hit.tier === 'section') {
-            hit = this.tierAtPoint(x, y, sectionId) || hit;
+            const fallback = this.tierAtPoint(x, y, sectionId);
+
+            if (fallback) {
+                hit = fallback;
+                hitSectionId = fallback.sectionId;
+            }
         }
 
         if (hit.tier === 'section') {
@@ -1720,25 +1769,28 @@ const StudioPreview = {
         if (hit.tier === 'field' && hit.entry.kind === 'undeclared') {
             const devMode = document.documentElement.classList.contains('studio-devmode');
 
-            return this.paintHalo(hit, devMode ? 'undeclared' : 'code', { target, sectionId });
+            return this.paintHalo(hit, devMode ? 'undeclared' : 'code', { target, sectionId: hitSectionId });
         }
 
         // A php:/blade:-bound field hovers exactly like code-owned content
         // — the click and the hover must agree on this (editabilityOf is
         // the single source both consult).
         if (hit.tier === 'field' && this.editabilityOf(hit.entry, sectionId) === 'code') {
-            return this.paintHalo(hit, 'code', { target, sectionId });
+            return this.paintHalo(hit, 'code', { target, sectionId: hitSectionId });
         }
 
-        this.paintHalo(hit, hit.tier, { target });
+        this.paintHalo(hit, hit.tier, { target, sectionId: hitSectionId });
     },
 
     /**
-     * Fallback for resolveHover(): walk every element actually stacked at
-     * (x, y) — elementsFromPoint(), the plural, returns the full z-order —
-     * and try tierAt() for each distinct [data-section] among them, in
-     * front-to-back order, skipping the section already tried. Keeps the
-     * first hit. Section-scoping itself stays (it protects against
+     * Fallback for resolveHover()/select(): walk every element actually
+     * stacked at (x, y) — elementsFromPoint(), the plural, returns the
+     * full z-order — and try tierAt() for each distinct [data-section]
+     * among them, in front-to-back order, skipping the section already
+     * tried. Keeps the first hit, plus the section it belongs to (needed
+     * so paintHalo()'s itemControls anchor to the section that actually
+     * owns the item, not whichever one the caller started from — see
+     * resolveHover()). Section-scoping itself stays (it protects against
      * occluded entries from an off-screen section whose rects still lay
      * out over the hero, e.g. a collapsed nav menu) — this only widens the
      * search to sections genuinely present at the point when the nearest
@@ -1760,7 +1812,7 @@ const StudioPreview = {
 
             const hit = this.tierAt(sectionId, x, y);
 
-            if (hit.tier !== 'section') return hit;
+            if (hit.tier !== 'section') return { ...hit, sectionId };
         }
 
         return null;
@@ -1774,6 +1826,13 @@ const StudioPreview = {
      * className, batched into a single requestAnimationFrame. This keeps
      * mousemove — read layout, read layout, ... — from ever being
      * interleaved with a write that would force a synchronous reflow.
+     *
+     * `event.sectionId` — when the caller passed one — is the section the
+     * hit actually belongs to and is authoritative: resolveHover()/select()
+     * can resolve a hit in a section other than the DOM ancestor of the
+     * pointer/click (tierAtPoint()'s cross-section fallback), and
+     * itemControls.sectionId (the item toolbar's anchor) must follow that,
+     * not fall back to re-deriving the DOM ancestor from `event.target`.
      */
     paintHalo(hit, kind, event) {
         let box = null;
@@ -1782,13 +1841,13 @@ const StudioPreview = {
         let sectionId = null;
 
         if (kind === 'field') {
-            sectionId = this.sectionIdAt(event);
+            sectionId = event.sectionId;
             box = StudioFields.box(hit.entry);
             label = this.labelFor(hit.entry, sectionId);
             const path = StudioFields.sourceFor(sectionId);
             source = path ? path.split('/').pop() + ':' + hit.entry.line : '';
         } else if (kind === 'item') {
-            sectionId = this.sectionIdAt(event);
+            sectionId = event.sectionId;
             const rect = hit.item.el.getBoundingClientRect();
             box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
             label = this.itemLabel(hit.item);
@@ -1799,7 +1858,7 @@ const StudioPreview = {
             // "Set in code" label.
             box = StudioFields.box(hit.entry);
         } else if (kind === 'undeclared') {
-            sectionId = this.sectionIdAt(event);
+            sectionId = event.sectionId;
             box = StudioFields.box(hit.entry);
             label = `Add "${hit.entry.key}" as a field`;
         } else {
@@ -1905,6 +1964,11 @@ const StudioPreview = {
 
     // In-progress pointer drag state; see startItemDrag().
     itemDrag: { active: false, sectionId: null, key: null, fromIndex: null, overIndex: null, overBefore: false },
+
+    // Set by dragItemEnd() when a real drag just ended — consumed once by
+    // select() to swallow the phantom click a drop's mouseup synthesizes
+    // on whatever's underneath it (see dragItemEnd()).
+    suppressNextClick: false,
 
     /**
      * Whether an item may offer add/reorder/delete at all. Three
@@ -2126,6 +2190,13 @@ const StudioPreview = {
 
         this.itemDrag = { active: false, sectionId: null, key: null, fromIndex: null, overIndex: null, overBefore: false };
 
+        // The mouseup that just ended this drag almost always lands off
+        // the toolbar, so the browser synthesizes a click on whatever
+        // section wrapper is underneath — select() must not treat that as
+        // a real click (it would open a caret or control the instant the
+        // item is dropped).
+        this.suppressNextClick = true;
+
         this.queuePaint(null);
 
         if (!commit || drag.overIndex === null) return;
@@ -2250,10 +2321,6 @@ const StudioPreview = {
         if (type === 'colorpicker') return 'color';
 
         return 'text';
-    },
-
-    sectionIdAt(event) {
-        return event.target.closest?.('[data-section]')?.dataset.section || null;
     },
 
     /**
@@ -2789,8 +2856,15 @@ const StudioPreview = {
         // scroll doesn't bubble — capture it at the document so a nested
         // scroll container re-syncs the halo/chip too. Both re-resolve
         // through the same rAF-batched queuePaint(), never writing directly.
-        document.addEventListener('scroll', () => this.rehover(), { capture: true, passive: true });
-        window.addEventListener('resize', () => this.rehover(), { passive: true });
+        //
+        // An open #studio-control (the url/select/color popover) isn't
+        // part of that repaint — it's a fixed-position element pinned to
+        // the box it opened against — so scroll/resize would otherwise
+        // leave it floating over whatever used to be there. Closing it
+        // here, from the same path, is simpler and safer than
+        // repositioning a popover mid-interaction.
+        document.addEventListener('scroll', () => { this.rehover(); this.control.close(); }, { capture: true, passive: true });
+        window.addEventListener('resize', () => { this.rehover(); this.control.close(); }, { passive: true });
     },
 
     sectionMenuItems(wrapper) {

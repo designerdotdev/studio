@@ -155,11 +155,24 @@ class DevModeController extends Controller
         }
 
         $blade = (string) file_get_contents($files['blade']);
-        $newBlade = $this->appendPropDefault($blade, $key);
+
+        // The yml contract can lag behind code a developer already wrote:
+        // `@props(['eyebrow' => 'New'])` plus `{{ $eyebrow }}`, yml not yet
+        // updated, is exactly the shape this affordance targets. Splicing
+        // a second `'eyebrow' => ''` into that array would still tokenize
+        // and parse clean — array_key_exists on the yml side would never
+        // catch it — but PHP keeps only the last duplicate key, silently
+        // replacing the author's default and wiping their text from the
+        // page. So the existing @props array is checked here too: when
+        // the key is already there, promotion writes only the yml half
+        // (the half that's actually missing) and leaves the blade file
+        // byte-identical.
+        $keyAlreadyInProps = $this->propsArrayHasKey($blade, $key);
+        $newBlade = $keyAlreadyInProps ? $blade : $this->appendPropDefault($blade, $key);
 
         // Same guarantee as the YAML side: nothing is written unless the
         // rewritten @props array is provably still valid PHP.
-        if (!$this->propsArrayIsValid($blade, $newBlade, $key)) {
+        if (!$keyAlreadyInProps && !$this->propsArrayIsValid($blade, $newBlade, $key)) {
             return response()->json(['success' => false, 'message' => 'Could not add that field: the result was not valid PHP.'], 500);
         }
 
@@ -521,6 +534,46 @@ class DevModeController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Whether the section's existing `@props([...])` array already
+     * defaults `$key` — the check `promoteField()` must run BEFORE
+     * splicing a new entry in, so an author's own default is never
+     * silently duplicated (and, since PHP keeps only the last of two
+     * identical array keys, silently overwritten).
+     *
+     * When the array is a pure literal, this is exact: parse it and ask
+     * `array_key_exists()`. When it isn't (a hand-written section may mix
+     * in a helper call or a constant elsewhere), fall back to a plain
+     * scan for a quoted `key` immediately followed by `=>` — a false
+     * positive here only makes promotion more conservative (yml-only,
+     * blade untouched), never less safe.
+     */
+    protected function propsArrayHasKey(string $blade, string $key): bool
+    {
+        $propsAt = strpos($blade, '@props(');
+
+        if ($propsAt === false) {
+            return false;
+        }
+
+        $bounds = $this->findBracketedArray($blade, $propsAt);
+
+        if ($bounds === null) {
+            return false;
+        }
+
+        [$open, $close] = $bounds;
+        $arrayText = substr($blade, $open, $close - $open + 1);
+
+        [$isLiteral, $value] = PhpLiteral::parse($arrayText);
+
+        if ($isLiteral) {
+            return is_array($value) && array_key_exists($key, $value);
+        }
+
+        return (bool) preg_match('/[\'"]' . preg_quote($key, '/') . '[\'"]\s*=>/', $arrayText);
     }
 
     /**
