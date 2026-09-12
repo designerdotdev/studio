@@ -670,6 +670,8 @@
             blocks: @js($blockByInstance),
             renderUrl: @js(route('studio.api.render')),
             csrf: @js(csrf_token()),
+            paths: @js($componentPaths),
+            contracts: @js($componentContracts),
         };
     </script>
 
