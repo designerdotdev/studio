@@ -113,7 +113,36 @@ class InlineVerify extends Command
             // way ComponentData::resolveVariables resolves them.
             $variables = [];
             foreach ($fields as $key => $config) {
-                $variables[$key] = ($config['type'] ?? 'text') === 'repeater' ? [] : ($config['default'] ?? '');
+                if (($config['type'] ?? 'text') === 'repeater') {
+                    // Seed repeater with synthetic rows to exercise {{ $loop->index }}
+                    // sentinels; build from sub_fields, using defaults where available.
+                    $subFields = $config['sub_fields'] ?? [];
+
+                    if ($subFields !== []) {
+                        $rows = [];
+
+                        // Create two synthetic rows to exercise loop indices.
+                        for ($i = 0; $i < 2; $i++) {
+                            $row = [];
+
+                            foreach ($subFields as $subKey => $subConfig) {
+                                $row[$subKey] = $subConfig['default'] ?? 'x';
+                            }
+
+                            // Include children for nestable repeaters.
+                            $row['children'] = [];
+
+                            // Convert to object for template access ($item->key syntax).
+                            $rows[] = (object) $row;
+                        }
+
+                        $variables[$key] = $rows;
+                    } else {
+                        $variables[$key] = [];
+                    }
+                } else {
+                    $variables[$key] = $config['default'] ?? '';
+                }
             }
 
             $plain = $this->render($source, $variables);
@@ -136,14 +165,15 @@ class InlineVerify extends Command
 
             $sentinels += substr_count($marked, '<!--sf:');
 
-            if ($instrumenter->strip($marked) === $plain) {
+            $stripped = $instrumenter->strip($marked);
+
+            if ($stripped === $plain) {
                 $identical++;
 
                 continue;
             }
 
             $offset = 0;
-            $stripped = $instrumenter->strip($marked);
             $limit = min(strlen($plain), strlen($stripped));
 
             while ($offset < $limit && $plain[$offset] === $stripped[$offset]) {
