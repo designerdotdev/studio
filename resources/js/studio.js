@@ -1428,7 +1428,13 @@ const StudioPreview = {
 
     /* --- selection ------------------------------------------------ */
 
-    select(sectionId, event) {
+    // `clickedSectionId` (the DOM ancestor of the click) is deliberately
+    // NOT named `sectionId` here — every downstream consumer in the hit
+    // branches below must key off the hit's OWN resolved section
+    // (`hitSectionId`), never the ancestor a cross-section fallback may
+    // have overridden, so a stale read is a visible rename mismatch
+    // rather than a silent wrong-section bug.
+    select(clickedSectionId, event) {
         if (event) event.stopPropagation();
 
         // The mouseup ending an item drag almost always lands off the
@@ -1452,10 +1458,18 @@ const StudioPreview = {
         // section itself) never leaves a stale control from the last one.
         this.control.close();
 
+        // The section the resolved hit actually belongs to — starts as
+        // the clicked ancestor, but tierAtPoint()'s cross-section fallback
+        // below can point it at a different section entirely. Read by the
+        // trailing "just select the section" fallback too (outside the
+        // `if (event)` block), so it's declared out here rather than
+        // inside it.
+        let hitSectionId = clickedSectionId;
+
         // A click resolves to the deepest tier under the pointer; only a
         // click on section chrome selects the section itself.
         if (event) {
-            let hit = this.tierAt(sectionId, event.clientX, event.clientY);
+            let hit = this.tierAt(clickedSectionId, event.clientX, event.clientY);
 
             // Mirror resolveHover()'s cross-section fallback: the DOM
             // ancestor's own box can come up empty while a *different*
@@ -1465,8 +1479,17 @@ const StudioPreview = {
             // on both paths, but only agrees when fed the same hit (a
             // destructive click, like turning a toggle off, must never
             // fire just because the click-side hit test gave up early).
+            // tierAtPoint() reports which section it actually found the
+            // hit in — every check and dispatch below must key off THAT
+            // section, not the ancestor of the click, or the gate ends up
+            // consulted against the wrong section's bindings/contract.
             if (hit.tier === 'section') {
-                hit = this.tierAtPoint(event.clientX, event.clientY, sectionId) || hit;
+                const fallback = this.tierAtPoint(event.clientX, event.clientY, clickedSectionId);
+
+                if (fallback) {
+                    hit = fallback;
+                    hitSectionId = fallback.sectionId;
+                }
             }
 
             if (hit.tier === 'field') {
@@ -1474,7 +1497,7 @@ const StudioPreview = {
                 // value — a source lookup, not an edit, so it fires
                 // regardless of how the field is bound.
                 if (event.altKey && document.documentElement.classList.contains('studio-devmode')) {
-                    const source = StudioFields.sourceFor(sectionId);
+                    const source = StudioFields.sourceFor(hitSectionId);
 
                     if (source) {
                         event.preventDefault();
@@ -1487,7 +1510,7 @@ const StudioPreview = {
                     }
                 }
 
-                const editability = this.editabilityOf(hit.entry, sectionId);
+                const editability = this.editabilityOf(hit.entry, hitSectionId);
 
                 // Dev mode only: clicking an undeclared echo offers to
                 // declare it as a field. Outside dev mode (or once the
@@ -1495,12 +1518,12 @@ const StudioPreview = {
                 // section selection below, exactly like any other
                 // code-owned content.
                 if (hit.entry.kind === 'undeclared' && document.documentElement.classList.contains('studio-devmode')) {
-                    this.applySelection(sectionId, false);
-                    this.selectField(hit.entry, sectionId);
-                    this.post('studio:section-selected', { sectionId });
+                    this.applySelection(hitSectionId, false);
+                    this.selectField(hit.entry, hitSectionId);
+                    this.post('studio:section-selected', { sectionId: hitSectionId });
 
                     const box = StudioFields.box(hit.entry);
-                    if (box) this.control.open('add-field', hit.entry, sectionId, box);
+                    if (box) this.control.open('add-field', hit.entry, hitSectionId, box);
 
                     return;
                 }
@@ -1510,16 +1533,16 @@ const StudioPreview = {
                 // plain section selection, same as clicking any other
                 // code-rendered content.
                 if (editability !== 'code') {
-                    this.applySelection(sectionId, false);
-                    this.selectField(hit.entry, sectionId);
-                    this.post('studio:section-selected', { sectionId });
+                    this.applySelection(hitSectionId, false);
+                    this.selectField(hit.entry, hitSectionId);
+                    this.post('studio:section-selected', { sectionId: hitSectionId });
 
                     // Only a genuinely inline-editable field opens for
                     // typing — a collection-bound or non-text-typed field
                     // still selects (inspector focus / "Edit in Content")
                     // but never takes free text on the canvas.
                     if (editability === 'edit') {
-                        const started = this.beginEdit(hit.entry, sectionId, this.isMultiline(hit.entry, sectionId), event.clientX, event.clientY);
+                        const started = this.beginEdit(hit.entry, hitSectionId, this.isMultiline(hit.entry, hitSectionId), event.clientX, event.clientY);
 
                         // A link's own text always wins the hit test against
                         // its href attr entry (the smallest box wins, and the
@@ -1530,11 +1553,11 @@ const StudioPreview = {
                         // the text host, and stealing focus would blur (and
                         // so commit/end) the edit before it began.
                         if (started) {
-                            const hrefEntry = StudioFields.hrefEntryFor(sectionId, this.editing.host);
+                            const hrefEntry = StudioFields.hrefEntryFor(hitSectionId, this.editing.host);
 
                             if (hrefEntry
-                                && this.editabilityOf(hrefEntry, sectionId) !== 'code'
-                                && !this.isCollectionBound(sectionId, hrefEntry.key)
+                                && this.editabilityOf(hrefEntry, hitSectionId) !== 'code'
+                                && !this.isCollectionBound(hitSectionId, hrefEntry.key)
                             ) {
                                 const hrefBox = StudioFields.box(hrefEntry);
 
@@ -1545,7 +1568,7 @@ const StudioPreview = {
                                     this.control.open(
                                         'url',
                                         hrefEntry,
-                                        sectionId,
+                                        hitSectionId,
                                         hrefBox,
                                         undefined,
                                         { placement: 'below', focus: false }
@@ -1553,9 +1576,9 @@ const StudioPreview = {
                                 }
                             }
                         }
-                    } else if (this.isImageField(hit.entry, sectionId)) {
-                        this.fieldAction(hit.entry, sectionId, 'pick-media');
-                    } else if (!this.isCollectionBound(sectionId, hit.entry.key)) {
+                    } else if (this.isImageField(hit.entry, hitSectionId)) {
+                        this.fieldAction(hit.entry, hitSectionId, 'pick-media');
+                    } else if (!this.isCollectionBound(hitSectionId, hit.entry.key)) {
                         // A collections.*-bound field only ever selects
                         // (inspector focus / "Edit in Content") — its value
                         // lives in Content, and EditorPanel::saveVariables()
@@ -1563,16 +1586,16 @@ const StudioPreview = {
                         // the control must never open for one.
                         const type = (hit.entry.kind === 'attr' && hit.entry.attribute === 'href')
                             ? 'url'
-                            : StudioFields.typeFor(sectionId, hit.entry);
+                            : StudioFields.typeFor(hitSectionId, hit.entry);
                         const box = StudioFields.box(hit.entry);
 
                         if (box && (type === 'url' || type === 'select' || type === 'colorpicker')) {
                             this.control.open(
                                 type === 'colorpicker' ? 'color' : type,
                                 hit.entry,
-                                sectionId,
+                                hitSectionId,
                                 box,
-                                StudioFields.contractFor(sectionId, hit.entry.key)?.options
+                                StudioFields.contractFor(hitSectionId, hit.entry.key)?.options
                             );
                         }
                     }
@@ -1580,9 +1603,9 @@ const StudioPreview = {
                     return;
                 }
             } else if (hit.tier === 'item') {
-                this.applySelection(sectionId, false);
-                this.selectItem(hit.item, sectionId);
-                this.post('studio:section-selected', { sectionId });
+                this.applySelection(hitSectionId, false);
+                this.selectItem(hit.item, hitSectionId);
+                this.post('studio:section-selected', { sectionId: hitSectionId });
 
                 return;
             } else {
@@ -1591,21 +1614,24 @@ const StudioPreview = {
                 // as the hover path: a php:/blade:-bound or collection-bound
                 // toggle offers nothing, and the click falls through to a
                 // plain section selection below, same as any other
-                // code-rendered content.
-                const toggleEntry = StudioFields.toggleAt(event.target, sectionId);
+                // code-rendered content. hit.tier is still 'section' here
+                // (the fallback found nothing either), so hitSectionId is
+                // exactly clickedSectionId — using it keeps this branch
+                // consistent with the rest rather than reaching past it.
+                const toggleEntry = StudioFields.toggleAt(event.target, hitSectionId);
 
                 if (toggleEntry
-                    && this.editabilityOf(toggleEntry, sectionId) !== 'code'
-                    && !this.isCollectionBound(sectionId, toggleEntry.key)
+                    && this.editabilityOf(toggleEntry, hitSectionId) !== 'code'
+                    && !this.isCollectionBound(hitSectionId, toggleEntry.key)
                 ) {
-                    this.openToggle(toggleEntry, sectionId);
+                    this.openToggle(toggleEntry, hitSectionId);
                 }
             }
         }
 
-        this.selection = { tier: 'section', sectionId, path: null, key: null, index: null };
-        this.applySelection(sectionId, false);
-        this.post('studio:section-selected', { sectionId });
+        this.selection = { tier: 'section', sectionId: hitSectionId, path: null, key: null, index: null };
+        this.applySelection(hitSectionId, false);
+        this.post('studio:section-selected', { sectionId: hitSectionId });
     },
 
     applySelection(sectionId, scroll = true) {
@@ -2190,12 +2216,17 @@ const StudioPreview = {
 
         this.itemDrag = { active: false, sectionId: null, key: null, fromIndex: null, overIndex: null, overBefore: false };
 
-        // The mouseup that just ended this drag almost always lands off
-        // the toolbar, so the browser synthesizes a click on whatever
-        // section wrapper is underneath — select() must not treat that as
-        // a real click (it would open a caret or control the instant the
-        // item is dropped).
-        this.suppressNextClick = true;
+        // Only a genuine drop (mouseup, commit === true) synthesizes a
+        // phantom click on whatever's underneath afterward — a cancelled
+        // drag (mouseleave, or a mode switch mid-drag) never produces one,
+        // so arming the flag there would leave it lingering with nothing
+        // to consume it, silently swallowing the user's next unrelated
+        // click. select() must not treat the drop's own phantom click as
+        // real (it would open a caret or control the instant the item is
+        // dropped).
+        if (commit) {
+            this.suppressNextClick = true;
+        }
 
         this.queuePaint(null);
 
