@@ -172,7 +172,10 @@ the honest-uneditable state, and it needs no extra work to compute.
   behaviour, unchanged)
 - pointer over a repeater item → orange halo + item chip
 - pointer over a mapped field → tight blue halo + field chip carrying the
-  field's label and, in dev mode, `hero:41` and a `</>` button
+  field's own `.yml` label (the wording the inspector uses, so both surfaces
+  name the same thing the same way) and, in dev mode, `hero:41`. The chip is
+  `pointer-events: none` — it must never block the hover it describes — so
+  the line reference is an affordance hint and ⌥-click is the gesture (§8).
 - click selects the tier under the pointer; **Esc walks up one tier** and only
   deselects from `section`. While a field is actively being typed into, Esc
   belongs to the editor (§7: revert and exit to `field`); the tier walk-up
@@ -242,7 +245,7 @@ over the caret.
 ## 8. Developer hooks
 
 **Bidirectional provenance.** Every entry carries a line. In dev mode the
-field chip shows `hero:41`; ⌥-click, or the chip's `</>` button, posts
+field chip shows `hero:41`; ⌥-click posts
 `studio:open-code-at {ref, line}`. The editor resolves the ref through
 `paths` to an app-relative path, switches to Code mode, calls
 `$store.code.openFile(path)`, then `studioCodeBuffers.editor.revealLineInCenter(line)`
