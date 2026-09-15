@@ -120,8 +120,8 @@
                 window.Studio.toast(d.message || 'The assistant failed.', 'error');
             }
 
+            // EditorPanel re-syncs the site, then reloads the canvas itself
             if (files.length || !failed) {
-                window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
                 window.Livewire?.dispatch('studio:code-saved');
             }
 
@@ -138,6 +138,7 @@
 >
     {{-- Header --}}
     <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3">
+        @include('studio::partials.float-close')
         <p class="s-microlabel flex-1">Assistant</p>
         <div class="relative" x-data="{ open: false }" @click.outside="open = false">
             <button type="button" class="s-icon-btn" title="Conversation history" aria-label="Conversation history" @click="open = !open">

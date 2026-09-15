@@ -15,35 +15,37 @@ use Symfony\Component\Yaml\Yaml;
  * Two views over one set of real paths (relative to the app root):
  *
  *   designer   only the site — `resources/designer` and `public/designer`,
- *              shown as `resources/` and `public/` holding just `designer/`
- *   laravel    the host application's own directories (self::LARAVEL_DIRS),
- *              with the site's two folders marked so they stay findable
+ *              shown as `resources/` and `public/` holding just `designer/`,
+ *              walked whole in one request
+ *   laravel    the whole application root, hidden files included, one
+ *              folder per request (a project walked whole blows any node
+ *              cap), with the site's two folders marked so they stay findable
  *
  * The views overlap (resources/designer is inside resources/), but a file
  * has one path in both, so a tab, an unsaved buffer, or a save is the same
  * whichever view it was opened from.
  *
- * Every path from the browser is resolved with realpath() against one of
- * the application's own directories and rejected if it escapes it; `..`,
- * hidden files, and unlisted extensions never resolve, which is what keeps
- * `.env` and the rest of the project out.
+ * Every file is listed, but not every file opens: dependency trees
+ * (self::INERT_DIRS) are shown and never entered, and binary or oversized
+ * files are shown and never read. Every path from the browser is resolved
+ * with realpath() and rejected if it escapes the application root.
  */
 class CodeWorkspace
 {
-    /** Extensions the editor will open. Anything else is invisible. */
-    public const EXTENSIONS = ['html', 'yml', 'yaml', 'css', 'js', 'php', 'json', 'md', 'txt', 'svg'];
+    /** Listed so the project reads true, but never descended into or opened. */
+    public const INERT_DIRS = ['vendor', 'node_modules', '.git'];
 
-    /**
-     * The host application's own directories, offered by the Laravel tree
-     * view. Deliberately an allowlist rather than "the project root minus a
-     * few things": `storage/` holds Studio's own documents (hand-editing
-     * them desyncs the editor) and nothing here is a dotfile, so `.env` is
-     * unreachable — it is never listed, and never resolves.
-     */
-    public const LARAVEL_DIRS = ['app', 'bootstrap', 'config', 'database', 'lang', 'public', 'resources', 'routes', 'tests'];
+    /** Never opened — a text editor would only mangle them. */
+    public const BINARY_EXTENSIONS = [
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'ico', 'bmp', 'tiff', 'psd',
+        'woff', 'woff2', 'ttf', 'otf', 'eot',
+        'mp3', 'mp4', 'mov', 'webm', 'wav', 'ogg', 'm4a',
+        'zip', 'gz', 'tgz', 'tar', 'rar', '7z', 'phar', 'pdf',
+        'sqlite', 'db', 'so', 'dylib', 'exe', 'bin', 'ds_store',
+    ];
 
-    /** Never descended into, wherever they appear. */
-    public const SKIP_DIRS = ['vendor', 'node_modules', '.git'];
+    /** What a browser path may look like; a file named otherwise is listed but not opened. */
+    protected const PATH_PATTERN = '#^[A-Za-z0-9._/@+-]+$#';
 
     /** A runaway tree would hang the browser, so the walk is bounded. */
     public const MAX_NODES = 4000;
@@ -61,25 +63,31 @@ class CodeWorkspace
     }
 
     /**
-     * A flat node list — {path, name, type, depth, parent, design} — ordered
-     * so the browser can render it as a tree without recursing. Directories
-     * come before files at every level, both alphabetical.
+     * A flat node list — {path, name, type, depth, parent, design, lazy,
+     * inert, note} — ordered so the browser can render it as a tree without
+     * recursing. Directories come before files at every level, both
+     * alphabetical. An `inert` node is listed but never opened; `note` says why.
+     *
+     * The Designer view comes back whole. The Laravel view comes back one
+     * folder at a time — the root, or the children of `$dir` — and a folder
+     * whose children are still to fetch is `lazy`.
      *
      * @param  string  $view  'designer' (the site) or 'laravel' (the app)
      */
-    public function tree(string $view = 'designer'): array
+    public function tree(string $view = 'designer', ?string $dir = null): array
     {
         $nodes = [];
 
         if ($view === 'laravel') {
-            foreach (self::LARAVEL_DIRS as $dir) {
-                if (!is_dir(base_path($dir))) {
-                    continue;
-                }
+            $dir = trim((string) $dir, '/') === '' ? null : $this->normaliseDirectory($dir);
 
-                $nodes[] = $this->node($dir, $dir, 'dir', 0, null);
-                $this->walk(base_path($dir), $dir, 1, $nodes);
-            }
+            $this->walk(
+                $dir === null ? base_path() : base_path($dir),
+                $dir,
+                $dir === null ? 0 : substr_count($dir, '/') + 1,
+                $nodes,
+                recursive: false,
+            );
 
             return $nodes;
         }
@@ -111,7 +119,7 @@ class CodeWorkspace
         return false;
     }
 
-    protected function node(string $path, string $name, string $type, int $depth, ?string $parent): array
+    protected function node(string $path, string $name, string $type, int $depth, ?string $parent, ?string $inert = null): array
     {
         return [
             'path' => $path,
@@ -120,74 +128,134 @@ class CodeWorkspace
             'depth' => $depth,
             'parent' => $parent,
             'design' => $this->isDesignPath($path),
+            'lazy' => false,
+            'inert' => $inert !== null,
+            'note' => $inert,
         ];
     }
 
-    protected function walk(string $absolute, string $prefix, int $depth, array &$nodes): void
+    /**
+     * List one directory into $nodes — every entry, hidden ones included —
+     * and, when $recursive, everything under it. A null $prefix is the
+     * application root.
+     */
+    protected function walk(string $absolute, ?string $prefix, int $depth, array &$nodes, bool $recursive = true): void
     {
         if (count($nodes) >= self::MAX_NODES) {
             return;
         }
 
-        try {
-            $entries = File::directories($absolute);
-        } catch (\Throwable $e) {
+        // scandir, not File::directories()/files(): Finder skips dotfiles
+        // and VCS folders, and this tree shows them
+        $entries = @scandir($absolute);
+
+        if ($entries === false) {
             // An unreadable or vanished directory is not worth failing a tree over
             return;
         }
 
-        sort($entries);
+        $dirs = [];
+        $files = [];
 
-        foreach ($entries as $dir) {
-            $name = basename($dir);
-
-            // Dependency trees and anything hidden stay out — the second rule
-            // is what keeps .env and friends from ever being listed.
-            if (in_array($name, self::SKIP_DIRS, true) || str_starts_with($name, '.')) {
+        foreach ($entries as $name) {
+            if ($name === '.' || $name === '..') {
                 continue;
             }
 
-            // A dangling symlink looks like a directory to File::directories()
-            // but explodes on descent; one pointing out of the project would
-            // take the tree somewhere it may not go.
-            $real = realpath($dir);
+            $full = $absolute . DIRECTORY_SEPARATOR . $name;
 
-            if ($real === false || !is_dir($real) || !$this->insideBase($real)) {
+            if (is_dir($full)) {
+                $dirs[] = $name;
+            } elseif (is_file($full)) {
+                $files[] = $name;
+            }
+        }
+
+        sort($dirs, SORT_STRING | SORT_FLAG_CASE);
+        sort($files, SORT_STRING | SORT_FLAG_CASE);
+
+        foreach ($dirs as $name) {
+            if (count($nodes) >= self::MAX_NODES) {
+                return;
+            }
+
+            $path = $prefix === null ? $name : $prefix . '/' . $name;
+
+            // A symlink pointing out of the project would take the tree
+            // somewhere it may not go
+            $real = realpath($absolute . DIRECTORY_SEPARATOR . $name);
+
+            if ($real === false || !$this->insideBase($real)) {
                 continue;
             }
 
-            $path = $prefix . '/' . $name;
-            $nodes[] = $this->node($path, $name, 'dir', $depth, $prefix);
-            $this->walk($dir, $path, $depth + 1, $nodes);
+            if (in_array($name, self::INERT_DIRS, true)) {
+                $nodes[] = $this->node($path, $name, 'dir', $depth, $prefix, 'Dependencies — Studio does not browse vendor, node_modules or .git.');
+
+                continue;
+            }
+
+            $node = $this->node($path, $name, 'dir', $depth, $prefix);
+
+            if (!$recursive) {
+                $node['lazy'] = true;
+                $nodes[] = $node;
+
+                continue;
+            }
+
+            $nodes[] = $node;
+            $this->walk($real, $path, $depth + 1, $nodes);
         }
 
-        try {
-            $found = File::files($absolute);
-        } catch (\Throwable $e) {
-            return;
+        foreach ($files as $name) {
+            if (count($nodes) >= self::MAX_NODES) {
+                return;
+            }
+
+            $path = $prefix === null ? $name : $prefix . '/' . $name;
+
+            $nodes[] = $this->node($path, $name, 'file', $depth, $prefix, $this->refusal($path, $absolute . DIRECTORY_SEPARATOR . $name));
+        }
+    }
+
+    /** Why the editor won't open this file, or null when it will. */
+    protected function refusal(string $path, string $absolute): ?string
+    {
+        if (!preg_match(self::PATH_PATTERN, $path)) {
+            return 'Studio cannot open a file with that name.';
         }
 
-        $files = array_filter(
-            $found,
-            fn ($file) => in_array(strtolower($file->getExtension()), self::EXTENSIONS, true)
-                && !str_starts_with($file->getFilename(), '.')
-        );
+        $real = realpath($absolute);
 
-        usort($files, fn ($a, $b) => strcmp($a->getFilename(), $b->getFilename()));
-
-        foreach ($files as $file) {
-            $nodes[] = $this->node($prefix . '/' . $file->getFilename(), $file->getFilename(), 'file', $depth, $prefix);
+        if ($real === false || !$this->insideBase($real)) {
+            return 'That file is outside the project.';
         }
+
+        if (in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), self::BINARY_EXTENSIONS, true)) {
+            return 'A binary file — the editor only opens text.';
+        }
+
+        if (filesize($real) > self::MAX_BYTES) {
+            return 'That file is too large to open in the editor.';
+        }
+
+        // No extension to go on (artisan, .DS_Store, a lockfile): a NUL byte
+        // near the top is the same test git uses for "binary"
+        $handle = @fopen($real, 'rb');
+        $head = $handle ? (string) fread($handle, 8000) : "\0";
+
+        if ($handle) {
+            fclose($handle);
+        }
+
+        return str_contains($head, "\0") ? 'A binary file — the editor only opens text.' : null;
     }
 
     /** Read one workspace file. */
     public function read(string $path): array
     {
         $absolute = $this->resolveExisting($path);
-
-        if (filesize($absolute) > self::MAX_BYTES) {
-            throw new RuntimeException('That file is too large to open in the editor.');
-        }
 
         return [
             'path' => $this->normalise($path),
@@ -288,24 +356,21 @@ class CodeWorkspace
     /* ------------------------------------------------------------------ */
 
     /**
-     * Turn a workspace path into an absolute path inside one of the app's
-     * directories, or throw. This is the only place browser input becomes a
+     * Turn a workspace path into an absolute path to a text file inside the
+     * application, or throw. This is the only place browser input becomes a
      * file path.
      */
     public function resolveExisting(string $path): string
     {
         $path = $this->normalise($path);
-        $root = explode('/', $path)[0];
+        $candidate = realpath(base_path($path));
 
-        if (!in_array($root, self::LARAVEL_DIRS, true)) {
-            throw new RuntimeException('That file is outside the Studio workspace.');
+        if ($candidate === false || !is_file($candidate) || !$this->insideBase($candidate)) {
+            throw new RuntimeException('That file could not be found in the Studio workspace.');
         }
 
-        $candidate = realpath(base_path($path));
-        $base = realpath(base_path($root));
-
-        if ($candidate === false || $base === false || !is_file($candidate) || !str_starts_with($candidate, $base . DIRECTORY_SEPARATOR)) {
-            throw new RuntimeException('That file could not be found in the Studio workspace.');
+        if ($reason = $this->refusal($path, $candidate)) {
+            throw new RuntimeException($reason);
         }
 
         return $candidate;
@@ -313,28 +378,37 @@ class CodeWorkspace
 
     /**
      * Validate a workspace path's shape — every traversal trick and every
-     * unlisted extension rejected up front — and return it normalised.
+     * dependency tree rejected up front — and return it normalised.
      */
     protected function normalise(string $path): string
     {
         $path = trim(trim($path), '/');
 
-        if ($path === '' || !preg_match('#^[A-Za-z0-9._/@-]+$#', $path)) {
+        if ($path === '' || !preg_match(self::PATH_PATTERN, $path)) {
             throw new RuntimeException('That is not a valid file path.');
         }
 
         foreach (explode('/', $path) as $segment) {
-            if ($segment === '' || $segment === '.' || $segment === '..' || str_starts_with($segment, '.')) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
                 throw new RuntimeException('That is not a valid file path.');
+            }
+
+            if (in_array($segment, self::INERT_DIRS, true)) {
+                throw new RuntimeException('Studio does not open files inside vendor, node_modules or .git.');
             }
         }
 
-        if (!str_contains($path, '/')) {
-            throw new RuntimeException('That is a folder, not a file.');
-        }
+        return $path;
+    }
 
-        if (!in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), self::EXTENSIONS, true)) {
-            throw new RuntimeException('Studio only edits ' . implode(', ', self::EXTENSIONS) . ' files.');
+    /** A folder the Laravel view may list, normalised like a file path. */
+    protected function normaliseDirectory(string $path): string
+    {
+        $path = $this->normalise($path);
+        $real = realpath(base_path($path));
+
+        if ($real === false || !is_dir($real) || !$this->insideBase($real)) {
+            throw new RuntimeException('That folder could not be found in the Studio workspace.');
         }
 
         return $path;
@@ -442,13 +516,13 @@ class CodeWorkspace
 
         return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
             'css' => 'css',
-            'js' => 'javascript',
+            'js', 'mjs', 'cjs' => 'javascript',
             'yml', 'yaml' => 'yaml',
-            'json' => 'json',
+            'json', 'lock' => 'json',
             'md' => 'markdown',
             'php' => 'php',
-            'txt' => 'plaintext',
-            default => 'html',
+            'html', 'htm', 'svg', 'xml', 'vue' => 'html',
+            default => 'plaintext',
         };
     }
 

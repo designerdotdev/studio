@@ -34,11 +34,14 @@ class CodeController extends Controller
         abort_unless(DevMode::enabled(), 404);
 
         $view = $request->query('view') === 'laravel' ? 'laravel' : 'designer';
+        $dir = $view === 'laravel' && is_string($request->query('dir')) ? $request->query('dir') : null;
 
-        return response()->json([
+        // The Laravel view arrives a folder at a time: the root, then `dir`
+        return $this->guard(fn () => [
             'success' => true,
             'view' => $view,
-            'nodes' => $this->workspace->tree($view),
+            'dir' => $dir,
+            'nodes' => $this->workspace->tree($view, $dir),
         ]);
     }
 

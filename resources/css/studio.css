@@ -366,6 +366,30 @@ html.studio-light {
         animation-name: s-sheet-in;
     }
 
+    /* A floating panel's close control — the macOS red traffic light, its ×
+       showing on hover (partials/float-close) */
+    .s-close-dot {
+        @apply flex shrink-0 cursor-pointer items-center justify-center rounded-full;
+        width: 12px;
+        height: 12px;
+        margin-inline: 1px 6px;
+        background: #ff5f57;
+        box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22);
+        color: rgba(77, 0, 0, 0.8);
+    }
+
+    .s-close-dot svg {
+        width: 8px;
+        height: 8px;
+        opacity: 0;
+        transition: opacity 120ms ease;
+    }
+
+    .s-close-dot:hover svg,
+    .s-close-dot:focus-visible svg {
+        opacity: 1;
+    }
+
     @keyframes s-float-in {
         from { opacity: 0; transform: translateY(6px) scale(0.985); }
         to { opacity: 1; transform: none; }
@@ -1081,6 +1105,11 @@ html.studio-light {
         background: var(--color-accent);
     }
 
+    /* The dock's drag shield, reused while the seam is dragged */
+    .s-drag-shield.is-col-resize {
+        cursor: col-resize;
+    }
+
     /* Empty-state dashed tile */
     .s-empty-tile {
         @apply flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong px-4 py-8 text-center transition-colors duration-150;
@@ -1103,24 +1132,11 @@ html.studio-light .s-pop {
 
 
 /* ------------------------------------------------------------------ */
-/*  Inverse popover — the main menu flips against the chrome           */
-/*  (white on dark, black on light), borderless, like the Sites menu   */
+/*  Inverse popover — the main menu is black in either chrome theme,   */
+/*  borderless, like the Sites menu                                    */
 /* ------------------------------------------------------------------ */
 
 .s-pop-inverse {
-    --color-overlay: #e9e9ed;
-    --color-ink: #141417;
-    --color-soft: #55565e;
-    --color-faint: #8d8d97;
-    --color-line: rgba(17, 17, 20, 0.1);
-    --color-line-strong: rgba(17, 17, 20, 0.16);
-    --color-wash: rgba(17, 17, 20, 0.06);
-    --color-wash-strong: rgba(17, 17, 20, 0.11);
-    border: 0;
-    box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-html.studio-light .s-pop-inverse {
     --color-overlay: #141417;
     --color-ink: #f4f4f6;
     --color-soft: #b9b9c2;
@@ -1129,6 +1145,12 @@ html.studio-light .s-pop-inverse {
     --color-line-strong: rgba(255, 255, 255, 0.16);
     --color-wash: rgba(255, 255, 255, 0.08);
     --color-wash-strong: rgba(255, 255, 255, 0.14);
+    border: 0;
+    /* a hairline keeps black-on-dark from melting into the dark chrome */
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px -8px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+html.studio-light .s-pop-inverse {
     box-shadow: 0 16px 40px -8px rgba(17, 17, 20, 0.35), 0 2px 6px rgba(17, 17, 20, 0.12);
 }
 

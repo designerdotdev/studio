@@ -766,25 +766,34 @@
         @if($devModeAvailable)
             @include('studio::partials.code-pane')
 
-            {{-- Drag seam between the code pane and the preview --}}
+            {{-- Drag seam between the code pane and the preview. While it is
+                 held, a transparent shield covers the window: a pointer that
+                 crosses into the preview iframe hands its mousemove/mouseup to
+                 that document, so a quick drag toward the preview would stall. --}}
             <div
                 x-show="$store.studio.mode === 'code' && $store.studio.codeSplit"
                 x-cloak
                 class="s-code-seam"
                 @mousedown.prevent="
                     const surface = $el.parentElement;
+                    const shield = document.createElement('div');
+                    shield.className = 's-drag-shield is-col-resize';
+                    document.body.appendChild(shield);
                     const move = (event) => {
                         const box = surface.getBoundingClientRect();
                         $store.studio.setCodeSize(((event.clientX - box.left) / box.width) * 100);
                     };
                     const stop = () => {
+                        shield.remove();
                         document.removeEventListener('mousemove', move);
                         document.removeEventListener('mouseup', stop);
+                        window.removeEventListener('blur', stop);
                         document.body.classList.remove('select-none');
                     };
                     document.body.classList.add('select-none');
                     document.addEventListener('mousemove', move);
                     document.addEventListener('mouseup', stop);
+                    window.addEventListener('blur', stop);
                 "
                 role="separator"
                 aria-label="Resize the code pane"
@@ -1199,6 +1208,7 @@
 
                 booted: false,
                 loading: false,
+                treeGeneration: 0,   // bumped per reload, so a stale folder fetch lands nowhere
                 saving: false,
                 creating: false,
                 error: '',
@@ -1224,11 +1234,11 @@
                 },
 
                 async loadTree() {
+                    const generation = ++this.treeGeneration;
                     this.loading = true;
                     try {
-                        const response = await fetch(`${this.base}/tree?view=${this.view}`, { headers: { 'Accept': 'application/json' } });
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not read the workspace.');
+                        const data = await this.fetchTree();
+                        if (generation !== this.treeGeneration) return;
                         this.nodes = data.nodes;
                         // The Designer view is small enough to open down to its
                         // two designer/ folders; the Laravel view starts
@@ -1239,10 +1249,49 @@
                             });
                             this.persistFolders();
                         }
+                        await this.expandOpen(generation);
                     } catch (e) {
                         this.error = e.message;
                     }
-                    this.loading = false;
+                    if (generation === this.treeGeneration) this.loading = false;
+                },
+
+                /** One tree request: the whole Designer view, or one Laravel folder (the root without `dir`). */
+                async fetchTree(dir = null) {
+                    const query = new URLSearchParams({ view: this.view });
+                    if (dir) query.set('dir', dir);
+                    const response = await fetch(`${this.base}/tree?${query}`, { headers: { 'Accept': 'application/json' } });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success) throw new Error(data.message || 'Could not read the workspace.');
+                    return data;
+                },
+
+                /** A lazy folder's children, fetched and slotted in right under it. */
+                async loadChildren(path, generation) {
+                    const folder = this.nodes.find((n) => n.path === path);
+                    if (!folder?.lazy || folder.loading) return;
+                    folder.loading = true;
+                    try {
+                        const data = await this.fetchTree(path);
+                        if (generation !== this.treeGeneration) return;
+                        this.nodes.splice(this.nodes.indexOf(folder) + 1, 0, ...data.nodes);
+                        folder.lazy = false;
+                    } catch (e) {
+                        this.error = e.message;
+                        // Closed, so expandOpen() doesn't retry it forever
+                        this.openFolders = { ...this.openFolders, [path]: false };
+                    } finally {
+                        folder.loading = false;
+                    }
+                },
+
+                /** Fetch every open, showing folder that is still lazy — a level at a time, until none are left. */
+                async expandOpen(generation) {
+                    while (generation === this.treeGeneration) {
+                        const pending = this.visibleNodes.filter((n) => n.lazy && !n.loading && this.openFolders[n.path]);
+                        if (!pending.length) return;
+                        await Promise.all(pending.map((n) => this.loadChildren(n.path, generation)));
+                    }
                 },
 
                 /** Flat list → tree: a node shows when every ancestor is open. */
@@ -1256,8 +1305,11 @@
                 },
 
                 toggleFolder(path) {
-                    this.openFolders = { ...this.openFolders, [path]: !this.openFolders[path] };
+                    const open = !this.openFolders[path];
+                    this.openFolders = { ...this.openFolders, [path]: open };
                     this.persistFolders();
+                    // Opening a lazy folder fetches it, and any folders inside it left open last time
+                    if (open) this.expandOpen(this.treeGeneration);
                 },
 
                 persistFolders() {
@@ -1426,8 +1478,9 @@
                         window.Studio.toast(data.synced
                             ? 'Saved — live on the site, and the editor is up to date'
                             : 'Saved');
-                        window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
+                        // A site file re-syncs first (EditorPanel reloads the canvas after)
                         if (data.synced) window.Livewire?.dispatch('studio:code-saved');
+                        else window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
                     } catch (e) {
                         this.error = e.message;
                     }
@@ -1586,7 +1639,7 @@
                         const data = await response.json().catch(() => ({}));
                         if (!response.ok || !data.success) throw new Error(data.message || 'Could not save the source files.');
                         window.Studio.toast('Section source saved — every section using it is updated');
-                        window.dispatchEvent(new CustomEvent('studio:refresh-preview'));
+                        // EditorPanel re-syncs, then reloads the canvas
                         window.Livewire?.dispatch('studio:code-saved');
                     } catch (e) {
                         this.error = e.message;

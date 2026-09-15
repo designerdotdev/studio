@@ -11,6 +11,7 @@
             : \Designer\Studio\Support\SiteUrls::pageUrl($pageSlug);
     @endphp
     <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-line bg-raised/40 px-3 text-[12px]">
+        @include('studio::partials.float-close')
         <span class="min-w-0 flex-1 truncate">
             <span class="text-soft">{{ $host }}</span>
             <span class="mx-1 text-faint">/</span><span class="font-mono text-[11.5px] text-ink">{{ $currentPath }}</span>

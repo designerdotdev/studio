@@ -336,6 +336,11 @@ class EditorPanel extends Component
         // into the documents (and the draft, where it has no edits of its own)
         app(\Designer\Studio\Services\Site\SiteMirror::class)->sync();
         $this->loadPage();
+
+        // The canvas renders sections from the synced library, so it reloads
+        // only now — a reload sent beside `studio:code-saved` races the sync
+        // and shows the old section
+        $this->dispatch('studio:refresh-preview');
     }
 
     /** Select from the layers list — also focus the section in the canvas */

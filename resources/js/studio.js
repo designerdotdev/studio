@@ -438,8 +438,9 @@ const StudioEditor = {
             if (!response.ok || !data.success) throw new Error(data.message || 'Could not add that field.');
 
             toast(`Added "${key}" as a field`);
-            this.refreshPreview();
+            // A synced save reloads the canvas from EditorPanel, after the sync
             if (data.synced) window.Livewire?.dispatch('studio:code-saved');
+            else this.refreshPreview();
         } catch (e) {
             toast(e.message || 'Could not add that field.', 'error');
         }

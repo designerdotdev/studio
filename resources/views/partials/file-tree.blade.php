@@ -53,7 +53,7 @@
                 class="s-seg-btn !h-6 !w-auto flex-1 text-[11.5px] font-medium"
                 :class="$store.code.view === 'laravel' && 'is-active'"
                 @click="$store.code.setView('laravel')"
-                title="The whole application — app, config, database, resources, routes, public, tests"
+                title="The whole application — every file, hidden ones included"
             >
                 Laravel
             </button>
@@ -101,37 +101,47 @@
     {{-- The tree --}}
     <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 pt-1">
         <template x-for="node in $store.code.visibleNodes" :key="node.path">
+            {{-- An inert row (vendor, node_modules, .git, a binary or oversized
+                 file) is listed so the project reads true, and does nothing --}}
             <div class="group relative flex items-center rounded-md transition-colors"
-                :class="$store.code.active === node.path ? 'bg-wash-strong text-ink' : 'text-soft hover:bg-wash hover:text-ink'">
+                :class="$store.code.active === node.path ? 'bg-wash-strong text-ink' : (node.inert ? 'text-faint/60' : 'text-soft hover:bg-wash hover:text-ink')"
+                :title="node.note">
 
                 {{-- Folder. The site's folders keep their accent tint in the
-                     Laravel view, where they are the thing you came looking for. --}}
-                <button
-                    x-show="node.type === 'dir'"
-                    type="button"
-                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1.5 text-left"
-                    :style="`padding-left: ${6 + node.depth * 12}px`"
-                    @click="$store.code.toggleFolder(node.path)"
-                >
-                    <svg class="h-2.5 w-2.5 shrink-0 text-faint transition-transform duration-100"
-                        :class="$store.code.openFolders[node.path] && 'rotate-90'"
-                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
-                    <svg class="h-3.5 w-3.5 shrink-0" :class="node.design ? 'text-accent' : 'text-faint/70'"
-                        viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.25 6A2.25 2.25 0 0 1 4.5 3.75h4.129a2.25 2.25 0 0 1 1.59.659l1.622 1.622a.75.75 0 0 0 .53.219H19.5A2.25 2.25 0 0 1 21.75 8.5v9.25A2.25 2.25 0 0 1 19.5 20H4.5a2.25 2.25 0 0 1-2.25-2.25V6Z"/></svg>
-                    <span class="truncate text-[12.5px]" :class="node.design && 'text-ink'" x-text="node.name"></span>
-                </button>
+                     Laravel view, where they are the thing you came looking for.
+                     x-if rather than x-show for the folder/file pair: rows are
+                     reused by key when the tree reloads, and an x-show'd file
+                     button could survive on a folder row beside its name. --}}
+                <template x-if="node.type === 'dir'">
+                    <button
+                        type="button"
+                        class="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1.5 text-left"
+                        :class="node.inert ? 'cursor-default' : 'cursor-pointer'"
+                        :style="`padding-left: ${6 + node.depth * 12}px`"
+                        @click="node.inert || $store.code.toggleFolder(node.path)"
+                    >
+                        <svg class="h-2.5 w-2.5 shrink-0 text-faint transition-transform duration-100"
+                            :class="{ 'rotate-90': $store.code.openFolders[node.path] && !node.inert, 'opacity-0': node.inert }"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                        <svg class="h-3.5 w-3.5 shrink-0" :class="node.design ? 'text-accent' : (node.inert ? 'text-faint/40' : 'text-faint/70')"
+                            viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.25 6A2.25 2.25 0 0 1 4.5 3.75h4.129a2.25 2.25 0 0 1 1.59.659l1.622 1.622a.75.75 0 0 0 .53.219H19.5A2.25 2.25 0 0 1 21.75 8.5v9.25A2.25 2.25 0 0 1 19.5 20H4.5a2.25 2.25 0 0 1-2.25-2.25V6Z"/></svg>
+                        <span class="truncate text-[12.5px]" :class="node.design && 'text-ink'" x-text="node.name"></span>
+                    </button>
+                </template>
 
                 {{-- File --}}
-                <button
-                    x-show="node.type === 'file'"
-                    type="button"
-                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1.5 text-left"
-                    :style="`padding-left: ${20 + node.depth * 12}px`"
-                    @click="$store.code.openFile(node.path)"
-                >
-                    <span class="truncate font-mono text-[11.5px]" :class="node.design && 'text-ink/90'" x-text="node.name"></span>
-                    <span x-show="$store.code.dirty[node.path]" x-cloak class="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Unsaved changes"></span>
-                </button>
+                <template x-if="node.type === 'file'">
+                    <button
+                        type="button"
+                        class="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1.5 text-left"
+                        :class="node.inert ? 'cursor-default' : 'cursor-pointer'"
+                        :style="`padding-left: ${20 + node.depth * 12}px`"
+                        @click="node.inert || $store.code.openFile(node.path)"
+                    >
+                        <span class="truncate font-mono text-[11.5px]" :class="node.design && !node.inert && 'text-ink/90'" x-text="node.name"></span>
+                        <span x-show="$store.code.dirty[node.path]" x-cloak class="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Unsaved changes"></span>
+                    </button>
+                </template>
 
                 {{-- Two-step delete keeps destructive intent inside the row --}}
                 <div x-show="node.type === 'file' && $store.code.confirmDelete === node.path" x-cloak class="flex shrink-0 items-center gap-1 pr-1.5" @click.stop>
@@ -140,7 +150,7 @@
                 </div>
 
                 <button
-                    x-show="node.type === 'file' && node.design && $store.code.confirmDelete !== node.path"
+                    x-show="node.type === 'file' && node.design && !node.inert && $store.code.confirmDelete !== node.path"
                     x-cloak
                     type="button"
                     class="s-icon-btn !h-6 !w-6 mr-1 hidden shrink-0 group-hover:flex"
