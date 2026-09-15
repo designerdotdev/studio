@@ -36,6 +36,8 @@ class StudioController extends Controller
             return view('studio::onboarding', [
                 'templates' => $catalog->all(),
                 'categories' => $catalog->categories(),
+                'themes' => $catalog->themes(),
+                'local' => $catalog->local(),
             ]);
         }
 

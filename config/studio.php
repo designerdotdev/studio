@@ -132,6 +132,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Template Preview (local development)
+    |--------------------------------------------------------------------------
+    |
+    | A folder of template repositories (each with a template.json). When the
+    | app runs locally and this is set, every template can be browsed without
+    | installing it: /template lists them and /template/{slug} renders one
+    | straight from its working tree — edit a file, refresh. Off everywhere
+    | else, and off when unset.
+    |
+    */
+
+    'template_preview' => [
+        'path' => env('STUDIO_TEMPLATE_PREVIEW_PATH'),
+        'prefix' => 'template',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Site templates
     |--------------------------------------------------------------------------
     |

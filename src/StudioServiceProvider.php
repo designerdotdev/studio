@@ -63,6 +63,11 @@ class StudioServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+
+        // Browse template repositories without installing them — local only
+        if (\Designer\Studio\Services\Templates\TemplatePreview::enabled()) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/template-preview.php');
+        }
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
 
         // Sections compose the site's other components (<x-nav>, an icon…).

@@ -4,6 +4,7 @@ namespace Designer\Studio\Services\Site;
 
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Templates\TemplateAssets;
+use Designer\Studio\Services\Templates\TemplateCatalog;
 use Designer\Studio\Services\Templates\TemplateSync;
 use Designer\Studio\Support\SitePaths;
 use Designer\Studio\Support\WelcomeRoutePruner;
@@ -34,6 +35,7 @@ class SiteInstaller
 
     public function __construct(
         protected TemplateSync $sync,
+        protected TemplateCatalog $catalog,
         protected SiteMirror $mirror,
         protected RuntimeInstaller $runtime,
         protected ComponentRepository $components,
@@ -49,7 +51,9 @@ class SiteInstaller
             throw new RuntimeException('A site is already installed in ' . SitePaths::relative(SitePaths::resources()) . '. Remove it first, or install with --force to replace it.');
         }
 
-        $dir = $this->sync->ensure($slug);
+        // A catalogued repository is cloned on first use; a template in the
+        // local template folder is copied straight from its working tree
+        $dir = $this->catalog->directory($slug);
 
         if ($problem = $this->sync->validate($dir)) {
             throw new RuntimeException("Template [{$slug}] can't be installed: {$problem}.");
@@ -187,7 +191,8 @@ class SiteInstaller
      */
     protected function manifest(string $slug, string $dir): array
     {
-        $template = $this->sync->manifest($slug) ?? [];
+        $template = json_decode((string) file_get_contents($dir . '/template.json'), true);
+        $template = is_array($template) ? $template : [];
         $names = array_values(array_filter((array) ($template['pages'] ?? []), 'is_string'));
         $home = is_file(SitePaths::pages('home.blade.php')) ? 'index' : 'home';
         $pages = [];

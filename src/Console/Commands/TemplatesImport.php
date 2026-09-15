@@ -3,25 +3,27 @@
 namespace Designer\Studio\Console\Commands;
 
 use Designer\Studio\Services\Site\SiteInstaller;
-use Designer\Studio\Services\Templates\TemplateSync;
+use Designer\Studio\Services\Templates\TemplateCatalog;
 use Designer\Studio\Support\SitePaths;
 use Illuminate\Console\Command;
 
 class TemplatesImport extends Command
 {
     protected $signature = 'studio:templates:import
-        {template : Slug of a template in studio.templates.catalog}
+        {template : Slug of a template in studio.templates.catalog (or in the local template folder when the previewer is on)}
         {--force : Replace the site already installed in resources/designer}';
 
     protected $description = 'Install a site template into resources/designer and public/designer';
 
-    public function handle(TemplateSync $sync, SiteInstaller $installer): int
+    public function handle(TemplateCatalog $catalog, SiteInstaller $installer): int
     {
         $slug = $this->argument('template');
 
-        if (!isset($sync->catalog()[$slug])) {
-            $this->error("Template [{$slug}] is not in studio.templates.catalog.");
-            $this->line('  Available: ' . (implode(', ', array_keys($sync->catalog())) ?: 'none'));
+        if (!$catalog->has($slug)) {
+            $this->error($catalog->local()
+                ? "Template [{$slug}] is not in the local template folder."
+                : "Template [{$slug}] is not in studio.templates.catalog.");
+            $this->line('  Available: ' . (implode(', ', array_keys($catalog->all())) ?: 'none'));
 
             return self::FAILURE;
         }

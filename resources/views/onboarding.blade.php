@@ -19,10 +19,41 @@
             step: 1,
             selected: @js(array_key_first($templates)),
             filter: 'all',
+            theme: 'all',
+            query: '',
             applying: false,
+            templates: @js(array_map(fn ($key, $t) => [
+                'key' => $key,
+                'title' => $t['title'],
+                'category' => $t['category'],
+                'theme' => $t['theme'],
+                'search' => \Illuminate\Support\Str::lower($t['title'] . ' ' . $key . ' ' . $t['category'] . ' ' . $t['theme'] . ' ' . $t['description']),
+            ], array_keys($templates), $templates)),
 
             showTemplates() {
                 this.step = 2;
+            },
+
+            matches(template) {
+                const needle = this.query.trim().toLowerCase();
+
+                return (this.filter === 'all' || template.category === this.filter)
+                    && (this.theme === 'all' || template.theme === this.theme)
+                    && (!needle || template.search.includes(needle));
+            },
+
+            get shown() {
+                return this.templates.filter((t) => this.matches(t)).length;
+            },
+
+            get selectedTitle() {
+                return this.templates.find((t) => t.key === this.selected)?.title ?? '—';
+            },
+
+            reset() {
+                this.filter = 'all';
+                this.theme = 'all';
+                this.query = '';
             },
 
             async apply() {
@@ -53,8 +84,8 @@
     >
         {{-- Step 1 — Welcome --}}
         <div x-show="step === 1" class="flex min-h-full flex-col items-center justify-center px-6 py-16 text-center">
-            <div class="onboard-up flex h-16 w-16 items-center justify-center rounded-2xl" style="animation-delay: 60ms">
-                <svg class="h-8 w-auto text-neutral-100" viewBox="0 0 72 75" fill="none">
+            <div class="onboard-up flex h-16 w-16 items-center  text-ink justify-center rounded-2xl" style="animation-delay: 60ms">
+                <svg class="h-8 w-auto text-ink" viewBox="0 0 72 75" fill="none">
                     <path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/>
                 </svg>
             </div>
@@ -92,18 +123,44 @@
                 </button>
             </div>
 
-            @if(count($categories) > 1)
-                <div class="mt-8 flex items-center gap-3">
-                    <div class="s-seg" role="tablist" aria-label="Filter templates">
-                        <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === 'all' && 'is-active'" :aria-selected="filter === 'all'" @click="filter = 'all'">All</button>
-                        @foreach($categories as $category => $label)
-                            <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === @js($category) && 'is-active'" :aria-selected="filter === @js($category)" @click="filter = @js($category)">{{ $label }}</button>
-                        @endforeach
-                    </div>
-                    <span
-                        class="text-xs text-faint"
-                        x-text="(({ all: {{ count($templates) }}, @foreach(array_count_values(array_column($templates, 'category')) as $category => $count)@js($category): {{ $count }}, @endforeach })[filter] ?? 0) + ' templates'"
-                    >{{ count($templates) }} templates</span>
+            @if(count($templates) > 1)
+                <div class="mt-8 flex flex-wrap items-center gap-3">
+                    @if(count($templates) > 6)
+                        <label class="relative block w-full max-w-[280px]">
+                            <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <input
+                                type="search"
+                                x-model="query"
+                                x-ref="search"
+                                @keydown.escape="query = ''; $el.blur()"
+                                @keydown.window.slash="if (step === 2 && document.activeElement !== $refs.search && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) { $event.preventDefault(); $refs.search.focus() }"
+                                class="s-input !pl-8"
+                                placeholder="Search templates"
+                                autocomplete="off"
+                                aria-label="Search templates"
+                            >
+                        </label>
+                    @endif
+
+                    @if(count($categories) > 1)
+                        <div class="s-seg" role="tablist" aria-label="Filter templates by category">
+                            <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === 'all' && 'is-active'" :aria-selected="filter === 'all'" @click="filter = 'all'">All</button>
+                            @foreach($categories as $category => $label)
+                                <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === @js($category) && 'is-active'" :aria-selected="filter === @js($category)" @click="filter = @js($category)">{{ $label }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if(count($themes) > 1)
+                        <div class="s-seg" role="tablist" aria-label="Filter templates by theme">
+                            <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="theme === 'all' && 'is-active'" :aria-selected="theme === 'all'" @click="theme = 'all'">Any theme</button>
+                            @foreach($themes as $option)
+                                <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="theme === @js($option) && 'is-active'" :aria-selected="theme === @js($option)" @click="theme = @js($option)">{{ \Illuminate\Support\Str::headline($option) }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <span class="text-xs text-faint tabular-nums" x-text="shown + ' of {{ count($templates) }} templates'">{{ count($templates) }} templates</span>
                 </div>
             @endif
 
@@ -111,7 +168,7 @@
                 @foreach($templates as $key => $template)
                     <button
                         type="button"
-                        x-show="filter === 'all' || filter === @js($template['category'])"
+                        x-show="matches(templates[{{ $loop->index }}])"
                         @click="selected = @js($key)"
                         @dblclick="selected = @js($key); apply()"
                         class="group relative flex flex-col overflow-hidden rounded-2xl border bg-raised text-left transition-all duration-150"
@@ -155,10 +212,33 @@
                                     <span class="s-chip">{{ $template['pages'] }} pages</span>
                                 @endif
                             </span>
-                            <span class="mt-1 text-xs leading-relaxed text-soft">{{ $template['description'] }}</span>
+                            <span class="mt-1 line-clamp-3 text-xs leading-relaxed text-soft">{{ $template['description'] }}</span>
+                            @if($template['preview_url'])
+                                <span class="mt-3 flex items-center gap-3 text-[12px]">
+                                    <a
+                                        href="{{ $template['preview_url'] }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        @click.stop
+                                        @dblclick.stop
+                                        class="inline-flex items-center gap-1 font-medium text-soft transition-colors hover:text-ink"
+                                    >
+                                        Preview
+                                        <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6h7m-3-3 3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </a>
+                                    @if($template['theme'])
+                                        <span class="text-faint">{{ \Illuminate\Support\Str::headline($template['theme']) }}</span>
+                                    @endif
+                                </span>
+                            @endif
                         </span>
                     </button>
                 @endforeach
+            </div>
+
+            <div x-show="shown === 0" x-cloak class="py-20 text-center text-[13.5px] text-soft">
+                <p>No templates match those filters.</p>
+                <button type="button" @click="reset()" class="s-btn-ghost mt-3">Clear filters</button>
             </div>
 
         </div>
@@ -175,7 +255,7 @@
                 <div class="ml-auto flex items-center gap-3">
                     <p class="text-[13px] text-soft">
                         <span class="text-faint">Selected:</span>
-                        <span class="font-medium text-ink" x-text="({ @foreach($templates as $key => $template)@js($key): @js($template['title']),@endforeach })[selected] ?? '—'"></span>
+                        <span class="font-medium text-ink" x-text="selectedTitle"></span>
                     </p>
                     <button
                         @click="apply()"
