@@ -243,6 +243,21 @@
             });
         </script>
 
+        {{-- This page on the live site, in a new tab --}}
+        <a
+            href="{{ $liveUrl }}"
+            target="_blank"
+            rel="noopener"
+            class="s-dock-btn"
+            data-tip="Open the live page"
+            aria-label="Open the live page in a new tab"
+        >
+            <svg class="h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13.5v5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h5"/>
+                <path d="M14 4h6v6M20 4l-8.5 8.5"/>
+            </svg>
+        </a>
+
         {{-- Publish --}}
         <div class="relative" x-data="{
             open: false,

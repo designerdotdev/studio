@@ -76,6 +76,13 @@
                             const button = document.querySelector(`#studio-dock [data-panel='${$store.studio.rail}']`);
                             const dock = document.getElementById('studio-dock');
                             if (!button || !dock) return;
+                            // A floating dock carries its own left/top. Until it
+                            // has them — the frame it is in has just changed, and
+                            // its effect runs after this one — its rect says
+                            // nothing, so stay out of sight rather than anchor to
+                            // the position it is leaving. It re-fires
+                            // studio:dock-moved the moment it lands.
+                            if (!dock.style.left) { this.style = { visibility: 'hidden' }; return; }
                             const gap = 12, edgePad = 12;
                             const W = window.innerWidth, H = window.innerHeight;
                             const b = button.getBoundingClientRect();

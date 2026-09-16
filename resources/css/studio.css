@@ -422,7 +422,8 @@ html.studio-light {
         user-select: none;
     }
 
-    .s-dock.is-dragging {
+    .s-dock.is-dragging,
+    .s-dock.is-snapping {
         transition: none;
     }
 

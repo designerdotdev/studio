@@ -26,6 +26,7 @@
         'is-pinned': $store.studio.dock.pinned && !dragging,
         'is-hidden': $store.studio.dockHidden && !peek,
         'is-dragging': dragging,
+        'is-snapping': snap,
         ['at-' + edge]: true,
     }"
     :style="style"
@@ -37,6 +38,8 @@
         over: false,
         peekTimer: null,
         style: '',
+        snap: false,      // land at once instead of sliding (a pin flip)
+        pinnedAt: null,   // the pin state place() last landed in
 
         // The edge the dock is on right now: the one it rides mid-drag, else the saved one
         get edge() {
@@ -47,8 +50,18 @@
         place() {
             if (this.dragging) return;
             const { edge, along, pinned } = $store.studio.dock;
+            // Pinning and unpinning change the toolbar's frame — they are not
+            // a slide along an edge. Land at once, so the open panel anchors
+            // to where the dock really is instead of where it was sliding from.
+            if (this.pinnedAt !== null && this.pinnedAt !== pinned) {
+                this.snap = true;
+                // Two frames: the new position must be painted with the
+                // transition off, or re-enabling it animates the jump anyway
+                requestAnimationFrame(() => requestAnimationFrame(() => { this.snap = false }));
+            }
+            this.pinnedAt = pinned;
             // Pinned: the rail is drawn flush by CSS, nothing to place
-            if (pinned) { this.style = ''; return; }
+            if (pinned) { this.style = ''; this.settled(); return; }
             const gap = 12;
             const w = this.$root.offsetWidth, h = this.$root.offsetHeight;
             const W = window.innerWidth, H = window.innerHeight;
@@ -61,6 +74,14 @@
                 left = edge === 'left' ? gap : W - gap - w;
             }
             this.style = `left:${left}px; top:${top}px`;
+            this.settled();
+        },
+
+        // Whatever is anchored to the dock — the open panel, a popover —
+        // measures it, and the dock's own effect runs after theirs. Tell them
+        // once the new position has actually been written to the element.
+        settled() {
+            this.$nextTick(() => this.$dispatch('studio:dock-moved'));
         },
 
         // Dragging: the dock stays glued to its edge and slides along it
