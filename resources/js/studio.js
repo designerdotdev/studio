@@ -352,6 +352,11 @@ const StudioEditor = {
         }
 
         if (key === 'Escape') {
+            // The Assistant's pick tool stands down before anything else
+            if (window.Studio?.picking) {
+                window.dispatchEvent(new CustomEvent('studio:pick-cancel'));
+                return;
+            }
             // An open panel closes first; the next Escape deselects
             const studio = window.Alpine?.store('studio');
             if (studio?.sidebar) {
@@ -2891,6 +2896,7 @@ const StudioPreview = {
         hide: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>',
         trash: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>',
         library: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>',
+        assistant: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>',
     },
 
     setupContextMenu() {
@@ -2922,7 +2928,7 @@ const StudioPreview = {
 
             if (wrapper) {
                 this.select(wrapper.dataset.section);
-                this.openMenu(event.clientX, event.clientY, this.sectionMenuItems(wrapper));
+                this.openMenu(event.clientX, event.clientY, this.sectionMenuItems(wrapper, event));
             } else {
                 this.openMenu(event.clientX, event.clientY, [
                     { header: 'Page' },
@@ -2949,7 +2955,7 @@ const StudioPreview = {
         window.addEventListener('resize', () => { this.rehover(); this.control.close(); }, { passive: true });
     },
 
-    sectionMenuItems(wrapper) {
+    sectionMenuItems(wrapper, event = null) {
         const d = wrapper.dataset;
         const id = d.section;
         const scope = d.scope || 'page';
@@ -2979,6 +2985,13 @@ const StudioPreview = {
 
         if (devMode) {
             items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.ref, d.title) });
+        }
+
+        // Hand the exact element under the pointer to the Assistant — the
+        // same payload the pick tool reports, without arming it
+        if (devMode && event?.target?.closest?.('[data-section-content]')) {
+            const target = event.target, x = event.clientX, y = event.clientY;
+            items.push({ label: 'Ask the assistant…', icon: 'assistant', onClick: () => this.post('studio:element-selected', this.describeElement(target, x, y)) });
         }
 
         items.push(
@@ -3068,6 +3081,39 @@ const StudioPreview = {
      * element (its path from the section root, tag, and text) to the
      * editor instead of selecting the section.
      */
+    /**
+     * What the Assistant is told about one element: the section it is in,
+     * its path from the section root, tag and text, and — when the point
+     * lands on a declared field — that field and its source line.
+     */
+    describeElement(target, x, y) {
+        const content = target.closest?.('[data-section-content]');
+        const section = content?.closest('[data-section]');
+        const path = [];
+        let node = target;
+
+        while (content && node && node !== content) {
+            path.unshift(node.tagName.toLowerCase());
+            node = node.parentElement;
+        }
+
+        const sectionId = section?.dataset.section || null;
+        const entry = sectionId ? StudioFields.at(sectionId, x, y) : null;
+        const source = sectionId ? StudioFields.sourceFor(sectionId) : null;
+
+        return {
+            sectionId,
+            ref: section?.dataset.ref || null,
+            path: path.join(' > '),
+            tag: target.tagName.toLowerCase(),
+            text: (target.innerText || '').trim().slice(0, 160),
+            field: entry ? entry.key : null,
+            itemIndex: entry ? entry.index : null,
+            subKey: entry ? entry.subKey : null,
+            source: entry && source ? source + '.blade.php:' + entry.line : null,
+        };
+    },
+
     setElementSelect(on) {
         document.documentElement.classList.toggle('studio-element-select', on);
 
@@ -3079,30 +3125,7 @@ const StudioPreview = {
                 event.preventDefault();
                 event.stopPropagation();
 
-                const section = content.closest('[data-section]');
-                const path = [];
-                let node = event.target;
-
-                while (node && node !== content) {
-                    path.unshift(node.tagName.toLowerCase());
-                    node = node.parentElement;
-                }
-
-                const sectionId = section?.dataset.section || null;
-                const entry = sectionId ? StudioFields.at(sectionId, event.clientX, event.clientY) : null;
-                const source = sectionId ? StudioFields.sourceFor(sectionId) : null;
-
-                this.post('studio:element-selected', {
-                    sectionId,
-                    ref: section?.dataset.ref || null,
-                    path: path.join(' > '),
-                    tag: event.target.tagName.toLowerCase(),
-                    text: (event.target.innerText || '').trim().slice(0, 160),
-                    field: entry ? entry.key : null,
-                    itemIndex: entry ? entry.index : null,
-                    subKey: entry ? entry.subKey : null,
-                    source: entry && source ? source + '.blade.php:' + entry.line : null,
-                });
+                this.post('studio:element-selected', this.describeElement(event.target, event.clientX, event.clientY));
 
                 this.setElementSelect(false);
             };
@@ -3268,6 +3291,8 @@ window.Studio = {
 
     // Set by the dev-mode code modal so global shortcuts stand down
     codeModalOpen: false,
+    // The Assistant's pick tool is armed (the editor's banner sets this)
+    picking: false,
 
     /**
      * Lazy-loading Monaco factory for the dev-mode source editor.

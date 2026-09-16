@@ -28,6 +28,14 @@
                 'slug' => $p->slug,
                 'path' => $p->slug === $homeSlug ? '' : $p->slug,
             ])->values());
+            // The pinned toolbar's page switcher reads this list
+            window.__studioPageList = @js($pages->map(fn ($p) => [
+                'slug' => $p->slug,
+                'title' => $p->title,
+                'path' => $p->slug === $homeSlug ? '/' : '/' . $p->slug,
+                'home' => $p->slug === $homeSlug,
+                'current' => $p->slug === $page->slug,
+            ])->values());
 
             document.addEventListener('alpine:init', () => {
                 Alpine.store('studio', {
@@ -70,22 +78,61 @@
                     get floatWidth() { return this.rail === 'assistant' ? 380 : 320 },
 
                     /* --- the dock ----------------------------------------
-                       Where the floating bar sits: which window edge, and how
-                       far along it (0..1, the dock's centre). Slides freely along the edge. */
+                       Where the toolbar sits: which window edge, how far
+                       along it (0..1, the dock's centre — it slides freely),
+                       and whether it is pinned. Floating, it is a pill over
+                       the site; pinned, it is a flush rail on that edge and
+                       the site is pushed over by exactly its size, so nothing
+                       is ever covered. Pinned top or bottom the bar runs the
+                       full width and carries the page switcher and device
+                       widths — that is the "header bar". */
                     dock: (() => {
                         try {
                             const saved = JSON.parse(localStorage.getItem('studio.dock') || 'null');
                             if (saved && ['bottom', 'left', 'right', 'top'].includes(saved.edge)) {
-                                return { edge: saved.edge, along: Math.min(1, Math.max(0, Number(saved.along) || 0.5)) };
+                                return {
+                                    edge: saved.edge,
+                                    along: Math.min(1, Math.max(0, Number(saved.along) || 0.5)),
+                                    pinned: saved.pinned === true,
+                                };
                             }
                         } catch (e) { /* fall through */ }
-                        return { edge: 'bottom', along: 0.5 };
+                        return { edge: 'bottom', along: 0.5, pinned: false };
                     })(),
-                    setDock(edge, along = null) {
+                    setDock(edge, along = null, pinned = null) {
                         if (!['bottom', 'left', 'right', 'top'].includes(edge)) return;
-                        this.dock = { edge, along: along === null ? 0.5 : Math.min(1, Math.max(0, along)) };
+                        this.dock = {
+                            edge,
+                            along: along === null ? 0.5 : Math.min(1, Math.max(0, along)),
+                            pinned: pinned === null ? this.dock.pinned : !!pinned,
+                        };
                         localStorage.setItem('studio.dock', JSON.stringify(this.dock));
                         window.dispatchEvent(new CustomEvent('studio:dock', { detail: this.dock }));
+                    },
+                    // Pin to the current edge / let it float again
+                    togglePin() {
+                        this.setDock(this.dock.edge, this.dock.along, !this.dock.pinned);
+                    },
+                    // Pinned bar sizes — the CSS rails are drawn to these
+                    get dockHorizontal() { return this.dock.edge === 'top' || this.dock.edge === 'bottom' },
+                    get barSize() { return this.dockHorizontal ? 48 : 52 },
+                    // The space the pinned rail takes: padding on the app
+                    // root, on the rail's edge only. A hidden dock (⌘.)
+                    // gives the space back.
+                    get appInsets() {
+                        if (!this.dock.pinned || this.dockHidden) return {};
+                        const side = { top: 'paddingTop', bottom: 'paddingBottom', left: 'paddingLeft', right: 'paddingRight' }[this.dock.edge];
+                        return { [side]: this.barSize + 'px' };
+                    },
+                    // A pinned toolbar docks the open panel as a column
+                    // beside it (sheets stay sheets): next to a left or
+                    // right rail, on the left under a top or bottom bar.
+                    get docked() { return this.dock.pinned && this.frame === 'popover' },
+                    get panelSide() { return this.dock.edge === 'right' ? 'right' : 'left' },
+                    panelWidth: (n => (n >= 260 && n <= 560) ? n : 320)(parseInt(localStorage.getItem('studio.panel-width'), 10)),
+                    setPanelWidth(px) {
+                        this.panelWidth = Math.round(Math.min(560, Math.max(260, px)));
+                        localStorage.setItem('studio.panel-width', String(this.panelWidth));
                     },
                     dockHidden: localStorage.getItem('studio.dock-hidden') === '1',
                     toggleDock() {
@@ -512,21 +559,34 @@
                         @endforeach
                     </span>
                 </div>
-                {{-- Dock placement — a row of little window diagrams --}}
+                {{-- Toolbar placement — floating, or pinned to an edge as a
+                     rail. Pinned top is the header bar. --}}
                 <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
                     <span class="flex items-center gap-2.5">
                         @include('studio::partials.activity-bar-glyph', ['position' => 'bottom'])
-                        Dock
+                        Toolbar
                     </span>
-                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Dock position">
-                        @foreach(['bottom' => 'Bottom', 'left' => 'Left', 'right' => 'Right', 'top' => 'Top'] as $value => $label)
+                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Toolbar placement">
+                        <button
+                            type="button"
+                            class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
+                            :class="!$store.studio.dock.pinned ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
+                            @click="$store.studio.setDock($store.studio.dock.edge, $store.studio.dock.along, false)"
+                            role="radio"
+                            :aria-checked="!$store.studio.dock.pinned"
+                            title="Floating — a pill you can drag to any edge"
+                            aria-label="Floating"
+                        >
+                            @include('studio::partials.activity-bar-glyph', ['position' => 'floating'])
+                        </button>
+                        @foreach(['left' => 'Pin left — an icon rail', 'top' => 'Pin top — the header bar', 'right' => 'Pin right — an icon rail', 'bottom' => 'Pin bottom — a full-width bar'] as $value => $label)
                             <button
                                 type="button"
                                 class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
-                                :class="$store.studio.dock.edge === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
-                                @click="$store.studio.setDock('{{ $value }}')"
+                                :class="$store.studio.dock.pinned && $store.studio.dock.edge === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
+                                @click="$store.studio.setDock('{{ $value }}', 0.5, true)"
                                 role="radio"
-                                :aria-checked="$store.studio.dock.edge === '{{ $value }}'"
+                                :aria-checked="$store.studio.dock.pinned && $store.studio.dock.edge === '{{ $value }}'"
                                 title="{{ $label }}"
                                 aria-label="{{ $label }}"
                             >
@@ -619,11 +679,13 @@
                     { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
                     @endif
                     { label: studio.sidebar ? 'Close the panel' : 'Open the panel', hint: 'Layout', run: () => studio.toggleSidebar() },
-                    { label: 'Dock: bottom', hint: 'Layout', when: studio.dock.edge !== 'bottom', run: () => studio.setDock('bottom') },
-                    { label: 'Dock: left', hint: 'Layout', when: studio.dock.edge !== 'left', run: () => studio.setDock('left') },
-                    { label: 'Dock: right', hint: 'Layout', when: studio.dock.edge !== 'right', run: () => studio.setDock('right') },
-                    { label: 'Dock: top', hint: 'Layout', when: studio.dock.edge !== 'top', run: () => studio.setDock('top') },
-                    { label: studio.dockHidden ? 'Show the dock' : 'Hide the dock', hint: 'Layout', run: () => studio.toggleDock() },
+                    { label: studio.dock.pinned ? 'Unpin the toolbar — let it float' : 'Pin the toolbar to its edge', hint: 'Layout', run: () => studio.togglePin() },
+                    { label: 'Toolbar: header bar (pin top)', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'top'), run: () => studio.setDock('top', 0.5, true) },
+                    { label: 'Toolbar: pin left', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'left'), run: () => studio.setDock('left', 0.5, true) },
+                    { label: 'Toolbar: pin right', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'right'), run: () => studio.setDock('right', 0.5, true) },
+                    { label: 'Toolbar: pin bottom', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'bottom'), run: () => studio.setDock('bottom', 0.5, true) },
+                    { label: 'Toolbar: floating', hint: 'Layout', when: studio.dock.pinned, run: () => studio.setDock(studio.dock.edge, studio.dock.along, false) },
+                    { label: studio.dockHidden ? 'Show the toolbar' : 'Hide the toolbar', hint: 'Layout', run: () => studio.toggleDock() },
                     { label: 'Preview: desktop', hint: 'Device', run: () => studio.device = 'desktop' },
                     { label: 'Preview: tablet', hint: 'Device', run: () => studio.device = 'tablet' },
                     { label: 'Preview: mobile', hint: 'Device', run: () => studio.device = 'mobile' },
@@ -760,6 +822,30 @@
     {{-- ============================================================ --}}
     {{-- Canvas                                                        --}}
     {{-- ============================================================ --}}
+    {{-- The Assistant's pick tool, armed: a banner over the canvas says what
+         the next click does, and how to stop. The iframe draws the dashed
+         outline; this is the editor's half of the same state. --}}
+    <div
+        x-data="{ on: false }"
+        @studio:pick.window="on = !!$event.detail?.on; window.Studio.picking = on"
+        x-show="on"
+        x-cloak
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 -translate-y-1"
+        class="s-pick-banner"
+        role="status"
+    >
+        <span class="s-pick-banner-dot"></span>
+        <span>Click anything on the page to add it to the chat</span>
+        <button type="button" class="s-pick-banner-cancel" @click="window.dispatchEvent(new CustomEvent('studio:pick-cancel'))">
+            Cancel <span class="s-kbd">Esc</span>
+        </button>
+    </div>
+
     {{-- Code mode takes the canvas's slot; the split gives half of it back.
          Both fill the canvas edge to edge as square frames. --}}
     <div class="s-canvas flex h-full w-full min-w-0" x-data>

@@ -631,6 +631,260 @@ html.studio-light {
     .s-dock.at-left .s-dock-btn[data-tip]::after { left: calc(100% + 10px); top: 50%; translate: 0 -50%; }
     .s-dock.at-right .s-dock-btn[data-tip]::after { right: calc(100% + 10px); top: 50%; translate: 0 -50%; }
 
+    /* --- pinned: a flush rail on its edge ------------------------------
+       The app root pads by the rail's size (appInsets), so it never covers
+       the site. Top/bottom: a 48px full-width bar. Left/right: a 52px
+       column. The pin button is the switch; dragging keeps the pin. */
+    .s-dock.is-pinned {
+        gap: 2px;
+        border-radius: 0;
+        background: var(--color-panel);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: none;
+        transition: none;
+    }
+
+    .s-dock.is-pinned.at-top,
+    .s-dock.is-pinned.at-bottom {
+        left: 0;
+        right: 0;
+        width: auto;
+        height: 48px;
+        padding: 0 10px 0 8px;
+    }
+
+    .s-dock.is-pinned.at-top {
+        top: 0;
+        bottom: auto;
+        border-bottom: 1px solid var(--color-line);
+    }
+
+    .s-dock.is-pinned.at-bottom {
+        top: auto;
+        bottom: 0;
+        border-top: 1px solid var(--color-line);
+    }
+
+    .s-dock.is-pinned.at-left,
+    .s-dock.is-pinned.at-right {
+        top: 0;
+        bottom: 0;
+        width: 52px;
+        height: auto;
+        padding: 8px 0;
+    }
+
+    .s-dock.is-pinned.at-left {
+        left: 0;
+        right: auto;
+        border-right: 1px solid var(--color-line);
+    }
+
+    .s-dock.is-pinned.at-right {
+        left: auto;
+        right: 0;
+        border-left: 1px solid var(--color-line);
+    }
+
+    /* A pinned rail has nowhere to slide, so its grip only starts a drag */
+    .s-dock.is-pinned .s-dock-grip {
+        opacity: 0.6;
+    }
+
+    .s-dock-pin.is-active svg {
+        fill: currentColor;
+    }
+
+    .s-dock-pin.is-active {
+        color: var(--color-ink);
+    }
+
+    /* Pushes the modes and Publish to the far end of a pinned rail */
+    .s-dock-spacer {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 0;
+    }
+
+    /* The page switcher, centred in a pinned top/bottom bar. Centred with
+       flex, not a transform: its popover is position:fixed, and a
+       transformed ancestor would become that popover's containing block. */
+    .s-dock-page {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+    }
+
+    .s-dock-page > * {
+        pointer-events: auto;
+    }
+
+    .s-dock-page-btn {
+        @apply flex cursor-pointer items-center gap-2 rounded-lg bg-wash;
+        height: 32px;
+        padding: 0 10px 0 11px;
+        max-width: min(360px, 32vw);
+        font-size: 12.5px;
+        transition: background-color 150ms ease;
+    }
+
+    .s-dock-page-btn:hover,
+    .s-dock-page-btn.is-open {
+        @apply bg-wash-strong;
+    }
+
+    .s-dock-page-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    /* --- docked panel: a real column beside a pinned rail ------------- */
+    .s-float.is-docked {
+        position: relative;
+        inset: auto;
+        z-index: 10;
+        height: auto;
+        min-height: 0;
+        flex: none;
+        border-radius: 0;
+        box-shadow: none;
+        animation: none;
+        border-right: 1px solid var(--color-line);
+    }
+
+    .s-float.is-docked.at-right {
+        border-right: 0;
+        border-left: 1px solid var(--color-line);
+    }
+
+    /* Its resize seam: a 6px grab strip on the inner edge, accent while held */
+    .s-panel-seam {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 6px;
+        z-index: 5;
+        cursor: col-resize;
+    }
+
+    .s-panel-seam::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 2px;
+        background: transparent;
+        transition: background-color 150ms ease;
+    }
+
+    .s-panel-seam:hover::after,
+    .s-panel-seam:active::after {
+        background: var(--color-accent);
+    }
+
+    .s-float.is-docked.at-right .s-panel-seam {
+        right: auto;
+        left: 0;
+    }
+
+    .s-float.is-docked.at-right .s-panel-seam::after {
+        right: auto;
+        left: 0;
+    }
+
+    /* --- the Assistant's pick tool, armed ------------------------------
+       A violet pill over the canvas: the next click adds an element to the
+       chat. Violet on purpose — Edit mode's selection is blue, and the two
+       must never read as the same thing. */
+    .s-pick-banner {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        translate: -50% 0;
+        z-index: 35;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 36px;
+        padding: 0 6px 0 13px;
+        border-radius: 999px;
+        background: #17122a;
+        color: #ede9fe;
+        font-size: 12.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        box-shadow:
+            0 0 0 1px rgba(167, 139, 250, 0.55),
+            0 14px 36px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    .s-pick-banner-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #a78bfa;
+        box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.3);
+        animation: s-pick-pulse 1.4s ease-in-out infinite;
+    }
+
+    .s-pick-banner-cancel {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 26px;
+        padding: 0 5px 0 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 120ms ease;
+    }
+
+    .s-pick-banner-cancel:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .s-pick-banner-cancel .s-kbd {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.16);
+        color: #c4b5fd;
+    }
+
+    /* The composer's pick button: a labelled pill, violet while armed */
+    .s-pick-btn {
+        @apply inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 text-soft;
+        height: 28px;
+        font-size: 11.5px;
+        font-weight: 500;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-pick-btn:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-pick-btn.is-on {
+        background: rgba(139, 92, 246, 0.16);
+        color: #c4b5fd;
+        box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.45);
+    }
+
+    html.studio-light .s-pick-btn.is-on {
+        color: #6d28d9;
+    }
+
+    @keyframes s-pick-pulse {
+        0%, 100% { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.3); }
+        50% { box-shadow: 0 0 0 6px rgba(167, 139, 250, 0.12); }
+    }
+
     /* Code mode's file tree column, inside the code pane */
     .s-code-files {
         @apply flex shrink-0 flex-col border-r border-line bg-panel;
@@ -640,6 +894,7 @@ html.studio-light {
     @media (prefers-reduced-motion: reduce) {
         .s-dock { transition: none; }
         .s-float { animation: none; }
+        .s-pick-banner-dot { animation: none; }
     }
 
     /* --- rich text (collections) ------------------------------------- */

@@ -6,16 +6,45 @@
                 position: relative;
             }
 
-            /* Element-select mode (the Assistant's crosshair): outline whatever
-               is under the pointer inside a section; the next click reports it */
+            /* The Assistant's pick tool: a dashed violet outline on whatever is
+               under the pointer inside a section; the next click reports it.
+               Violet, dashed, and with every Edit-mode affordance hidden, so
+               it can't be mistaken for selecting a section (solid blue). */
             html.studio-element-select,
             html.studio-element-select * {
                 cursor: crosshair !important;
             }
 
-            html.studio-element-select [data-section-content] *:hover {
-                outline: 2px solid #4c7dfa !important;
-                outline-offset: 1px;
+            /* Only the deepest hovered element — :hover also matches every
+               ancestor under the pointer, which would nest the outlines */
+            html.studio-element-select [data-section-content] *:hover:not(:has(:hover)) {
+                outline: 2px dashed #8b5cf6 !important;
+                outline-offset: 2px;
+                background-color: rgba(139, 92, 246, 0.07) !important;
+                border-radius: 3px;
+            }
+
+            html.studio-element-select .studio-section::after,
+            html.studio-element-select .studio-chip,
+            html.studio-element-select .studio-toolbar,
+            html.studio-element-select .studio-insert,
+            html.studio-element-select .studio-region,
+            html.studio-element-select .studio-fhalo,
+            html.studio-element-select .studio-fchip,
+            html.studio-element-select .studio-cursor,
+            html.studio-element-select .studio-item-flank,
+            html.studio-element-select .studio-item-toolbar {
+                display: none !important;
+            }
+
+            /* A violet edge on the whole canvas while it is armed */
+            html.studio-element-select body::after {
+                content: '';
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                z-index: 2147483001;
+                box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.75);
             }
 
             /* Scroll-reveal systems (site templates tag elements with data-reveal

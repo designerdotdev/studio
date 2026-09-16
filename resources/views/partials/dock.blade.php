@@ -1,8 +1,12 @@
-{{-- The dock: the editor's only chrome. A floating pill over the site with
-     the menu, one button per panel, the Preview/Edit/Code pill and Publish.
-     Drag the grip to any window edge; the position lives in
-     $store.studio.dock. Panels open from it as popovers (or sheets),
-     anchored by the float in the layout to the button's data-panel. --}}
+{{-- The dock: the editor's only chrome. Floating, it is a pill over the
+     site with the menu, one button per panel, the Preview/Edit/Code pill and
+     Publish; drag the grip to any window edge. Pinned (the pin button, or
+     the menu's Toolbar row), it becomes a flush rail on that edge — the app
+     root pads by its size so the site moves over instead of being covered —
+     and a pinned top or bottom bar also carries the page switcher and the
+     device widths, which is the header bar. The position lives in
+     $store.studio.dock. Panels open from it as popovers (or sheets), or as a
+     docked column while it is pinned. --}}
 @php
     $dev = \Designer\Studio\Support\DevMode::enabled();
     $panels = array_values(array_filter([
@@ -19,6 +23,7 @@
     class="s-dock"
     :class="{
         'is-vertical': edge === 'left' || edge === 'right',
+        'is-pinned': $store.studio.dock.pinned && !dragging,
         'is-hidden': $store.studio.dockHidden && !peek,
         'is-dragging': dragging,
         ['at-' + edge]: true,
@@ -41,7 +46,9 @@
         // Position from the store: the dock's centre sits `along` the edge
         place() {
             if (this.dragging) return;
-            const { edge, along } = $store.studio.dock;
+            const { edge, along, pinned } = $store.studio.dock;
+            // Pinned: the rail is drawn flush by CSS, nothing to place
+            if (pinned) { this.style = ''; return; }
             const gap = 12;
             const w = this.$root.offsetWidth, h = this.$root.offsetHeight;
             const W = window.innerWidth, H = window.innerHeight;
@@ -64,6 +71,15 @@
             this.dragging = true;
             const rect = this.$root.getBoundingClientRect();
             this.drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, edge: $store.studio.dock.edge };
+            if ($store.studio.dock.pinned) {
+                // The flush rail turns back into a pill as the drag starts —
+                // re-measure it and carry it centred under the pointer
+                this.$nextTick(() => {
+                    this.drag.dx = this.$root.offsetWidth / 2;
+                    this.drag.dy = this.$root.offsetHeight / 2;
+                    this.slide(event.clientX, event.clientY);
+                });
+            }
         },
         moveDrag(event) {
             if (!this.dragging) return;
@@ -111,7 +127,8 @@
             const along = (edge === 'bottom' || edge === 'top')
                 ? (rect.left + rect.width / 2) / window.innerWidth
                 : (rect.top + rect.height / 2) / window.innerHeight;
-            $store.studio.setDock(edge, along);
+            // A pinned toolbar re-pins on whichever edge it was dropped at
+            $store.studio.setDock(edge, along, $store.studio.dock.pinned);
             this.$nextTick(() => this.place());
         },
     }"
@@ -139,6 +156,22 @@
         <svg viewBox="0 0 8 14" width="8" height="14" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.3"/><circle cx="6" cy="2" r="1.3"/><circle cx="2" cy="7" r="1.3"/><circle cx="6" cy="7" r="1.3"/><circle cx="2" cy="12" r="1.3"/><circle cx="6" cy="12" r="1.3"/></svg>
     </span>
 
+    {{-- Pin: a flush rail on this edge, the site pushed over by its size --}}
+    <button
+        type="button"
+        class="s-dock-btn s-dock-pin"
+        :class="$store.studio.dock.pinned && 'is-active'"
+        :data-tip="$store.studio.dock.pinned ? 'Unpin — let the toolbar float' : 'Pin the toolbar to this edge'"
+        :aria-pressed="$store.studio.dock.pinned"
+        @click="$store.studio.togglePin()"
+        aria-label="Pin the toolbar"
+    >
+        <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 3.5h6l-.6 6.2 2.6 2.3v1.5H7v-1.5l2.6-2.3L9 3.5Z"/>
+            <path d="M12 13.5V21"/>
+        </svg>
+    </button>
+
     {{ $menu ?? '' }}
 
     <span class="s-dock-sep"></span>
@@ -158,23 +191,95 @@
         </button>
     @endforeach
 
-    @if($dev)
-        {{-- Files belongs to Code mode: it toggles the tree column in the code pane --}}
+    {{-- Pinned top or bottom, the bar is the full window width: the page
+         switcher sits in its centre and the device widths join the right
+         group. Floating and vertical rails stay icons-only. --}}
+    <div
+        x-show="$store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
+        x-cloak
+        class="s-dock-page"
+        x-data="{
+            open: false,
+            popStyle: '',
+            pages: window.__studioPageList || [],
+            get current() { return this.pages.find((p) => p.current) || { title: 'Page', path: '/' } },
+            go(slug) { window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(slug) },
+        }"
+        @click.outside="open = false"
+        @keydown.escape.window="open = false"
+    >
         <button
             type="button"
-            class="s-dock-btn"
-            data-panel="files"
-            data-tip="Files"
-            x-show="$store.studio.mode === 'code'"
-            x-cloak
-            :class="$store.studio.filesOpen && 'is-active'"
-            :aria-pressed="$store.studio.filesOpen"
-            @click="$store.studio.toggleFiles()"
-            aria-label="Files"
+            class="s-dock-page-btn"
+            :class="open && 'is-open'"
+            @click="open = !open"
+            x-data="{ state: 'idle' }"
+            @studio:status.window="state = $event.detail.state"
+            :title="state === 'saving' ? 'Saving…' : state === 'error' ? 'Offline — changes are not being saved' : 'All changes saved'"
+            aria-haspopup="menu"
+            :aria-expanded="open"
         >
-            <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.25 12.75V12a2.25 2.25 0 0 1 2.25-2.25h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>
+            <span class="s-dock-status" :class="{ 'is-saving': state === 'saving', 'is-error': state === 'error' }"></span>
+            <span class="truncate font-medium text-ink" x-text="current.title"></span>
+            <span class="truncate font-mono text-[11px] text-faint" x-text="current.path"></span>
+            <svg class="h-3 w-3 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
         </button>
-    @endif
+        <div
+            x-show="open"
+            x-cloak
+            x-transition:enter="transition ease-out duration-150"
+            x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            class="s-pop fixed z-50 w-64 p-1"
+            :style="popStyle"
+            x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 256) })"
+            role="menu"
+        >
+            <p class="s-microlabel px-2.5 pb-1 pt-1.5">Pages</p>
+            <div class="max-h-72 overflow-y-auto">
+                <template x-for="p in pages" :key="p.slug">
+                    <button type="button" class="s-menu-item" :class="p.current && 'bg-wash !text-ink'" role="menuitem" @click="open = false; if (!p.current) go(p.slug)">
+                        <span class="min-w-0 flex-1 truncate" x-text="p.title"></span>
+                        <span class="shrink-0 font-mono text-[10.5px] text-faint" x-text="p.path"></span>
+                    </button>
+                </template>
+            </div>
+            <div class="s-divider my-1"></div>
+            <button type="button" class="s-menu-item" role="menuitem" @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))">
+                <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                New page…
+            </button>
+            <button type="button" class="s-menu-item" role="menuitem" @click="open = false; $store.studio.setRail('pages', true)">
+                <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
+                Manage pages…
+            </button>
+        </div>
+    </div>
+
+    {{-- Pushes the modes and Publish to the far end of a pinned rail --}}
+    <span class="s-dock-spacer" x-show="$store.studio.dock.pinned && !dragging" x-cloak></span>
+
+    {{-- Device widths — only where the bar has the room --}}
+    <div
+        class="s-dock-seg s-dock-devices"
+        x-show="$store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
+        x-cloak
+        role="radiogroup"
+        aria-label="Canvas width"
+    >
+        <button type="button" class="s-dock-seg-btn" :class="$store.studio.device === 'desktop' && 'is-active'" @click="$store.studio.device = 'desktop'" title="Desktop (⌥1)" aria-label="Desktop width" role="radio" :aria-checked="$store.studio.device === 'desktop'">
+            <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></svg>
+        </button>
+        <button type="button" class="s-dock-seg-btn" :class="$store.studio.device === 'tablet' && 'is-active'" @click="$store.studio.device = 'tablet'" title="Tablet — 768px (⌥2)" aria-label="Tablet width" role="radio" :aria-checked="$store.studio.device === 'tablet'">
+            <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
+        </button>
+        <button type="button" class="s-dock-seg-btn" :class="$store.studio.device === 'mobile' && 'is-active'" @click="$store.studio.device = 'mobile'" title="Mobile — 390px (⌥3)" aria-label="Mobile width" role="radio" :aria-checked="$store.studio.device === 'mobile'">
+            <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
+        </button>
+    </div>
 
     <span class="s-dock-sep"></span>
 

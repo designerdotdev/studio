@@ -44,37 +44,35 @@
             </button>
         </div>
 
-        <div class="flex h-dvh flex-col">
+        {{-- The app root. A pinned toolbar reserves its edge here as padding
+             (appInsets), so the rail below is flush and the site is pushed
+             over rather than covered. --}}
+        <div class="flex h-dvh flex-col" x-data :style="$store.studio?.appInsets || {}">
             @isset($sidebar)
-                {{-- The site is the screen: the stage fills the window. --}}
-                <main class="s-stage">
-                    {{ $slot }}
-                </main>
-
-                {{-- Behind a sheet only --}}
-                <div
-                    x-data
-                    x-show="$store.studio.sidebar && $store.studio.frame === 'sheet'"
-                    x-cloak
-                    x-transition.opacity.duration.150ms
-                    class="s-scrim"
-                    @click="$store.studio.closePanel()"
-                ></div>
+                {{-- One row: the docked panel (when the toolbar is pinned)
+                     and the stage. A right rail flips the row so the panel
+                     sits beside it. --}}
+                <div class="flex min-h-0 min-w-0 flex-1" :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'">
 
                 {{-- The floating surface: every panel lives here, one visible
-                     at a time. Anchored to its dock button (popover) or
-                     centred (sheet). The height is fixed to what fits so the
-                     panels' own scroll regions keep working. --}}
+                     at a time. Anchored to its dock button (popover), centred
+                     (sheet), or — with the toolbar pinned — a real column
+                     beside the site (docked). The popover height is fixed to
+                     what fits so the panels' own scroll regions keep working. --}}
                 <aside
                     class="s-float"
-                    :class="$store.studio.frame === 'sheet' && 'is-sheet'"
+                    :class="{
+                        'is-sheet': $store.studio.frame === 'sheet',
+                        'is-docked': $store.studio.docked,
+                        'at-right': $store.studio.docked && $store.studio.panelSide === 'right',
+                    }"
                     {{-- An object binding: a string would replace the style
                          attribute and wipe the display:none x-show sets --}}
-                    :style="$store.studio.frame === 'popover' ? style : {}"
+                    :style="$store.studio.docked ? { width: $store.studio.panelWidth + 'px' } : ($store.studio.frame === 'popover' ? style : {})"
                     x-data="{
                         style: {},
                         place() {
-                            if ($store.studio.frame !== 'popover') return;
+                            if ($store.studio.frame !== 'popover' || $store.studio.docked) return;
                             const button = document.querySelector(`#studio-dock [data-panel='${$store.studio.rail}']`);
                             const dock = document.getElementById('studio-dock');
                             if (!button || !dock) return;
@@ -114,7 +112,57 @@
                     <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                         {{ $sidebar }}
                     </div>
+
+                    {{-- Docked: a drag seam on the panel's inner edge sets
+                         its width. A shield covers the window while it is
+                         held so the canvas iframe can't swallow the pointer. --}}
+                    <div
+                        x-show="$store.studio.docked"
+                        x-cloak
+                        class="s-panel-seam"
+                        role="separator"
+                        aria-label="Resize the panel"
+                        @mousedown.prevent="
+                            const aside = $el.closest('aside');
+                            const right = $store.studio.panelSide === 'right';
+                            const shield = document.createElement('div');
+                            shield.className = 's-drag-shield is-col-resize';
+                            document.body.appendChild(shield);
+                            const move = (event) => {
+                                const box = aside.getBoundingClientRect();
+                                $store.studio.setPanelWidth(right ? box.right - event.clientX : event.clientX - box.left);
+                            };
+                            const stop = () => {
+                                shield.remove();
+                                document.removeEventListener('mousemove', move);
+                                document.removeEventListener('mouseup', stop);
+                                window.removeEventListener('blur', stop);
+                                document.body.classList.remove('select-none');
+                            };
+                            document.body.classList.add('select-none');
+                            document.addEventListener('mousemove', move);
+                            document.addEventListener('mouseup', stop);
+                            window.addEventListener('blur', stop);
+                        "
+                    ></div>
                 </aside>
+
+                {{-- The site is the screen: the stage fills what is left. --}}
+                <main class="s-stage">
+                    {{ $slot }}
+                </main>
+
+                </div>
+
+                {{-- Behind a sheet only --}}
+                <div
+                    x-data
+                    x-show="$store.studio.sidebar && $store.studio.frame === 'sheet'"
+                    x-cloak
+                    x-transition.opacity.duration.150ms
+                    class="s-scrim"
+                    @click="$store.studio.closePanel()"
+                ></div>
 
                 @include('studio::partials.dock')
             @else

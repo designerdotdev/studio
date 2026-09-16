@@ -30,6 +30,20 @@
         <div class="flex min-w-0 flex-1 flex-col">
     {{-- Tab strip --}}
     <div class="flex h-9 shrink-0 items-stretch gap-px overflow-x-auto border-b border-line bg-raised/50">
+        {{-- The file tree column, toggled from where it lives --}}
+        <div class="flex shrink-0 items-center border-r border-line px-1.5">
+            <button
+                type="button"
+                class="s-icon-btn"
+                :class="$store.studio.filesOpen && '!bg-wash-strong !text-ink'"
+                @click="$store.studio.toggleFiles()"
+                :title="$store.studio.filesOpen ? 'Hide the files' : 'Show the files'"
+                :aria-label="$store.studio.filesOpen ? 'Hide the files' : 'Show the files'"
+                :aria-pressed="$store.studio.filesOpen"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M9 4.75v14.5M5.75 8.5h1.5M5.75 11h1.5M5.75 13.5h1.5"/></svg>
+            </button>
+        </div>
         <template x-for="tab in $store.code.tabs" :key="tab.path">
             <div
                 class="group flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-3 text-[11.5px] transition-colors"

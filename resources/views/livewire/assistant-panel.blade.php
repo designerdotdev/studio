@@ -26,19 +26,27 @@
         init() {
             window.addEventListener('studio:element-selected', (e) => {
                 this.element = e.detail;
-                this.picking = false;
+                this.setPicking(false);
                 Alpine.store('studio').setRail('assistant', true);
                 this.$nextTick(() => this.$refs.composer?.focus());
             });
+            // Esc (in the editor or the canvas) and the banner's Cancel
+            window.addEventListener('studio:pick-cancel', () => { if (this.picking) this.setPicking(false) });
             this.$watch('busy', () => this.$nextTick(() => this.scrollToEnd()));
             this.$nextTick(() => this.scrollToEnd());
         },
 
         scrollToEnd() { const el = this.$refs.log; if (el) el.scrollTop = el.scrollHeight; },
 
-        togglePick() {
-            this.picking = !this.picking;
-            window.dispatchEvent(new CustomEvent('studio:to-iframe', { detail: { type: 'studio:element-select', on: this.picking } }));
+        togglePick() { this.setPicking(!this.picking) },
+
+        // The pick tool is one state in two documents: the canvas draws the
+        // dashed outline and reports the click; the editor shows the banner
+        // (studio:pick) and cancels on Esc.
+        setPicking(on) {
+            this.picking = on;
+            window.dispatchEvent(new CustomEvent('studio:to-iframe', { detail: { type: 'studio:element-select', on } }));
+            window.dispatchEvent(new CustomEvent('studio:pick', { detail: { on } }));
         },
 
         use(text) { this.prompt = text; this.$refs.composer?.focus(); },
@@ -186,7 +194,7 @@
             @if(empty($messages) && !$thread)
                 <div class="px-1 py-6 text-center">
                     <p class="text-[13px] text-ink">What should change on this page?</p>
-                    <p class="mt-1 text-[11.5px] leading-relaxed text-faint">Describe an edit in plain words. Select a section first, or pick an element with the crosshair, to point at something specific.</p>
+                    <p class="mt-1 text-[11.5px] leading-relaxed text-faint">Describe an edit in plain words. To point at something, select a section first, or use <span class="text-soft">Select on page</span> below and click the exact element. You can also right-click anything on the page and choose “Ask the assistant”.</p>
                 </div>
             @endif
 
@@ -270,8 +278,18 @@
                     :disabled="busy"
                 ></textarea>
                 <div class="flex items-center gap-1 px-1.5 pb-1.5">
-                    <button type="button" class="s-icon-btn !h-7 !w-7" :class="picking && '!bg-accent/20 !text-accent'" title="Pick an element on the canvas" @click="togglePick()">
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5a.75.75 0 0 1 1.14-.64l12 7a.75.75 0 0 1-.09 1.33l-4.2 1.72-1.72 4.2a.75.75 0 0 1-1.33.09l-7-12A.75.75 0 0 1 3 3.5Z"/></svg>
+                    {{-- The pick tool. Labelled, and violet while armed, so it
+                         never reads as Edit mode's blue selection. --}}
+                    <button
+                        type="button"
+                        class="s-pick-btn"
+                        :class="picking && 'is-on'"
+                        :title="picking ? 'Stop selecting (Esc)' : 'Click an element on the page to add it to the chat'"
+                        :aria-pressed="picking"
+                        @click="togglePick()"
+                    >
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+                        <span x-text="picking ? 'Selecting…' : 'Select on page'"></span>
                     </button>
 
                     {{-- Engine picker --}}
