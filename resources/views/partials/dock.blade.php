@@ -27,6 +27,7 @@
         'is-hidden': $store.studio.dockHidden && !peek,
         'is-dragging': dragging,
         'is-snapping': snap,
+        'no-tips': !$store.studio.view.tips,
         ['at-' + edge]: true,
     }"
     :style="style"
@@ -154,7 +155,7 @@
         },
     }"
     x-init="place(); $nextTick(() => place())"
-    x-effect="$store.studio.dock; $store.studio.mode; $store.studio.codeAvailable; $nextTick(() => place())"
+    x-effect="$store.studio.dock; $store.studio.mode; $store.studio.codeAvailable; $store.studio.view; $nextTick(() => place())"
     @resize.window.debounce.50ms="place()"
     @transitionend.self="$dispatch('studio:dock-moved')"
     {{-- A peeked dock hides again when the pointer leaves it. The canvas
@@ -168,7 +169,11 @@
     @pointerup.window="endDrag($event)"
     @pointercancel.window="if (dragging) { dragging = false; place() }"
 >
+    {{-- The optional parts — grip, pin, page switcher, device widths,
+         Back/Forward/Reload, the live-page link, tooltips — follow
+         $store.studio.view, switched from the menu's View submenu --}}
     <span
+        x-show="$store.studio.view.grip"
         class="s-dock-grip"
         title="Drag to move the dock"
         aria-label="Drag to move the dock"
@@ -179,6 +184,7 @@
 
     {{-- Pin: a flush rail on this edge, the site pushed over by its size --}}
     <button
+        x-show="$store.studio.view.pin"
         type="button"
         class="s-dock-btn s-dock-pin"
         :class="$store.studio.dock.pinned && 'is-active'"
@@ -212,11 +218,27 @@
         </button>
     @endforeach
 
+    {{-- Back / Forward / Reload — off by default (View → Navigation
+         buttons). Back and Forward walk the editor window's history, which
+         is where page switches and Preview-mode link clicks land. --}}
+    <div class="s-dock-nav" x-show="$store.studio.view.nav" x-cloak>
+        <span class="s-dock-sep"></span>
+        <button type="button" class="s-dock-btn" data-tip="Back" aria-label="Back" @click="history.back()">
+            <svg class="h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+        </button>
+        <button type="button" class="s-dock-btn" data-tip="Forward" aria-label="Forward" @click="history.forward()">
+            <svg class="h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+        </button>
+        <button type="button" class="s-dock-btn" data-tip="Reload the preview" aria-label="Reload the preview" @click="window.dispatchEvent(new CustomEvent('studio:refresh-preview'))">
+            <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
+        </button>
+    </div>
+
     {{-- Pinned top or bottom, the bar is the full window width: the page
          switcher sits in its centre and the device widths join the right
          group. Floating and vertical rails stay icons-only. --}}
     <div
-        x-show="$store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
+        x-show="$store.studio.view.pages && $store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
         x-cloak
         class="s-dock-page"
         x-data="{
@@ -286,7 +308,7 @@
     {{-- Device widths — only where the bar has the room --}}
     <div
         class="s-dock-seg s-dock-devices"
-        x-show="$store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
+        x-show="$store.studio.view.devices && $store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
         x-cloak
         role="radiogroup"
         aria-label="Canvas width"

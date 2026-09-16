@@ -139,6 +139,37 @@
                         this.dockHidden = !this.dockHidden;
                         localStorage.setItem('studio.dock-hidden', this.dockHidden ? '1' : '0');
                     },
+
+                    /* --- View ------------------------------------------------
+                       Which optional parts of the toolbar are drawn, from the
+                       menu's View submenu. Only these switches live here — the
+                       canvas width, dock position and theme keep their own
+                       state and the submenu just edits it. A key missing from
+                       the saved object takes its default, so a new switch
+                       never needs a migration. */
+                    viewDefaults: { grip: true, pin: true, pages: true, devices: true, nav: false, live: true, tips: true },
+                    view: (() => {
+                        const defaults = { grip: true, pin: true, pages: true, devices: true, nav: false, live: true, tips: true };
+                        try {
+                            const saved = JSON.parse(localStorage.getItem('studio.view') || 'null');
+                            if (saved && typeof saved === 'object') {
+                                return Object.fromEntries(Object.keys(defaults).map((key) => [key, typeof saved[key] === 'boolean' ? saved[key] : defaults[key]]));
+                            }
+                        } catch (e) { /* fall through */ }
+                        return defaults;
+                    })(),
+                    toggleView(key) {
+                        if (!(key in this.viewDefaults)) return;
+                        this.view = { ...this.view, [key]: !this.view[key] };
+                        localStorage.setItem('studio.view', JSON.stringify(this.view));
+                    },
+                    resetView() {
+                        this.view = { ...this.viewDefaults };
+                        localStorage.removeItem('studio.view');
+                    },
+                    get viewCustomized() {
+                        return Object.keys(this.viewDefaults).some((key) => this.view[key] !== this.viewDefaults[key]);
+                    },
                     // Code mode's file tree column (inside the code pane)
                     filesOpen: localStorage.getItem('studio.files') !== '0',
                     toggleFiles() {
@@ -249,6 +280,7 @@
             target="_blank"
             rel="noopener"
             class="s-dock-btn"
+            x-show="$store.studio.view.live"
             data-tip="Open the live page"
             aria-label="Open the live page in a new tab"
         >
@@ -358,6 +390,7 @@
             <button
                 @click="open = !open; if (open) refreshStatus()"
                 class="s-dock-publish"
+                :class="open && 'is-open'"
                 x-data="{ state: 'idle' }"
                 @studio:status.window="state = $event.detail.state"
                 :title="state === 'saving' ? 'Saving…' : state === 'error' ? 'Offline — changes are not being saved' : 'All changes saved'"
@@ -474,6 +507,34 @@
             x-data="{
                 open: false,
                 popStyle: '',
+                viewOpen: false,
+                viewStyle: '',
+                viewTimer: null,
+
+                // The View submenu flies out beside the menu, on whichever
+                // side has room, its first row level with the View row.
+                placeView() {
+                    const menu = this.$refs.menu.getBoundingClientRect();
+                    const row = this.$refs.viewRow.getBoundingClientRect();
+                    const width = 300, gap = 6, pad = 12;
+                    const h = this.$refs.view.offsetHeight || 420;
+                    let left = menu.right + gap;
+                    if (left + width > window.innerWidth - pad) left = menu.left - gap - width;
+                    left = Math.max(pad, left);
+                    const top = Math.max(pad, Math.min(row.top - 5, window.innerHeight - h - pad));
+                    this.viewStyle = `left:${Math.round(left)}px; top:${Math.round(top)}px; width:${width}px`;
+                },
+                showView(delay = 0) {
+                    clearTimeout(this.viewTimer);
+                    this.viewTimer = setTimeout(() => {
+                        this.viewOpen = true;
+                        this.$nextTick(() => this.placeView());
+                    }, delay);
+                },
+                hideView(delay = 0) {
+                    clearTimeout(this.viewTimer);
+                    this.viewTimer = setTimeout(() => { this.viewOpen = false }, delay);
+                },
 
                 async duplicatePage() {
                     this.open = false;
@@ -496,8 +557,10 @@
                     }
                 },
             }"
-            @click.outside="open = false"
-            @keydown.escape.window="open = false"
+            @click.outside="open = false; viewOpen = false"
+            @keydown.escape.window="if (viewOpen) viewOpen = false; else open = false"
+            x-effect="if (!open) viewOpen = false"
+            @studio:dock-moved.window="if (open) { popStyle = window.StudioDock.anchor($refs.menu, $refs.menu.previousElementSibling, 272); if (viewOpen) $nextTick(() => placeView()) }"
         >
             <button @click="open = !open" class="s-dock-btn is-menu s-logo-btn" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu">
                 <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
@@ -513,9 +576,12 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop s-pop-inverse fixed z-50 w-60"
+                class="s-pop s-pop-inverse fixed z-50 w-[272px]"
                 :style="popStyle"
-                x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 240) })"
+                x-ref="menu"
+                x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 272) })"
+                {{-- Pointing at any other row closes the View submenu --}}
+                @mouseover="if ($event.target.closest('.s-menu-item:not([data-view-row])')) hideView(120)"
             >
                 <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
                     <svg class="h-[17px] w-auto -translate-y-0.5 text-ink" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
@@ -554,17 +620,80 @@
                     </span>
                     <span class="s-chip" :class="$store.studio.theme === 'light' && '!border-accent/50 !text-accent'" x-text="$store.studio.theme === 'light' ? 'On' : 'Off'"></span>
                 </button>
-                {{-- Canvas width --}}
+                {{-- View: canvas width, toolbar position and which toolbar
+                     parts are drawn, in a submenu beside this one --}}
+                <button
+                    type="button"
+                    class="s-menu-item justify-between"
+                    :class="viewOpen && 'bg-wash !text-ink'"
+                    data-view-row
+                    x-ref="viewRow"
+                    @mouseenter="showView(80)"
+                    @mouseleave="if (!$event.relatedTarget?.closest?.('[data-view-menu]')) hideView(250)"
+                    @click="viewOpen ? hideView() : showView()"
+                    @keydown.arrow-right.prevent="showView(); $nextTick(() => $refs.view.querySelector('button')?.focus())"
+                    aria-haspopup="menu"
+                    :aria-expanded="viewOpen"
+                >
+                    <span class="flex items-center gap-2.5">
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
+                        View
+                    </span>
+                    <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+                @if($liveUrl)
+                    <div class="s-divider my-1"></div>
+                    <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
+                        View live site
+                    </a>
+                @endif
+            </div>
+
+            {{-- The View submenu. A sibling of the menu, not inside it: the
+                 menu's enter transition transforms it, and a transformed
+                 ancestor would anchor this fixed panel to itself. --}}
+            @php
+                $viewSwitches = [
+                    'grip' => ['Drag handle', 'Drag the toolbar to any edge'],
+                    'pin' => ['Pin button', 'Pin the toolbar flush to its edge'],
+                    'nav' => ['Back, Forward & Reload', 'Browser-style buttons in the toolbar'],
+                    'live' => ['Open live page', 'A button that opens this page in a new tab'],
+                    'pages' => ['Page switcher', 'In the pinned top or bottom bar'],
+                    'devices' => ['Canvas width buttons', 'In the pinned top or bottom bar'],
+                    'tips' => ['Tooltips', 'Button labels on hover'],
+                ];
+            @endphp
+            <div
+                x-show="open && viewOpen"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="s-pop s-pop-inverse fixed z-50"
+                :style="viewStyle"
+                x-ref="view"
+                data-view-menu
+                role="menu"
+                aria-label="View"
+                @mouseenter="clearTimeout(viewTimer)"
+                @mouseleave="if (!$event.relatedTarget?.closest?.('[data-view-row]')) hideView(250)"
+                @keydown.arrow-left.prevent="viewOpen = false; $refs.viewRow.focus()"
+            >
+                <p class="s-microlabel px-2.5 pb-1 pt-2">Canvas</p>
                 <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
                     <span class="flex items-center gap-2.5">
                         <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="1.75" y="2.25" width="12.5" height="11.5" rx="2.25"/><path d="M5.5 13.75v-2.5m5 2.5v-2.5"/></svg>
-                        Canvas width
+                        Width
                     </span>
                     <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Canvas width">
-                        @foreach(['desktop' => 'Desktop', 'tablet' => 'Tablet — 768px', 'mobile' => 'Mobile — 390px'] as $value => $label)
+                        @foreach(['desktop' => 'Desktop (⌥1)', 'tablet' => 'Tablet — 768px (⌥2)', 'mobile' => 'Mobile — 390px (⌥3)'] as $value => $label)
                             <button
                                 type="button"
-                                class="flex h-6 cursor-pointer items-center justify-center rounded-md px-1.5 text-[11px] transition-colors duration-150"
+                                class="flex h-6 cursor-pointer items-center justify-center rounded-md px-2 text-[11.5px] transition-colors duration-150"
                                 :class="$store.studio.device === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
                                 @click="$store.studio.device = '{{ $value }}'"
                                 role="radio"
@@ -574,12 +703,15 @@
                         @endforeach
                     </span>
                 </div>
-                {{-- Toolbar placement — floating, or pinned to an edge as a
-                     rail. Pinned top is the header bar. --}}
+
+                <div class="s-divider my-1"></div>
+
+                <p class="s-microlabel px-2.5 pb-1 pt-1.5">Toolbar</p>
+                {{-- Floating, or pinned to an edge as a rail. Pinned top is the header bar. --}}
                 <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
                     <span class="flex items-center gap-2.5">
                         @include('studio::partials.activity-bar-glyph', ['position' => 'bottom'])
-                        Toolbar
+                        Position
                     </span>
                     <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Toolbar placement">
                         <button
@@ -610,28 +742,42 @@
                         @endforeach
                     </span>
                 </div>
-                <div class="s-divider my-1"></div>
-                {{-- Browser-style navigation --}}
-                <div class="flex items-center gap-1 px-1.5 py-0.5">
-                    <button type="button" class="s-menu-item flex-1 !justify-center" @click="open = false; history.back()" title="Back">
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 5.5 8 12l6.5 6.5"/></svg>
-                        Back
-                    </button>
-                    <button type="button" class="s-menu-item flex-1 !justify-center" @click="open = false; history.forward()" title="Forward">
-                        Forward
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
-                    </button>
-                    <button type="button" class="s-menu-item flex-1 !justify-center" @click="open = false; window.dispatchEvent(new CustomEvent('studio:refresh-preview'))" title="Reload the preview">
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.75V6.9a.6.6 0 0 1-.6.6h-3.15"/></svg>
-                        Reload
+
+                <div class="mt-0.5">
+                    @foreach($viewSwitches as $key => [$label, $hint])
+                        <button
+                            type="button"
+                            class="s-menu-item"
+                            role="menuitemcheckbox"
+                            :aria-checked="$store.studio.view.{{ $key }}"
+                            @click="$store.studio.toggleView('{{ $key }}')"
+                            title="{{ $hint }}"
+                        >
+                            <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                                <svg x-show="$store.studio.view.{{ $key }}" class="h-3.5 w-3.5 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                            </span>
+                            <span class="min-w-0 flex-1 truncate" :class="$store.studio.view.{{ $key }} && 'text-ink'">{{ $label }}</span>
+                            @if(in_array($key, ['pages', 'devices'], true))
+                                <span class="shrink-0 text-[10.5px] text-faint" x-show="!($store.studio.dock.pinned && $store.studio.dockHorizontal)">pinned bar</span>
+                            @endif
+                        </button>
+                    @endforeach
+                    <button type="button" class="s-menu-item" role="menuitemcheckbox" :aria-checked="!$store.studio.dockHidden" @click="$store.studio.toggleDock()" title="Hide the toolbar; point at its edge to peek it back">
+                        <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                            <svg x-show="!$store.studio.dockHidden" class="h-3.5 w-3.5 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                        </span>
+                        <span class="min-w-0 flex-1 truncate" :class="!$store.studio.dockHidden && 'text-ink'">Show toolbar</span>
+                        <span class="s-kbd">⌘.</span>
                     </button>
                 </div>
-                @if($liveUrl)
-                    <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
-                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
-                        View live site
-                    </a>
-                @endif
+
+                <div x-show="$store.studio.viewCustomized" x-cloak>
+                    <div class="s-divider my-1"></div>
+                    <button type="button" class="s-menu-item" @click="$store.studio.resetView()">
+                        <span class="h-3.5 w-3.5 shrink-0"></span>
+                        Reset toolbar parts
+                    </button>
+                </div>
             </div>
         </div>
     </x-slot:menu>
@@ -701,6 +847,13 @@
                     { label: 'Toolbar: pin bottom', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'bottom'), run: () => studio.setDock('bottom', 0.5, true) },
                     { label: 'Toolbar: floating', hint: 'Layout', when: studio.dock.pinned, run: () => studio.setDock(studio.dock.edge, studio.dock.along, false) },
                     { label: studio.dockHidden ? 'Show the toolbar' : 'Hide the toolbar', hint: 'Layout', run: () => studio.toggleDock() },
+                    { label: studio.view.nav ? 'Hide Back, Forward & Reload' : 'Show Back, Forward & Reload', hint: 'View', run: () => studio.toggleView('nav') },
+                    { label: studio.view.grip ? 'Hide the drag handle' : 'Show the drag handle', hint: 'View', run: () => studio.toggleView('grip') },
+                    { label: studio.view.pin ? 'Hide the pin button' : 'Show the pin button', hint: 'View', run: () => studio.toggleView('pin') },
+                    { label: studio.view.live ? 'Hide the live-page button' : 'Show the live-page button', hint: 'View', run: () => studio.toggleView('live') },
+                    { label: studio.view.tips ? 'Turn toolbar tooltips off' : 'Turn toolbar tooltips on', hint: 'View', run: () => studio.toggleView('tips') },
+                    { label: 'Go back', hint: 'Navigate', run: () => history.back() },
+                    { label: 'Go forward', hint: 'Navigate', run: () => history.forward() },
                     { label: 'Preview: desktop', hint: 'Device', run: () => studio.device = 'desktop' },
                     { label: 'Preview: tablet', hint: 'Device', run: () => studio.device = 'tablet' },
                     { label: 'Preview: mobile', hint: 'Device', run: () => studio.device = 'mobile' },

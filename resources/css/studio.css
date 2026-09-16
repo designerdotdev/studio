@@ -505,6 +505,11 @@ html.studio-light {
         @apply text-ink;
     }
 
+    /* Back / Forward / Reload: its buttons sit in the dock's own flex row */
+    .s-dock-nav {
+        display: contents;
+    }
+
     .s-dock-sep {
         @apply shrink-0 bg-line;
         width: 1px;
@@ -625,6 +630,13 @@ html.studio-light {
     .s-dock-btn[data-tip]:hover::after {
         opacity: 1;
         transition-delay: 450ms;
+    }
+
+    /* No tooltips while a dock popover is open (they would sit on top of
+       it), or when View → Tooltips is off */
+    .s-dock:has(.is-open) .s-dock-btn[data-tip]::after,
+    .s-dock.no-tips .s-dock-btn[data-tip]::after {
+        display: none;
     }
 
     .s-dock.at-bottom .s-dock-btn[data-tip]::after { bottom: calc(100% + 10px); left: 50%; translate: -50% 0; }
