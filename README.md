@@ -1,5 +1,7 @@
 # Designer Studio
 
+<img src="https://cdn.designer.dev/banner-graphic.png" style="width:100%; height:auto" alt="Designer Studio graphic banner" />
+
 A visual component builder/editor for Laravel applications. Build beautiful pages visually and export them as Blade files.
 
 ## Features
