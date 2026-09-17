@@ -18,6 +18,92 @@
             // Apply the saved editor theme before first paint (dark is the default)
             if (localStorage.getItem('studio.theme') === 'light') document.documentElement.classList.add('studio-light');
         </script>
+        @isset($sidebar)
+            {{-- The editor boots hidden. The dock is placed by script, the
+                 open panel anchors to the dock, and the canvas paints blank
+                 until its document loads — shown as they arrive, they jump.
+                 So until all of it has settled (Alpine up, fonts in, the
+                 canvas loaded, the dock placed against the real font) they
+                 stay invisible, still laid out so they can be measured, and
+                 then fade in together. Inline, so it holds from first paint;
+                 a timeout reveals regardless, so nothing can stay hidden. --}}
+            <style>
+                html.studio-booting .s-dock,
+                html.studio-booting .s-float,
+                html.studio-booting .s-scrim,
+                html.studio-booting .s-stage {
+                    visibility: hidden;
+                    opacity: 0;
+                    transition: none !important;
+                    animation: none !important;
+                    pointer-events: none;
+                }
+
+                html.studio-revealing .s-dock,
+                html.studio-revealing .s-stage,
+                html.studio-revealing .s-float,
+                html.studio-revealing .s-scrim {
+                    transition: opacity 180ms ease;
+                }
+            </style>
+            <script>
+                (() => {
+                    const root = document.documentElement;
+                    root.classList.add('studio-booting');
+
+                    const frames = (n) => new Promise((resolve) => {
+                        const step = () => (n-- > 0 ? requestAnimationFrame(step) : resolve());
+                        step();
+                    });
+
+                    // Alpine has rendered the stores and run the dock's first place()
+                    const alpine = new Promise((resolve) => {
+                        if (window.Alpine?.version) return resolve();
+                        document.addEventListener('alpine:initialized', resolve, { once: true });
+                    }).then(() => frames(2));
+
+                    // The canvas document, its images and its own fonts. A capturing
+                    // listener catches the iframe's load even though load doesn't bubble.
+                    const canvas = new Promise((resolve) => {
+                        const done = (frame) => {
+                            let fonts;
+                            try { fonts = frame.contentDocument?.fonts?.ready; } catch (e) { /* cross-origin */ }
+                            Promise.resolve(fonts).then(resolve, resolve);
+                        };
+                        document.addEventListener('load', (event) => {
+                            if (event.target?.id === 'studio-canvas-frame') done(event.target);
+                        }, true);
+                        document.addEventListener('DOMContentLoaded', () => {
+                            const frame = document.getElementById('studio-canvas-frame');
+                            if (!frame) return resolve();
+                            try {
+                                if (frame.contentDocument?.readyState === 'complete' && frame.contentWindow.location.href !== 'about:blank') done(frame);
+                            } catch (e) { /* the load listener still fires */ }
+                        });
+                    });
+
+                    const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
+
+                    let revealed = false;
+                    const reveal = async () => {
+                        if (revealed) return;
+                        revealed = true;
+                        // Re-place the dock and panel against the loaded font, then
+                        // show them only once that position has been painted
+                        window.dispatchEvent(new CustomEvent('studio:reflow'));
+                        await frames(2);
+                        root.classList.add('studio-revealing');
+                        root.classList.remove('studio-booting');
+                        setTimeout(() => root.classList.remove('studio-revealing'), 250);
+                    };
+
+                    Promise.race([
+                        Promise.all([alpine, document.fonts.ready, canvas]),
+                        timeout,
+                    ]).then(reveal, reveal);
+                })();
+            </script>
+        @endisset
         @studioStyles
         @livewireStyles
     </head>
@@ -111,6 +197,7 @@
                     x-effect="$store.studio.rail; $store.studio.sidebar; $store.studio.dock; $store.studio.mode; $nextTick(() => place())"
                     @resize.window.debounce.50ms="place()"
                     @studio:dock-moved.window="place()"
+                    @studio:reflow.window="place()"
                     x-show="$store.studio.sidebar"
                     x-cloak
                     :aria-hidden="!$store.studio.sidebar"
