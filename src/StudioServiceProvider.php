@@ -70,6 +70,9 @@ class StudioServiceProvider extends ServiceProvider
         }
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
 
+        // "designer studio · Edit" on pages the site serves (see studio.badge)
+        $this->app['router']->pushMiddlewareToGroup('web', \Designer\Studio\Http\Middleware\InjectEditBadge::class);
+
         // Sections compose the site's other components (<x-nav>, an icon…).
         // The runtime provider registers the same path for the live site;
         // Studio needs it for the canvas even before that provider exists.

@@ -53,6 +53,18 @@
                         this.sidebar = false;
                         localStorage.setItem('studio.sidebar', '0');
                     },
+                    // A floating popover behaves like one: pressing the site
+                    // behind it closes it (the canvas iframe reports its own
+                    // presses as studio:canvas-pointerdown). Nothing covers
+                    // the site to catch the press, so it keeps scrolling.
+                    // Armed, the Assistant's pick tool owns that press — the
+                    // panel stays. A docked column is part of the layout, and
+                    // a sheet already has its scrim.
+                    dismissFloating() {
+                        if (!this.sidebar || this.docked || this.frame !== 'popover') return;
+                        if (window.Studio?.picking) return;
+                        this.closePanel();
+                    },
                     // The rail: which panel the floating surface shows.
                     rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) ? s : 'sections')(localStorage.getItem('studio.rail')),
                     setRail(name, force = false) {
@@ -1057,6 +1069,7 @@
         <div
             class="min-w-0 flex-1 overflow-auto"
             x-show="$store.studio.canvasVisible"
+            @pointerdown="if ($event.button === 0) $store.studio.dismissFloating()"
         >
             <div class="flex h-full flex-col">
                 <div

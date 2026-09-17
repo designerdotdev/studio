@@ -157,6 +157,7 @@
     x-init="place(); $nextTick(() => place())"
     x-effect="$store.studio.dock; $store.studio.mode; $store.studio.codeAvailable; $store.studio.view; $nextTick(() => place())"
     @resize.window.debounce.50ms="place()"
+    @studio:reflow.window="place()"
     @transitionend.self="$dispatch('studio:dock-moved')"
     {{-- A peeked dock hides again when the pointer leaves it. The canvas
          iframe swallows pointer events, so this is per-element enter/leave,

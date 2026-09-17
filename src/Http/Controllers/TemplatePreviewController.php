@@ -7,8 +7,7 @@ use Designer\Studio\Services\Templates\TemplatePreview;
 /**
  * /template — browse the template repositories in the configured folder
  * without installing any of them (local development only; see
- * TemplatePreview and `studio.template_preview`). /templates is the
- * gallery and viewer over the same folder.
+ * TemplatePreview and `studio.template_preview`).
  */
 class TemplatePreviewController
 {
@@ -21,38 +20,6 @@ class TemplatePreviewController
                 'templates' => $preview->catalog(),
                 'root' => $preview->root(),
                 'prefix' => $preview->prefix(),
-            ])
-            ->header('Cache-Control', 'no-store');
-    }
-
-    public function gallery()
-    {
-        $templates = TemplatePreview::make()->catalog();
-
-        return response()
-            ->view('studio::template-gallery', [
-                'templates' => $templates,
-                'categories' => array_values(array_unique(array_filter(array_column($templates, 'category')))),
-            ])
-            ->header('Cache-Control', 'no-store');
-    }
-
-    public function viewer(string $slug)
-    {
-        $templates = TemplatePreview::make()->catalog();
-        $index = array_search($slug, array_column($templates, 'slug'), true);
-
-        abort_if($index === false, 404);
-
-        $count = count($templates);
-
-        return response()
-            ->view('studio::template-viewer', [
-                'template' => $templates[$index],
-                'previous' => $templates[($index - 1 + $count) % $count],
-                'next' => $templates[($index + 1) % $count],
-                'position' => $index + 1,
-                'count' => $count,
             ])
             ->header('Cache-Control', 'no-store');
     }
