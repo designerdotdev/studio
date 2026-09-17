@@ -327,7 +327,7 @@ class TemplateSync
     /** Run git, returning stdout; throws with stderr on failure. */
     protected function git(array $args, string $cwd): string
     {
-        $process = new Process(['git', ...$args], $cwd, ['GIT_TERMINAL_PROMPT' => '0']);
+        $process = new Process(['git', ...$args], $cwd, $this->environment());
         $process->setTimeout(self::GIT_TIMEOUT);
         $process->run();
 
@@ -338,5 +338,39 @@ class TemplateSync
         }
 
         return $process->getOutput();
+    }
+
+    /**
+     * The environment git runs in. It must never prompt, and it needs the
+     * user's global config — the credential helper there is the only way a
+     * private repository clones — plus the helper's own binaries. A web SAPI
+     * often drops HOME and trims PATH (`php artisan serve` drops HOME on
+     * purpose), so both are restored here when they are missing.
+     *
+     * @return array<string, string>
+     */
+    protected function environment(): array
+    {
+        $env = ['GIT_TERMINAL_PROMPT' => '0'];
+
+        if (!getenv('HOME') && function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $home = posix_getpwuid(posix_geteuid())['dir'] ?? null;
+
+            if (is_string($home) && $home !== '') {
+                $env['HOME'] = $home;
+            }
+        }
+
+        $path = array_filter(explode(PATH_SEPARATOR, (string) getenv('PATH')));
+        $missing = array_filter(
+            ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'],
+            fn (string $dir) => is_dir($dir) && !in_array($dir, $path, true)
+        );
+
+        if ($missing) {
+            $env['PATH'] = implode(PATH_SEPARATOR, [...$path, ...$missing]);
+        }
+
+        return $env;
     }
 }

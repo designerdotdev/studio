@@ -167,15 +167,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | Whole starter sites, each living in its own git repository in the
-    | DevDojo site-templates format. Picking one (in onboarding, or with
-    | `php artisan studio:templates:import pilot`) copies the files it uses
+    | Designer template repository format. Picking one (in onboarding, or with
+    | `php artisan studio:templates:import starter`) copies the files it uses
     | into your app — its `files/resources` tree into resources/designer and
     | its `files/public` tree into public/designer — and nothing else.
     |
     | `catalog` is the authority on which templates are offered, in picker
     | order: slug => repository URL, or an array with a `repo` plus the
-    | `name`, `description` and `category` (landing | business) the picker
-    | shows before the template is downloaded. Repositories are cloned on
+    | `name`, `description` and `category` (starter | landing | business) the
+    | picker shows before the template is downloaded. Repositories are cloned on
     | first use into `path`, a cache inside Studio's storage
     | (`php artisan studio:templates:sync` refreshes it).
     |
@@ -184,74 +184,68 @@ return [
         'path' => storage_path('studio/templates'),
 
         'catalog' => [
-            // Landing pages — products, SaaS, and the studios that build them
-            'pilot' => [
-                'repo' => 'https://github.com/site-templates/pilot',
-                'name' => 'Pilot',
-                'category' => 'landing',
-                'description' => 'An off-white, monochrome site for an AI agent framework — dark dropdown menus, a three-pane agent console standing on a painted landscape, and a guides library.',
+            // Starting points — a blank site, and a neutral kit of sections
+            'blank' => [
+                'repo' => 'https://github.com/designer-templates/blank',
+                'name' => 'Blank',
+                'category' => 'starter',
+                'description' => 'An empty site: the token layer, a nav and a footer, a home page with nothing on it, and a 404 — build every section yourself.',
             ],
-            'amber' => [
-                'repo' => 'https://github.com/site-templates/amber',
-                'name' => 'Amber',
-                'category' => 'landing',
-                'description' => 'A warm, serif-led studio landing page — an art-directed hero, numbered services, featured work, retainer pricing, an accordion FAQ, and a news section with full posts.',
-            ],
-            'draft' => [
-                'repo' => 'https://github.com/site-templates/draft',
-                'name' => 'Draft',
-                'category' => 'landing',
-                'description' => 'A dark, Linear-grade SaaS site — glass nav with a mega-dropdown, a CSS-built product mock, bento features, an Updates journal, a changelog, and a mini docs hub.',
-            ],
-            'signal' => [
-                'repo' => 'https://github.com/site-templates/signal',
-                'name' => 'Signal',
-                'category' => 'landing',
-                'description' => 'A warm, canvas-styled SaaS marketing site — floating pill nav, a giant cursor-bar headline, a CSS-built product window, bento features, pricing, a changelog, and a blog.',
-            ],
-            'reply' => [
-                'repo' => 'https://github.com/site-templates/reply',
-                'name' => 'Reply',
-                'category' => 'landing',
-                'description' => 'A cream-canvas SaaS site for a help desk with an AI teammate — an inbox floating on painterly wildflower fields, a live resolution ticker, a pricing toggle, and customer stories.',
-            ],
-            'lumen' => [
-                'repo' => 'https://github.com/site-templates/lumen',
-                'name' => 'Lumen',
-                'category' => 'landing',
-                'description' => 'A polished, deep-green landing page for studios and consultancies — editorial serif headlines, numbered services, big stats, a case-study spotlight, and a journal.',
+            'starter' => [
+                'repo' => 'https://github.com/designer-templates/starter',
+                'name' => 'Starter',
+                'category' => 'starter',
+                'description' => 'A neutral starter with a library of ready-made sections — heroes, features, pricing, testimonials, FAQ, contact and more — across a home, pricing, about and contact page.',
             ],
 
-            // Businesses — studios, hospitality, and property
-            'monarch' => [
-                'repo' => 'https://github.com/site-templates/monarch',
-                'name' => 'Monarch',
-                'category' => 'business',
-                'description' => 'A bone-and-black product studio site built around an oversized menu capsule — split hero, services bento, a dark testimonial, a studio journal, and a dated changelog, lit by an electric lime accent.',
+            // Landing pages
+            'aisle' => [
+                'repo' => 'https://github.com/designer-templates/aisle',
+                'name' => 'Aisle',
+                'category' => 'landing',
+                'description' => 'A sage-grey landing page for hardware-store inventory: a two-tone headline over three tall tiles where a stock count dips under its reorder point and the supplier card stamps PO sent, then a low-stock bento, a phone cycle count, a green-black results band and a paint-drawdown close.',
             ],
-            'stone' => [
-                'repo' => 'https://github.com/site-templates/stone',
-                'name' => 'Stone',
-                'category' => 'business',
-                'description' => 'A calm, confident studio site on warm paper — serif display headlines, a numbered fullscreen menu, an ink-dark pricing tier, and a remembered light/dark mode.',
+            'ascent' => [
+                'repo' => 'https://github.com/designer-templates/ascent',
+                'name' => 'Ascent',
+                'category' => 'landing',
+                'description' => 'App Store analytics landing page for indie iOS developers: a drawn dashboard in a soft silk-ribbon frame whose downloads chart draws and review feed updates, digest, keyword-rank and trial-cohort rows, a plum stats band, a review inbox with replies, and plans with a lifted Indie tier.',
             ],
-            'strata' => [
-                'repo' => 'https://github.com/site-templates/strata',
-                'name' => 'Strata',
-                'category' => 'business',
-                'description' => 'An elegant luxury real-estate site — a full-bleed dusk hero, serif-display property pages with stat cards, a curated portfolio grid, and warm editorial storytelling.',
+            'bramble' => [
+                'repo' => 'https://github.com/designer-templates/bramble',
+                'name' => 'Bramble',
+                'category' => 'landing',
+                'description' => 'A warm, playful SaaS site for mobile pet groomers — sleepy drawn characters that wake when a booking lands, an app-card bento, a route day that draws itself, a quote wall and plan cards.',
             ],
-            'crema' => [
-                'repo' => 'https://github.com/site-templates/crema',
-                'name' => 'Crema',
-                'category' => 'business',
-                'description' => 'A specialty coffee roaster and neighbourhood bar, built around a hand-set counter board, a priced menu, and structured single-origin pages.',
+            'canary' => [
+                'repo' => 'https://github.com/designer-templates/canary',
+                'name' => 'Canary',
+                'category' => 'landing',
+                'description' => 'A warm-black preview-environments landing page in Host Grotesk: a coral horizon over three environment windows where Staging and Dev angle away from a glowing Production window that runs its build log and turns Live, a PR-comment workflow split, a seeded-data bento, a canary.yml code window, an editorial pull quote, and a per-preview-hour pricing teaser.',
             ],
-            'norden' => [
-                'repo' => 'https://github.com/site-templates/norden',
-                'name' => 'Norden',
-                'category' => 'business',
-                'description' => 'A calm, photographic coffee house — a split hero under a rotating seal, a full drinks menu with a page for every cup, a drawn neighbourhood map, and a journal.',
+            'pacer' => [
+                'repo' => 'https://github.com/designer-templates/pacer',
+                'name' => 'Pacer',
+                'category' => 'landing',
+                'description' => 'A honey-yellow landing site for a running-club app: a poster headline with route, pace and RSVP cards fanning out beneath it, drawn run cards, a route map that draws itself, an ink stats band and a sunlit photograph close.',
+            ],
+            'pinnacle' => [
+                'repo' => 'https://github.com/designer-templates/pinnacle',
+                'name' => 'Pinnacle',
+                'category' => 'landing',
+                'description' => 'A blue-hour treasury site for a US contractor-payouts product: a full-bleed alpine lake with a live payout run settling across the states, a graphite bento of USD accounts, ACH, RTP and FedNow rails and 1099 filing, a readable cost-and-speed table, a dot-matrix map of all 50 states and DC, and a quiet onyx-and-cobalt palette in Onest.',
+            ],
+            'pioneer' => [
+                'repo' => 'https://github.com/designer-templates/pioneer',
+                'name' => 'Pioneer',
+                'category' => 'landing',
+                'description' => 'A sand-and-canyon-orange landing site for a travel-and-expense agent: a gouache desert morning in a rounded stage where an itinerary books itself row by row, a step rail, a live-budget bento, a torn hotel folio matched to its card charge, an espresso stats band and a dusk close, set in Figtree and Instrument Sans.',
+            ],
+            'quill' => [
+                'repo' => 'https://github.com/designer-templates/quill',
+                'name' => 'Quill',
+                'category' => 'landing',
+                'description' => 'A warm cream knowledge-base landing site — a hand-drawn rope illustration, a wiki on a laptop with a phone overlapping, a Discussions split on sand dunes, a tilted ink ellipse, a testimonials wall, a template carousel, pricing with a yearly switch, a blog, and sign-in and sign-up pages.',
             ],
         ],
     ],

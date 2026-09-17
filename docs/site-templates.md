@@ -1,7 +1,7 @@
 # Site templates and the installed site
 
 A site template is a whole starter site — pages, sections, a palette, and its own assets —
-living in its own git repository in the DevDojo `site-templates` format. Studio installs one
+living in its own git repository in the Designer template repository format. Studio installs one
 into your Laravel app, and from then on **the site is a set of ordinary files in your app**:
 
 ```
@@ -18,8 +18,8 @@ site keeps working, because nothing it serves comes from the package.
 Pick a template on the first visit to `/studio`, or from the console:
 
 ```bash
-php artisan studio:templates:import pilot            # install into an app with no site yet
-php artisan studio:templates:import monarch --force  # replace the installed site
+php artisan studio:templates:import starter          # install into an app with no site yet
+php artisan studio:templates:import aisle --force    # replace the installed site
 php artisan studio:templates:sync --list             # what is catalogued and downloaded
 ```
 
@@ -43,9 +43,9 @@ Installing:
 'templates' => [
     'path' => storage_path('studio/templates'),
     'catalog' => [
-        'pilot' => [
-            'repo' => 'https://github.com/site-templates/pilot',
-            'name' => 'Pilot',
+        'aisle' => [
+            'repo' => 'https://github.com/designer-templates/aisle',
+            'name' => 'Aisle',
             'category' => 'landing',
             'description' => '…',
         ],
@@ -57,20 +57,22 @@ Installing:
 The catalog decides which templates the picker offers, and in what order. An entry is a
 repository URL, or an array with a `repo` plus the `name`/`description` shown before it is
 downloaded (the picture comes from the repository's `thumbnail.png`) and a `category` the
-picker's filters group by (`landing`, `business`, or any word of your own).
+picker's filters group by (`starter`, `landing`, `business`, or any word of your own).
 
-Studio ships with eleven:
+Studio ships with ten — two starting points and eight landing pages:
 
-| Landing pages | | Business | |
+| Starting points | | Landing pages | |
 |---|---|---|---|
-| Pilot | AI agent framework, off-white and monochrome | Monarch | Product studio, bone and black with a lime accent |
-| Amber | Warm, serif-led studio landing page | Stone | Calm studio site on warm paper, light/dark |
-| Draft | Dark, Linear-grade SaaS with a changelog and docs | Strata | Luxury real estate with property pages |
-| Signal | Warm SaaS marketing site with a changelog and blog | Crema | Coffee roaster and bar with single-origin pages |
-| Reply | Cream-canvas help desk SaaS with customer stories | Norden | Photographic coffee house with a page per drink |
-| Lumen | Deep-green landing page for studios and consultancies | | |
+| Blank | The token layer, a nav and a footer, an empty home page | Aisle | Hardware-store inventory, sage-grey with a paint-drawdown close |
+| Starter | A neutral kit of ready-made sections across four pages | Ascent | App Store analytics for indie iOS developers |
+| | | Bramble | Mobile pet groomers, warm and playful with drawn characters |
+| | | Canary | Preview environments, warm-black with a coral horizon |
+| | | Pacer | A running-club app, honey-yellow with a route map that draws itself |
+| | | Pinnacle | Contractor payouts, a blue-hour treasury site |
+| | | Pioneer | A travel-and-expense agent, sand and canyon orange |
+| | | Quill | A knowledge base, warm cream with a pricing page and a blog |
 
-Any repository in the `site-templates` format works — add your own to the list.
+Any repository in this format works — add your own to the list.
 
 A downloaded clone is an ordinary checkout; one holding uncommitted or unpushed work is never
 reset — sync reports it and moves on, and only `--force` discards it.

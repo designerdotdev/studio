@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
  * The templates a site can start from.
  *
  * Normally the entries of `studio.templates.catalog`, each a whole site in
- * its own git repository (the DevDojo `site-templates` format). A template
+ * its own git repository (the Designer template repository format). A template
  * does not have to be downloaded to be offered — the picker shows the
  * catalog's own name and description, with the thumbnail served from the
  * repository — and it is cloned the moment someone picks it.
@@ -96,7 +96,7 @@ class TemplateCatalog
      */
     public function categories(): array
     {
-        $labels = ['landing' => 'Landing pages', 'business' => 'Business'];
+        $labels = ['starter' => 'Starting points', 'landing' => 'Landing pages', 'business' => 'Business'];
         $categories = [];
 
         foreach ($this->all() as $entry) {

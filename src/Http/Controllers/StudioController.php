@@ -404,13 +404,26 @@ class StudioController extends Controller
     }
 
     /**
-     * The picture a template ships of itself: from the local copy once it
-     * has been downloaded, from its repository before that.
+     * The picture a template ships of itself: from the local copy, which is
+     * downloaded on the first request for it (a private repository has no
+     * public raw URL to fall back on), and from the repository's raw
+     * thumbnail only when the download failed.
      */
     public function templateThumbnail(string $name)
     {
         $catalog = app(\Designer\Studio\Services\Templates\TemplateCatalog::class);
         $path = $catalog->thumbnailPath($name);
+
+        if (!$path && $catalog->has($name) && !$catalog->local()) {
+            try {
+                $catalog->directory($name);
+            } catch (\Throwable $e) {
+                // Offline or unreachable: fall through to the remote picture
+                report($e);
+            }
+
+            $path = $catalog->thumbnailPath($name);
+        }
 
         if ($path) {
             return response()->file($path, [
