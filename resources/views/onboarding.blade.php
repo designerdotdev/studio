@@ -264,7 +264,7 @@
                     >
                         <span x-show="!applying">Use this template</span>
                         <span x-show="applying" x-cloak class="flex items-center gap-2">
-                            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                            <x-studio::mark-loader class="h-4 w-4"/>
                             Setting up your site…
                         </span>
                     </button>

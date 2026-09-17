@@ -236,7 +236,7 @@
                 <div x-show="busy" x-cloak class="mr-6 rounded-xl rounded-bl-sm border border-line bg-raised px-3 py-2 text-[12.5px] leading-relaxed text-ink/90">
                     <p class="whitespace-pre-wrap break-words" x-text="live.text" x-show="live.text"></p>
                     <p class="flex items-center gap-1.5 text-[11px] text-faint" :class="live.text && 'mt-1.5'" x-show="live.activity">
-                        <svg class="h-3 w-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                        <x-studio::mark-loader class="h-3 w-3 shrink-0"/>
                         <span class="truncate" x-text="live.activity"></span>
                     </p>
                 </div>

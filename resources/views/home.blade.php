@@ -1242,7 +1242,7 @@
                                             </span>
                                         </span>
                                         <span x-show="addingRef === @js('block:' . $block['slug'])" x-cloak>
-                                            <svg class="h-4 w-4 animate-spin text-block" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                                            <x-studio::mark-loader class="h-4 w-4 text-block"/>
                                         </span>
                                     </span>
                                 </button>
@@ -1275,7 +1275,7 @@
                                                 @endif
                                             </span>
                                             <span x-show="addingRef === @js($component->name)" x-cloak>
-                                                <svg class="h-4 w-4 animate-spin text-accent" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                                                <x-studio::mark-loader class="h-4 w-4 text-accent"/>
                                             </span>
                                         </span>
                                     </button>
@@ -1943,7 +1943,7 @@
                 {{-- Editors --}}
                 <div class="relative min-h-0 flex-1">
                     <div x-show="loading" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-panel/70">
-                        <svg class="h-5 w-5 animate-spin text-soft" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                        <x-studio::mark-loader class="h-5 w-5 text-soft"/>
                     </div>
                     <div x-ref="htmlHost" x-show="tab === 'html'" class="s-code-pane h-full"></div>
                     <div x-ref="yamlHost" x-show="tab === 'yaml'" class="s-code-pane h-full"></div>
