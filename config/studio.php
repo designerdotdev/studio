@@ -195,7 +195,7 @@ return [
                 'repo' => 'https://github.com/designer-templates/starter',
                 'name' => 'Starter',
                 'category' => 'starter',
-                'description' => 'A neutral starter with a library of ready-made sections — heroes, features, pricing, testimonials, FAQ, contact and more — across a home, pricing, about and contact page.',
+                'description' => 'A neutral, light starter site with a library of 20 general-purpose sections — four heroes, three feature layouts, three calls to action, pricing, FAQ, stats, team, testimonials, newsletter, contact, prose and a banner — composed into four pages: Home, Pricing, About and Contact.',
             ],
 
             // Landing pages
