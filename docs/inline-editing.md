@@ -157,8 +157,9 @@ uses `setVariable()` instead.
   change.
 - **repeater items** — hover a row for flanking add-before/after, drag to reorder, delete with
   Undo. Not offered for a `collections.*`-bound repeater.
-- **collection rows** — a value or item of a `collections.*`-bound repeater shows the collection
-  badge and a `Kpis · Value` chip; the click posts `studio:open-inspector` and then
+- **collection rows** — a `collections.*`-bound repeater's row is the only target: its values
+  never get their own halo (`tierAt()` resolves them to the row, since each would open the same
+  row). The row shows the collection badge and a `Kpis · Kpi` chip; the click posts `studio:open-inspector` and then
   `studio:open-collection-row {sectionId, key, index}`. The editor relays the latter to Livewire
   (`EditorPanel::openCollectionRowFromCanvas`), which maps the rendered index onto the
   collection's row order and opens that row's form inside the bound repeater's card in the
@@ -241,9 +242,11 @@ contain zero `sf:` or `data-sf-`.
   must not *replace* the ancestor-first attempt, which is what protects against occluded
   entries (a collapsed nav menu still has laid-out rects over the hero).
 - **Animated sections exist** (Pilot's `logos` marquee). Never cache a rect across frames.
-- **A repeater rendered by two `@foreach` loops** over the same field merges both DOM copies
-  into one group, so the item's common ancestor can climb to the whole section. Those items are
-  detected and get no controls.
+- **A repeater rendered by two `@foreach` loops** over the same field (a nav's desktop bar and
+  its hidden mobile sheet, a marquee's duplicate) would merge both DOM copies into one group, so
+  the item's common ancestor climbs to the whole `<header>` or section. `groupItems()` splits a
+  row's entries into renderings (document order; a repeated field path starts a new one), so each
+  copy is its own item. An item whose box is still the section wrapper gets no controls.
 - **The canvas iframe loads `studio.js` only, never `studio.css`** — anything that renders
   inside the frame needs its styles in `iframe.blade.php`'s pushed `<style>` block.
 - **`DataBag::wrap([])` is an object, and objects are truthy.** Unrelated to inline editing but

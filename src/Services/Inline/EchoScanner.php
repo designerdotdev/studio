@@ -27,6 +27,9 @@ final class EchoScanner
      */
     private const RESERVED = ['loop', 'slot', 'attributes', 'errors', 'site'];
 
+    /** `@foreach (<anything> as [$key =>] $alias)` — group 1 the source, 2 the alias. */
+    private const LOOP_OPEN = '/\G@(?:foreach|forelse)\s*\((.+?)\s+as\s+(?:\$\w+\s*=>\s*)?\$(\w+)\s*\)/A';
+
     /**
      * @param array<string, array> $fields the section's yml field contract
      * @return list<EchoRef>
@@ -62,8 +65,14 @@ final class EchoScanner
             $char = $source[$at];
 
             if ($state === 'TEXT' && $char === '@') {
-                if (preg_match('/\G@(?:foreach|forelse)\s*\(\s*\$(\w+)(?:\[[^\]]*\])?\s+as\s+(?:\$\w+\s*=>\s*)?\$(\w+)\s*\)/A', $source, $m, 0, $at)) {
-                    $loops[] = ['alias' => $m[2], 'field' => isset($fields[$m[1]]) ? $m[1] : null];
+                // Every loop is pushed, even one over something that isn't a
+                // field (`$link->children`): its @endforeach pops, and an
+                // unpushed loop would pop the enclosing one instead — leaving
+                // everything after it (an @else branch, a second copy of the
+                // list) unmapped.
+                if (preg_match(self::LOOP_OPEN, $source, $m, 0, $at)) {
+                    $field = preg_match('/^\$(\w+)(?:\[[^\]]*\])?$/', trim($m[1]), $f) && isset($fields[$f[1]]) ? $f[1] : null;
+                    $loops[] = ['alias' => $m[2], 'field' => $field];
                     $at += strlen($m[0]);
 
                     continue;
@@ -230,7 +239,7 @@ final class EchoScanner
             $char = $source[$at];
 
             if ($state === 'TEXT' && $char === '@') {
-                if (preg_match('/\G@(?:foreach|forelse)\s*\(\s*\$(\w+)(?:\[[^\]]*\])?\s+as\s+(?:\$\w+\s*=>\s*)?\$(\w+)\s*\)/A', $source, $m, 0, $at)) {
+                if (preg_match(self::LOOP_OPEN, $source, $m, 0, $at)) {
                     $loopAliases[] = $m[2];
                     $at += strlen($m[0]);
 

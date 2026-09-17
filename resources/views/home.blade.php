@@ -59,12 +59,14 @@
                     // the site to catch the press, so it keeps scrolling.
                     // Armed, the Assistant's pick tool owns that press — the
                     // panel stays. A docked column is part of the layout, and
-                    // a sheet already has its scrim.
+                    // a sheet already has its scrim. The Sections panel stays
+                    // too: clicking the site is how you pick what it shows.
                     dismissFloating() {
                         if (window.Studio?.picking) return;
                         // The floating chat's conversation folds like a popover
                         if (this.chatFloating && this.chatOpen) this.setChatOpen(false);
                         if (!this.sidebar || this.docked || this.frame !== 'popover') return;
+                        if (this.rail === 'sections') return;
                         this.closePanel();
                     },
                     // The rail: which panel the floating surface shows.

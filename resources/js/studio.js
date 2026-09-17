@@ -688,13 +688,55 @@ const StudioFields = {
         });
 
         return Object.entries(groups)
-            .map(([id, members]) => ({
+            .flatMap(([id, members]) => this.renderings(members).map((cluster) => ({
                 id,
-                key: members[0].key,
-                index: members[0].index,
-                el: this.commonAncestor(members),
-            }))
+                key: cluster[0].key,
+                index: cluster[0].index,
+                el: this.commonAncestor(cluster),
+            })))
             .filter((item) => item.el);
+    },
+
+    /**
+     * One row can render more than once — a nav's links in the desktop bar
+     * AND in the hidden mobile sheet. Grouping both into one item made its
+     * common ancestor the whole <header>, so hovering anywhere on the bar
+     * read as a single "Link". Walk the row's entries in document order and
+     * start a new rendering whenever a field repeats: each copy becomes its
+     * own item, boxed by its own markup (a hidden copy just never hits).
+     */
+    renderings(members) {
+        // A text entry's position is its opening sentinel (the node just
+        // before the range), not the range's container element.
+        const nodeOf = (entry) => entry.range
+            ? (entry.range.startContainer.childNodes[entry.range.startOffset - 1] || entry.range.startContainer)
+            : entry.el;
+        const signature = (entry) => entry.path + '|' + entry.kind + '|' + (entry.attribute || '');
+        const sorted = [...members].sort((a, b) => {
+            const na = nodeOf(a);
+            const nb = nodeOf(b);
+
+            if (na === nb) return 0;
+
+            return na.compareDocumentPosition(nb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+        });
+
+        const clusters = [];
+        let current = null;
+        let seen = null;
+
+        for (const entry of sorted) {
+            if (!current || seen.has(signature(entry))) {
+                current = [];
+                seen = new Set();
+                clusters.push(current);
+            }
+
+            current.push(entry);
+            seen.add(signature(entry));
+        }
+
+        return clusters;
     },
 
     commonAncestor(entries) {
@@ -1794,6 +1836,14 @@ const StudioPreview = {
     /** The tier under a point: a field beats an item beats the section. */
     tierAt(sectionId, x, y) {
         const entry = StudioFields.at(sectionId, x, y);
+
+        // A collection row's fields all open the same row — so the row
+        // itself is the only target; its title/body never get their own.
+        if (entry && entry.index !== null && this.isCollectionBound(sectionId, entry.key)) {
+            const row = StudioFields.itemAt(sectionId, x, y);
+
+            if (row && row.key === entry.key && row.index === entry.index) return { tier: 'item', item: row };
+        }
 
         if (entry) return { tier: 'field', entry };
 
