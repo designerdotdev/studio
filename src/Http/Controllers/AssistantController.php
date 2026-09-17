@@ -50,6 +50,10 @@ class AssistantController extends Controller
             'context.page' => 'nullable|string|max:120',
             'context.section' => 'nullable|array',
             'context.element' => 'nullable|array',
+            'context.attachments' => 'nullable|array|max:6',
+            'context.attachments.*' => 'string|max:400',
+            // Ask reads and answers; Build (the default) edits files
+            'mode' => 'nullable|string|in:ask,build',
         ]);
 
         try {
@@ -58,6 +62,7 @@ class AssistantController extends Controller
                 'engine' => $data['engine'] ?? null,
                 'prompt' => $data['prompt'],
                 'context' => $data['context'] ?? [],
+                'mode' => $data['mode'] ?? 'build',
             ]);
         } catch (\RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);

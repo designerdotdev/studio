@@ -148,9 +148,10 @@
                 <aside
                     class="s-float"
                     :class="{
-                        'is-sheet': $store.studio.frame === 'sheet',
+                        'is-sheet': $store.studio.sidebar && $store.studio.frame === 'sheet',
                         'is-docked': $store.studio.docked,
                         'at-right': $store.studio.docked && $store.studio.panelSide === 'right',
+                        'is-ghost': !$store.studio.sidebar && $store.studio.chatFloating,
                     }"
                     {{-- An object binding: a string would replace the style
                          attribute and wipe the display:none x-show sets --}}
@@ -198,10 +199,13 @@
                     @resize.window.debounce.50ms="place()"
                     @studio:dock-moved.window="place()"
                     @studio:reflow.window="place()"
-                    x-show="$store.studio.sidebar"
+                    {{-- With the chat floating the aside stays mounted as an
+                         invisible ghost (is-ghost): the chat card is one of
+                         its children, fixed over the site --}}
+                    x-show="$store.studio.sidebar || $store.studio.chatFloating"
                     x-cloak
-                    :aria-hidden="!$store.studio.sidebar"
-                    :inert="!$store.studio.sidebar"
+                    :aria-hidden="!$store.studio.sidebar && !$store.studio.chatFloating"
+                    :inert="!$store.studio.sidebar && !$store.studio.chatFloating"
                 >
                     <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                         {{ $sidebar }}

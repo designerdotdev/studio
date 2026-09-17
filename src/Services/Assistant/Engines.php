@@ -71,10 +71,18 @@ class Engines
     /**
      * The argv that runs one turn non-interactively and streams JSON lines.
      *
+     * Two kinds of turn share a thread: Build (the default) may edit files;
+     * Ask may only read them and answer — its tools are cut down to the
+     * read-only ones and the permission bypass is left off, so an Ask turn
+     * cannot change the site even if the model tries.
+     *
      * @param  ?string  $session  a previous turn's session/thread id to continue
+     * @param  string  $mode  `build` or `ask`
      */
-    public function command(string $engine, string $prompt, ?string $session, string $systemPrompt): array
+    public function command(string $engine, string $prompt, ?string $session, string $systemPrompt, string $mode = 'build'): array
     {
+        $ask = $mode === 'ask';
+
         $bin = $this->available()[$engine]['bin'] ?? null;
 
         if ($bin === null) {
@@ -86,9 +94,13 @@ class Engines
             // no separate system-prompt flag in `exec`.
             $full = $systemPrompt . "\n\n---\n\n" . $prompt;
 
+            // Build writes inside the workspace without asking; Ask cannot
+            // write at all. (`--full-auto` is gone from recent Codex releases.)
+            $sandbox = $ask ? 'read-only' : 'workspace-write';
+
             $argv = $session
-                ? [$bin, 'exec', 'resume', '--json', '--skip-git-repo-check', $session, $full]
-                : [$bin, 'exec', '--json', '--skip-git-repo-check', '-C', base_path(), '--full-auto', $full];
+                ? [$bin, 'exec', 'resume', '--json', '--skip-git-repo-check', '-c', 'sandbox_mode="' . $sandbox . '"', '-c', 'approval_policy="never"', $session, $full]
+                : [$bin, 'exec', '--json', '--skip-git-repo-check', '-C', base_path(), '--sandbox', $sandbox, '-c', 'approval_policy="never"', $full];
 
             if ($model = config('studio.assistant.engines.codex.model')) {
                 array_splice($argv, 2, 0, ['--model', $model]);
@@ -102,10 +114,17 @@ class Engines
             '--output-format', 'stream-json',
             '--verbose',
             '--include-partial-messages',
-            '--permission-mode', 'acceptEdits',
-            '--dangerously-skip-permissions',
             '--append-system-prompt', $systemPrompt,
         ];
+
+        if ($ask) {
+            array_push($argv,
+                '--allowedTools', 'Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch',
+                '--disallowedTools', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Agent',
+            );
+        } else {
+            array_push($argv, '--permission-mode', 'acceptEdits', '--dangerously-skip-permissions');
+        }
 
         if ($session) {
             array_push($argv, '--resume', $session);

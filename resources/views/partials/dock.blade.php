@@ -23,7 +23,7 @@
     class="s-dock"
     :class="{
         'is-vertical': edge === 'left' || edge === 'right',
-        'is-pinned': $store.studio.dock.pinned && !dragging,
+        'is-pinned': $store.studio.dock.pinned && !floatDrag,
         'is-hidden': $store.studio.dockHidden && !peek,
         'is-dragging': dragging,
         'is-snapping': snap,
@@ -46,6 +46,10 @@
         get edge() {
             return this.dragging && this.drag ? this.drag.edge : $store.studio.dock.edge;
         },
+
+        // A drag that carries the pill. A pinned bar dragged stays a bar:
+        // it hops from edge to edge under the pointer and never floats.
+        floatDrag: false,
 
         // Position from the store: the dock's centre sits `along` the edge
         place() {
@@ -92,16 +96,8 @@
             event.preventDefault();
             this.dragging = true;
             const rect = this.$root.getBoundingClientRect();
-            this.drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, edge: $store.studio.dock.edge };
-            if ($store.studio.dock.pinned) {
-                // The flush rail turns back into a pill as the drag starts —
-                // re-measure it and carry it centred under the pointer
-                this.$nextTick(() => {
-                    this.drag.dx = this.$root.offsetWidth / 2;
-                    this.drag.dy = this.$root.offsetHeight / 2;
-                    this.slide(event.clientX, event.clientY);
-                });
-            }
+            this.drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, edge: $store.studio.dock.edge, pinned: $store.studio.dock.pinned };
+            this.floatDrag = !this.drag.pinned;
         },
         moveDrag(event) {
             if (!this.dragging) return;
@@ -110,6 +106,13 @@
             const d = { left: x, right: W - x, top: y, bottom: H - y };
             if (d[this.drag.edge] > 80) {
                 const nearest = Object.keys(d).reduce((a, k) => d[k] < d[a] ? k : a, 'bottom');
+                if (nearest !== this.drag.edge && this.drag.pinned) {
+                    // Pinned: the bar re-pins on the new edge at once — the
+                    // rail, the app's inset and a docked panel all follow live
+                    this.drag.edge = nearest;
+                    $store.studio.setDock(nearest, 0.5, true);
+                    return;
+                }
                 if (nearest !== this.drag.edge) {
                     // Hop: re-measure once the orientation class has applied,
                     // then carry the dock centred under the pointer
@@ -122,7 +125,7 @@
                     return;
                 }
             }
-            this.slide(x, y);
+            if (!this.drag.pinned) this.slide(x, y);
         },
         slide(x, y) {
             const gap = 12;
@@ -142,6 +145,13 @@
         },
         endDrag() {
             if (!this.dragging) return;
+            this.floatDrag = false;
+            if (this.drag.pinned) {
+                // Already re-pinned on its edge while dragging
+                this.dragging = false;
+                this.$nextTick(() => this.place());
+                return;
+            }
             const edge = this.drag.edge;
             const rect = this.$root.getBoundingClientRect();
             this.dragging = false;
@@ -168,7 +178,7 @@
          over the canvas iframe, the parent document sees every event --}}
     @pointermove.window="moveDrag($event)"
     @pointerup.window="endDrag($event)"
-    @pointercancel.window="if (dragging) { dragging = false; place() }"
+    @pointercancel.window="if (dragging) { dragging = false; floatDrag = false; place() }"
 >
     {{-- The optional parts — grip, pin, page switcher, device widths,
          Back/Forward/Reload, the live-page link, tooltips — follow
@@ -205,13 +215,20 @@
     <span class="s-dock-sep"></span>
 
     @foreach($panels as [$name, $label, $icon])
+        @php
+            // The Assistant's button follows the floating chat when it is out:
+            // lit while the conversation is open, pulsing while a turn runs
+            $active = $name === 'assistant'
+                ? "\$store.studio.chatFloating ? \$store.studio.chatOpen : (\$store.studio.rail === 'assistant' && \$store.studio.sidebar)"
+                : "\$store.studio.rail === '{$name}' && \$store.studio.sidebar";
+        @endphp
         <button
             type="button"
             class="s-dock-btn"
             data-panel="{{ $name }}"
-            data-tip="{{ $label }}"
-            :class="$store.studio.rail === '{{ $name }}' && $store.studio.sidebar && 'is-active'"
-            :aria-pressed="$store.studio.rail === '{{ $name }}' && $store.studio.sidebar"
+            :data-tip="{{ $name === 'assistant' ? "\$store.studio.chatFloating ? (\$store.studio.chatOpen ? 'Fold the conversation' : 'Open the conversation') : 'Assistant'" : "'{$label}'" }}"
+            :class="{ 'is-active': {{ $active }}, 'is-busy': {{ $name === 'assistant' ? '$store.studio.chatBusy' : 'false' }} }"
+            :aria-pressed="{{ $active }}"
             @click="$store.studio.setRail('{{ $name }}')"
             aria-label="{{ $label }}"
         >
@@ -239,7 +256,7 @@
          switcher sits in its centre and the device widths join the right
          group. Floating and vertical rails stay icons-only. --}}
     <div
-        x-show="$store.studio.view.pages && $store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
+        x-show="$store.studio.view.pages && $store.studio.dock.pinned && $store.studio.dockHorizontal && !floatDrag"
         x-cloak
         class="s-dock-page"
         x-data="{
@@ -304,12 +321,12 @@
     </div>
 
     {{-- Pushes the modes and Publish to the far end of a pinned rail --}}
-    <span class="s-dock-spacer" x-show="$store.studio.dock.pinned && !dragging" x-cloak></span>
+    <span class="s-dock-spacer" x-show="$store.studio.dock.pinned && !floatDrag" x-cloak></span>
 
     {{-- Device widths — only where the bar has the room --}}
     <div
         class="s-dock-seg s-dock-devices"
-        x-show="$store.studio.view.devices && $store.studio.dock.pinned && $store.studio.dockHorizontal && !dragging"
+        x-show="$store.studio.view.devices && $store.studio.dock.pinned && $store.studio.dockHorizontal && !floatDrag"
         x-cloak
         role="radiogroup"
         aria-label="Canvas width"

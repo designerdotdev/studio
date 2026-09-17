@@ -30,7 +30,7 @@ class SystemPrompt
      * @param  array{page?: ?string, section?: ?array, element?: ?array}  $context
      *         section: {id, ref, title, scope}; element: {path, tag, text, field, itemIndex, subKey, source}
      */
-    public function build(array $context = []): string
+    public function build(array $context = [], string $mode = 'build'): string
     {
         $base = base_path();
         $storageRel = $this->relative($this->storage->getBasePath());
@@ -39,7 +39,9 @@ class SystemPrompt
         $public = $this->relative(SitePaths::public());
 
         $lines = [
-            'You are the Assistant inside Designer Studio, a visual page builder for the Blade site installed in this Laravel application at ' . $base . '. Make the change the user asks for directly by editing files, then reply with one or two sentences saying what you changed. Do not ask for confirmation for ordinary edits.',
+            $mode === 'ask'
+                ? 'You are the Assistant inside Designer Studio, a visual page builder for the Blade site installed in this Laravel application at ' . $base . '. This is an Ask turn: answer the question by reading the files you need. You must not create, edit, move, or delete anything, and you must not run commands — if the user asks for a change, describe exactly what you would change and tell them to switch to Build to have it done. Reply concisely, in plain words, naming files only when it helps.'
+                : 'You are the Assistant inside Designer Studio, a visual page builder for the Blade site installed in this Laravel application at ' . $base . '. Make the change the user asks for directly by editing files, then reply with one or two sentences saying what you changed. Do not ask for confirmation for ordinary edits.',
             '',
             '## Where things live',
             "- The site's source: `{$site}/` — `views/pages/*.blade.php` (one page per URL, `index.blade.php` is `/`; a page is `<x-layouts.main title=\"…\">` wrapping section tags like `<x-sections.hero heading=\"…\" :items=\"\$posts\"/>`), `views/components/` (anonymous Blade components: `sections/<name>.blade.php` + a `<name>.yml` declaring the section's editable `fields`, `layouts/*.blade.php` document shells with `{{ \$slot }}`, supporting components like `nav`/`footer`), `data/site.json` (read everywhere as `\$site`), `data/collections/<name>.json` (read everywhere as `\$<name>`), `css/*.css` (Tailwind v4 with `@theme` tokens), `designer.json` (page titles, SEO, order).",
@@ -57,9 +59,44 @@ class SystemPrompt
             '',
         ];
 
-        $lines = [...$lines, ...$this->pageContext($context), ...$this->selectionContext($context)];
+        $lines = [...$lines, ...$this->pageContext($context), ...$this->selectionContext($context), ...$this->attachmentContext($context)];
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Images attached to the message from the media library. They are
+     * public files of the site, named by path so the CLI can open them
+     * with its own file tools; anything outside public/designer is dropped.
+     */
+    protected function attachmentContext(array $context): array
+    {
+        $public = rtrim(SitePaths::public(), '/');
+        $paths = [];
+
+        foreach ((array) ($context['attachments'] ?? []) as $url) {
+            if (!is_string($url)) {
+                continue;
+            }
+
+            $relative = ltrim(preg_replace('#^/designer/#', '', parse_url($url, PHP_URL_PATH) ?: ''), '/');
+            $absolute = realpath($public . '/' . $relative);
+
+            if ($relative !== '' && $absolute && str_starts_with($absolute, $public . '/') && is_file($absolute)) {
+                $paths[] = $this->relative($absolute);
+            }
+        }
+
+        if (!$paths) {
+            return [];
+        }
+
+        return [
+            '## Attached images',
+            '- Look at each of these with your file tools before answering; the user attached them to this message:',
+            ...array_map(fn ($path) => '  - `' . $path . '`', $paths),
+            '',
+        ];
     }
 
     protected function pageContext(array $context): array

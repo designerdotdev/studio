@@ -61,13 +61,21 @@
                     // panel stays. A docked column is part of the layout, and
                     // a sheet already has its scrim.
                     dismissFloating() {
-                        if (!this.sidebar || this.docked || this.frame !== 'popover') return;
                         if (window.Studio?.picking) return;
+                        // The floating chat's conversation folds like a popover
+                        if (this.chatFloating && this.chatOpen) this.setChatOpen(false);
+                        if (!this.sidebar || this.docked || this.frame !== 'popover') return;
                         this.closePanel();
                     },
                     // The rail: which panel the floating surface shows.
                     rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) ? s : 'sections')(localStorage.getItem('studio.rail')),
                     setRail(name, force = false) {
+                        // Floating, the chat is not a rail panel: its button
+                        // opens the conversation over the site instead
+                        if (name === 'assistant' && this.chatFloating) {
+                            force ? this.setChatOpen(true) : this.toggleChat();
+                            return;
+                        }
                         // Every dock button toggles its own panel; a forced
                         // call (picker, palette, inspector) always opens it.
                         if (!force && this.rail === name && this.sidebar) {
@@ -83,6 +91,88 @@
                     // state — the toolbar's Edit-fields button lands here.
                     openInspector() {
                         this.setRail('sections', true);
+                    },
+
+                    /* --- the chat ------------------------------------------
+                       Where the Assistant lives: in the panel, like every
+                       other rail item, or floating — a composer over the
+                       bottom of the site that is always there, with the
+                       conversation opening upward on demand. Floating, it is
+                       independent of the rail, so the inspector and the chat
+                       can be open at the same time. Only where the Assistant
+                       exists at all (the server's dev-mode gate). */
+                    chatAvailable: @js($devModeAvailable),
+                    chatFloating: @js($devModeAvailable) && localStorage.getItem('studio.chat-float') === '1',
+                    chatOpen: localStorage.getItem('studio.chat-open') === '1',
+                    chatBusy: false,   // a turn is streaming
+                    setChatFloating(on) {
+                        if (!this.chatAvailable) return;
+                        on = !!on;
+                        if (on === this.chatFloating) return;
+                        this.chatFloating = on;
+                        localStorage.setItem('studio.chat-float', on ? '1' : '0');
+                        if (on) {
+                            // The float takes over from the panel
+                            if (this.sidebar && this.rail === 'assistant') this.closePanel();
+                        } else {
+                            this.setChatOpen(false);
+                        }
+                        window.dispatchEvent(new CustomEvent('studio:chat', { detail: { floating: on } }));
+                    },
+                    setChatOpen(on) {
+                        this.chatOpen = !!on;
+                        localStorage.setItem('studio.chat-open', this.chatOpen ? '1' : '0');
+                    },
+                    toggleChat() { this.setChatOpen(!this.chatOpen) },
+                    // Bring the chat forward wherever it lives, caret in it (⌘J)
+                    focusChat() {
+                        if (!this.chatAvailable) return;
+                        if (this.chatFloating) this.setChatOpen(true); else this.setRail('assistant', true);
+                        window.dispatchEvent(new CustomEvent('studio:focus-chat'));
+                    },
+                    // The floating card's distance from the bottom edge: it
+                    // never sits on the dock, pinned or floating
+                    get chatBottom() {
+                        if (this.dockHidden) return 16;
+                        if (this.dock.pinned) return this.dock.edge === 'bottom' ? this.barSize + 14 : 16;
+                        return this.dock.edge === 'bottom' ? 46 + 24 : 16;
+                    },
+
+                    /* --- workspaces ----------------------------------------
+                       Three arrangements of the same chrome, one click each.
+                       A workspace sets the toolbar, the chat and the panel —
+                       never the mode or the canvas width — and the menu shows
+                       which one you are in (none, when you have moved things
+                       yourself). */
+                    workspaces: {
+                        chat: { label: 'Chat focused', hint: 'Header bar, the chat floating over the site', needsChat: true },
+                        minimal: { label: 'Minimal', hint: 'A floating toolbar and nothing else', needsChat: false },
+                        classic: { label: 'Classic', hint: 'Header bar with the panel docked beside the site', needsChat: false },
+                    },
+                    applyWorkspace(name) {
+                        if (!this.workspaces[name]) return;
+                        if (name === 'chat') {
+                            if (!this.chatAvailable) return;
+                            if (this.sidebar) this.closePanel();
+                            this.setDock('top', 0.5, true);
+                            this.setChatFloating(true);
+                        } else if (name === 'minimal') {
+                            this.setChatFloating(false);
+                            if (this.sidebar) this.closePanel();
+                            this.setDock('bottom', 0.5, false);
+                        } else {
+                            this.setChatFloating(false);
+                            this.setDock('top', 0.5, true);
+                            this.setRail('sections', true);
+                        }
+                        if (this.dockHidden) this.toggleDock();
+                        window.dispatchEvent(new CustomEvent('studio:workspace', { detail: { name } }));
+                    },
+                    get workspace() {
+                        const top = this.dock.pinned && this.dock.edge === 'top';
+                        if (this.chatFloating) return top ? 'chat' : null;
+                        if (!this.dock.pinned) return 'minimal';
+                        return top ? 'classic' : null;
                     },
                     // Which frame the open panel takes: the two data screens
                     // are sheets, everything else a popover on the dock.
@@ -139,7 +229,9 @@
                     // A pinned toolbar docks the open panel as a column
                     // beside it (sheets stay sheets): next to a left or
                     // right rail, on the left under a top or bottom bar.
-                    get docked() { return this.dock.pinned && this.frame === 'popover' },
+                    // Only while a panel is open: with the chat floating the
+                    // aside stays mounted as a ghost, and a ghost is no column
+                    get docked() { return this.sidebar && this.dock.pinned && this.frame === 'popover' },
                     get panelSide() { return this.dock.edge === 'right' ? 'right' : 'left' },
                     panelWidth: (n => (n >= 260 && n <= 560) ? n : 320)(parseInt(localStorage.getItem('studio.panel-width'), 10)),
                     setPanelWidth(px) {
@@ -519,33 +611,38 @@
             x-data="{
                 open: false,
                 popStyle: '',
-                viewOpen: false,
-                viewStyle: '',
-                viewTimer: null,
+                // The open flyout — 'view' or 'workspace'. One position string
+                // per flyout: a string :style rewrites the attribute, so a
+                // shared one would wipe the display:none x-show wrote on the
+                // other flyout every time this one was placed.
+                sub: null,
+                subStyles: { view: '', workspace: '' },
+                subTimer: null,
 
-                // The View submenu flies out beside the menu, on whichever
-                // side has room, its first row level with the View row.
-                placeView() {
+                // A submenu flies out beside the menu, on whichever side has
+                // room, its first row level with the row that opened it.
+                placeSub() {
+                    if (!this.sub) return;
                     const menu = this.$refs.menu.getBoundingClientRect();
-                    const row = this.$refs.viewRow.getBoundingClientRect();
+                    const row = this.$refs[this.sub + 'Row'].getBoundingClientRect();
                     const width = 300, gap = 6, pad = 12;
-                    const h = this.$refs.view.offsetHeight || 420;
+                    const h = this.$refs[this.sub].offsetHeight || 420;
                     let left = menu.right + gap;
                     if (left + width > window.innerWidth - pad) left = menu.left - gap - width;
                     left = Math.max(pad, left);
                     const top = Math.max(pad, Math.min(row.top - 5, window.innerHeight - h - pad));
-                    this.viewStyle = `left:${Math.round(left)}px; top:${Math.round(top)}px; width:${width}px`;
+                    this.subStyles[this.sub] = `left:${Math.round(left)}px; top:${Math.round(top)}px; width:${width}px`;
                 },
-                showView(delay = 0) {
-                    clearTimeout(this.viewTimer);
-                    this.viewTimer = setTimeout(() => {
-                        this.viewOpen = true;
-                        this.$nextTick(() => this.placeView());
+                showSub(name, delay = 0) {
+                    clearTimeout(this.subTimer);
+                    this.subTimer = setTimeout(() => {
+                        this.sub = name;
+                        this.$nextTick(() => this.placeSub());
                     }, delay);
                 },
-                hideView(delay = 0) {
-                    clearTimeout(this.viewTimer);
-                    this.viewTimer = setTimeout(() => { this.viewOpen = false }, delay);
+                hideSub(delay = 0) {
+                    clearTimeout(this.subTimer);
+                    this.subTimer = setTimeout(() => { this.sub = null }, delay);
                 },
 
                 async duplicatePage() {
@@ -569,10 +666,10 @@
                     }
                 },
             }"
-            @click.outside="open = false; viewOpen = false"
-            @keydown.escape.window="if (viewOpen) viewOpen = false; else open = false"
-            x-effect="if (!open) viewOpen = false"
-            @studio:dock-moved.window="if (open) { popStyle = window.StudioDock.anchor($refs.menu, $refs.menu.previousElementSibling, 272); if (viewOpen) $nextTick(() => placeView()) }"
+            @click.outside="open = false; sub = null"
+            @keydown.escape.window="if (sub) sub = null; else open = false"
+            x-effect="if (!open) sub = null"
+            @studio:dock-moved.window="if (open) { popStyle = window.StudioDock.anchor($refs.menu, $refs.menu.previousElementSibling, 272); if (sub) $nextTick(() => placeSub()) }"
         >
             <button @click="open = !open" class="s-dock-btn is-menu s-logo-btn" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu">
                 <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
@@ -592,8 +689,8 @@
                 :style="popStyle"
                 x-ref="menu"
                 x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 272) })"
-                {{-- Pointing at any other row closes the View submenu --}}
-                @mouseover="if ($event.target.closest('.s-menu-item:not([data-view-row])')) hideView(120)"
+                {{-- Pointing at any other row closes an open flyout --}}
+                @mouseover="if ($event.target.closest('.s-menu-item:not([data-sub-row])')) hideSub(120)"
             >
                 <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
                     <svg class="h-[17px] w-auto -translate-y-0.5 text-ink" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
@@ -637,21 +734,44 @@
                 <button
                     type="button"
                     class="s-menu-item justify-between"
-                    :class="viewOpen && 'bg-wash !text-ink'"
-                    data-view-row
+                    :class="sub === 'view' && 'bg-wash !text-ink'"
+                    data-sub-row
                     x-ref="viewRow"
-                    @mouseenter="showView(80)"
-                    @mouseleave="if (!$event.relatedTarget?.closest?.('[data-view-menu]')) hideView(250)"
-                    @click="viewOpen ? hideView() : showView()"
-                    @keydown.arrow-right.prevent="showView(); $nextTick(() => $refs.view.querySelector('button')?.focus())"
+                    @mouseenter="showSub('view', 80)"
+                    @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-menu]')) hideSub(250)"
+                    @click="sub === 'view' ? hideSub() : showSub('view')"
+                    @keydown.arrow-right.prevent="showSub('view'); $nextTick(() => $refs.view.querySelector('button')?.focus())"
                     aria-haspopup="menu"
-                    :aria-expanded="viewOpen"
+                    :aria-expanded="sub === 'view'"
                 >
                     <span class="flex items-center gap-2.5">
                         <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
                         View
                     </span>
                     <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                </button>
+                {{-- Workspace: three arrangements of the chrome, in a flyout like View --}}
+                <button
+                    type="button"
+                    class="s-menu-item justify-between"
+                    :class="sub === 'workspace' && 'bg-wash !text-ink'"
+                    data-sub-row
+                    x-ref="workspaceRow"
+                    @mouseenter="showSub('workspace', 80)"
+                    @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-menu]')) hideSub(250)"
+                    @click="sub === 'workspace' ? hideSub() : showSub('workspace')"
+                    @keydown.arrow-right.prevent="showSub('workspace'); $nextTick(() => $refs.workspace.querySelector('button')?.focus())"
+                    aria-haspopup="menu"
+                    :aria-expanded="sub === 'workspace'"
+                >
+                    <span class="flex items-center gap-2.5">
+                        @include('studio::partials.activity-bar-glyph', ['position' => 'chat'])
+                        Workspace
+                    </span>
+                    <span class="flex items-center gap-2">
+                        <span class="text-[11px] text-faint" x-text="$store.studio.workspace ? $store.studio.workspaces[$store.studio.workspace].label : 'Custom'"></span>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                    </span>
                 </button>
                 @if($liveUrl)
                     <div class="s-divider my-1"></div>
@@ -677,7 +797,7 @@
                 ];
             @endphp
             <div
-                x-show="open && viewOpen"
+                x-show="open && sub === 'view'"
                 x-cloak
                 x-transition:enter="transition ease-out duration-100"
                 x-transition:enter-start="opacity-0"
@@ -686,14 +806,14 @@
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
                 class="s-pop s-pop-inverse fixed z-50"
-                :style="viewStyle"
+                :style="subStyles.view"
                 x-ref="view"
-                data-view-menu
+                data-sub-menu
                 role="menu"
                 aria-label="View"
-                @mouseenter="clearTimeout(viewTimer)"
-                @mouseleave="if (!$event.relatedTarget?.closest?.('[data-view-row]')) hideView(250)"
-                @keydown.arrow-left.prevent="viewOpen = false; $refs.viewRow.focus()"
+                @mouseenter="clearTimeout(subTimer)"
+                @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-row]')) hideSub(250)"
+                @keydown.arrow-left.prevent="sub = null; $refs.viewRow.focus()"
             >
                 <p class="s-microlabel px-2.5 pb-1 pt-2">Canvas</p>
                 <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
@@ -791,6 +911,50 @@
                     </button>
                 </div>
             </div>
+
+            {{-- The Workspace flyout: three presets. The check follows the real
+                 state, so moving the toolbar or the chat by hand leaves none
+                 of them checked. --}}
+            <div
+                x-show="open && sub === 'workspace'"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="s-pop s-pop-inverse fixed z-50"
+                :style="subStyles.workspace"
+                x-ref="workspace"
+                data-sub-menu
+                role="menu"
+                aria-label="Workspace"
+                @mouseenter="clearTimeout(subTimer)"
+                @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-row]')) hideSub(250)"
+                @keydown.arrow-left.prevent="sub = null; $refs.workspaceRow.focus()"
+            >
+                <p class="s-microlabel px-2.5 pb-1 pt-2">Workspace</p>
+                @foreach(['chat', 'minimal', 'classic'] as $workspace)
+                    @if($workspace !== 'chat' || $devModeAvailable)
+                        <button
+                            type="button"
+                            class="s-menu-item s-workspace-item"
+                            :class="$store.studio.workspace === '{{ $workspace }}' && 'is-active'"
+                            role="menuitemradio"
+                            :aria-checked="$store.studio.workspace === '{{ $workspace }}'"
+                            @click="open = false; $store.studio.applyWorkspace('{{ $workspace }}')"
+                        >
+                            @include('studio::partials.activity-bar-glyph', ['position' => $workspace])
+                            <span class="flex min-w-0 flex-1 flex-col">
+                                <span class="truncate" x-text="$store.studio.workspaces['{{ $workspace }}'].label"></span>
+                                <span class="truncate text-[11px] text-faint" x-text="$store.studio.workspaces['{{ $workspace }}'].hint"></span>
+                            </span>
+                            <svg x-show="$store.studio.workspace === '{{ $workspace }}'" x-cloak class="h-3.5 w-3.5 shrink-0 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                        </button>
+                    @endif
+                @endforeach
+            </div>
         </div>
     </x-slot:menu>
 
@@ -802,7 +966,37 @@
             <livewire:studio::editor-panel :page-slug="$page->slug" />
         </div>
         @if(\Designer\Studio\Support\DevMode::enabled())
-            <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'assistant'" x-cloak>
+            {{-- Floating, this wrapper leaves the panel's column and becomes
+                 the card over the site (s-chat-host): one Livewire instance,
+                 two homes. The aside stays in the DOM as a ghost for it. --}}
+            <div
+                x-data="{
+                    style: {},
+                    // Centred in the stage — not the window — so a docked
+                    // panel beside the site never sits under the card
+                    place() {
+                        if (!$store.studio.chatFloating) { this.style = {}; return; }
+                        const stage = document.querySelector('main.s-stage');
+                        const r = stage ? stage.getBoundingClientRect() : { left: 0, width: window.innerWidth };
+                        // 530px: the floating toolbar's width, so the two read as one family
+                        const w = Math.round(Math.min(530, Math.max(320, r.width - 32)));
+                        const left = Math.round(r.left + (r.width - w) / 2);
+                        this.style = { left: left + 'px', width: w + 'px', bottom: $store.studio.chatBottom + 'px' };
+                    },
+                }"
+                class="flex h-full min-h-0 flex-col"
+                :class="$store.studio.chatFloating && 's-chat-host'"
+                :style="style"
+                x-effect="$store.studio.chatFloating; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $nextTick(() => place())"
+                @resize.window.debounce.50ms="place()"
+                @studio:reflow.window="place()"
+                @studio:dock-moved.window="place()"
+                {{-- Floating, the card steps aside while a sheet is up: the
+                     sheet is centred with a transform, which would capture a
+                     fixed child, and the scrim covers the card anyway --}}
+                x-show="$store.studio.chatFloating ? !($store.studio.sidebar && $store.studio.frame === 'sheet') : $store.studio.rail === 'assistant'"
+                x-cloak
+            >
                 <livewire:studio::assistant-panel :page-slug="$page->slug" />
             </div>
         @endif
@@ -848,7 +1042,14 @@
                     { label: 'Content panel', hint: 'Panel', run: () => studio.setRail('content', true) },
                     { label: 'Media panel', hint: 'Panel', run: () => studio.setRail('media', true) },
                     @if($devModeAvailable)
-                    { label: 'Assistant panel', hint: 'Panel', run: () => studio.setRail('assistant', true) },
+                    { label: 'Assistant panel', hint: 'Panel', when: !studio.chatFloating, run: () => studio.setRail('assistant', true) },
+                    { label: 'Focus the chat', hint: 'Chat', run: () => studio.focusChat() },
+                    { label: studio.chatFloating ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', run: () => studio.setChatFloating(!studio.chatFloating) },
+                    { label: 'Workspace: Chat focused', hint: 'Workspace', when: studio.workspace !== 'chat', run: () => studio.applyWorkspace('chat') },
+                    @endif
+                    { label: 'Workspace: Minimal', hint: 'Workspace', when: studio.workspace !== 'minimal', run: () => studio.applyWorkspace('minimal') },
+                    { label: 'Workspace: Classic', hint: 'Workspace', when: studio.workspace !== 'classic', run: () => studio.applyWorkspace('classic') },
+                    @if($devModeAvailable)
                     { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
                     @endif
                     { label: studio.sidebar ? 'Close the panel' : 'Open the panel', hint: 'Layout', run: () => studio.toggleSidebar() },

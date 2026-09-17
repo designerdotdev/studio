@@ -340,6 +340,13 @@ const StudioEditor = {
             return;
         }
 
+        // Cmd/Ctrl+J — the chat, wherever it lives, with the caret in it
+        if (meta && (key === 'j' || key === 'J')) {
+            preventDefault();
+            window.Alpine?.store('studio')?.focusChat?.();
+            return;
+        }
+
         // Cmd/Ctrl+. — hide or show the dock (the site, and nothing else)
         if (meta && key === '.') {
             preventDefault();
@@ -372,8 +379,13 @@ const StudioEditor = {
                 window.dispatchEvent(new CustomEvent('studio:pick-cancel'));
                 return;
             }
-            // An open panel closes first; the next Escape deselects
+            // The floating chat's conversation folds, then an open panel
+            // closes, then the next Escape deselects
             const studio = window.Alpine?.store('studio');
+            if (studio?.chatFloating && studio.chatOpen) {
+                studio.setChatOpen(false);
+                return;
+            }
             if (studio?.sidebar) {
                 studio.closePanel();
                 return;

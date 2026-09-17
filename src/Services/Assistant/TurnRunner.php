@@ -72,10 +72,15 @@ class TurnRunner
     /**
      * Record a pending turn and the user's message on its thread.
      *
-     * @param  array{thread: string, engine: string, prompt: string, context?: array}  $input
+     * @param  array{thread: string, engine: string, prompt: string, context?: array, mode?: string}  $input
      */
     public function start(array $input): array
     {
+        $mode = ($input['mode'] ?? 'build') === 'ask' ? 'ask' : 'build';
+        $context = $input['context'] ?? [];
+        // The transcript shows which kind of turn each message was
+        $context['mode'] = $mode;
+
         $thread = $this->threads->find($input['thread']);
 
         if (!$thread) {
@@ -93,7 +98,7 @@ class TurnRunner
         $this->threads->append($thread['id'], [
             'role' => 'user',
             'text' => $input['prompt'],
-            'context' => $input['context'] ?? null,
+            'context' => $context,
         ]);
 
         // Prune old turn files so the folder never grows unbounded
@@ -108,7 +113,8 @@ class TurnRunner
             'thread' => $thread['id'],
             'engine' => $engine,
             'prompt' => $input['prompt'],
-            'context' => $input['context'] ?? [],
+            'context' => $context,
+            'mode' => $mode,
             'status' => 'pending',
             'created_at' => now()->toIso8601String(),
         ];
@@ -156,11 +162,13 @@ class TurnRunner
         $session = $thread['session_id'] ?? null;
 
         try {
+            $mode = ($turn['mode'] ?? 'build') === 'ask' ? 'ask' : 'build';
             $argv = $this->engines->command(
                 $turn['engine'],
                 $turn['prompt'],
                 $session,
-                $this->systemPrompt->build($turn['context'] ?? [])
+                $this->systemPrompt->build($turn['context'] ?? [], $mode),
+                $mode
             );
         } catch (\Throwable $e) {
             $this->finish($turn, $emit, ['error' => $e->getMessage()]);

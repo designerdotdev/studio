@@ -426,7 +426,8 @@ html.studio-light {
         height: 46px;
         padding: 5px 6px 5px 4px;
         border-radius: 999px;
-        background: color-mix(in srgb, var(--color-overlay) 94%, transparent);
+        /* the panel's surface — as dark as the chat and the popovers it opens */
+        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
         box-shadow:
@@ -625,7 +626,7 @@ html.studio-light {
 
     .s-dock-publish .s-dock-dirty {
         @apply absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent;
-        box-shadow: 0 0 0 2px var(--color-overlay);
+        box-shadow: 0 0 0 2px var(--color-panel);
     }
 
     /* Label tooltips, away from the dock's edge */
@@ -1452,4 +1453,370 @@ html.studio-light .s-pop-inverse {
 .s-field-flash {
     animation: s-field-flash 900ms ease-out;
     border-radius: 6px;
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  The chat — the Assistant in the rail, or floating over the site     */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+
+    /* With the chat floating, the aside stays mounted as a ghost: nothing
+       of it shows or takes the pointer, but the chat card inside it can be
+       fixed over the site while every other panel stays where it was. */
+    .s-float.is-ghost {
+        visibility: hidden;
+        pointer-events: none;
+        background: transparent;
+        box-shadow: none;
+        animation: none;
+        /* a transformed ancestor would become the fixed card's containing block */
+        transform: none;
+    }
+
+    /* The wrapper around the Assistant, floating: a card over the bottom
+       of the site, centred, never wider than the composer needs. The
+       store sets `bottom` so it clears the dock. */
+    .s-chat-host {
+        position: fixed;
+        left: max(16px, calc(50% - 265px));
+        width: min(530px, calc(100vw - 32px));
+        height: auto !important;
+        max-height: calc(100vh - 32px);
+        z-index: 8;
+        visibility: visible;
+        pointer-events: auto;
+        animation: s-chat-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @keyframes s-chat-in {
+        from { opacity: 0; transform: translateY(12px) scale(0.985); }
+        to { opacity: 1; transform: none; }
+    }
+
+    /* The card itself: the dock's material, so the two read as one family */
+    .s-chat.is-floating {
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow:
+            0 0 0 1px var(--color-line),
+            inset 0 1px 0 var(--color-wash),
+            0 24px 60px -24px rgba(0, 0, 0, 0.7),
+            0 6px 18px -8px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        transition: opacity 180ms ease;
+    }
+
+    /* While the pick tool is armed the card steps back so the canvas and
+       its banner are unmistakably where the action is */
+    .s-chat.is-floating.is-picking {
+        opacity: 0.55;
+    }
+
+    .s-chat.is-floating.is-picking:hover {
+        opacity: 1;
+    }
+
+    /* --- the conversation ---------------------------------------------
+       In the rail it fills the panel. Floating, it folds out of the
+       composer: a grid row that grows from nothing, so the card's height
+       animates without measuring anything. */
+    .s-chat-thread {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
+    .s-chat-thread-inner {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
+    .s-chat.is-floating .s-chat-thread {
+        display: grid;
+        flex: none;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-chat.is-floating.is-open .s-chat-thread {
+        grid-template-rows: 1fr;
+    }
+
+    .s-chat.is-floating .s-chat-thread-inner {
+        overflow: hidden;
+    }
+
+    .s-chat-head {
+        @apply flex shrink-0 items-center gap-1 border-b border-line px-3;
+        height: 44px;
+    }
+
+    .s-chat-log {
+        @apply min-h-0 flex-1 overflow-y-auto p-3;
+    }
+
+    .s-chat.is-floating .s-chat-log {
+        max-height: 52vh;
+        padding: 14px 16px;
+    }
+
+    /* Messages */
+    .s-chat-msg-user {
+        @apply ml-6 rounded-xl rounded-br-sm px-3 py-2 text-[12.5px] leading-relaxed text-white;
+        background: color-mix(in srgb, var(--color-accent) 90%, transparent);
+    }
+
+    .s-chat-msg {
+        @apply mr-6 rounded-xl rounded-bl-sm border border-line bg-raised px-3 py-2 text-[12.5px] leading-relaxed;
+        color: color-mix(in srgb, var(--color-ink) 90%, transparent);
+    }
+
+    .s-chat.is-floating .s-chat-msg-user { margin-left: 15%; }
+    .s-chat.is-floating .s-chat-msg { margin-right: 15%; }
+
+    /* --- the folded part: status + composer --------------------------- */
+    .s-chat-fold {
+        @apply shrink-0 border-t border-line;
+    }
+
+    /* Floating and folded there is nothing above the composer to divide from */
+    .s-chat.is-floating:not(.is-open) .s-chat-fold {
+        border-top-color: transparent;
+    }
+
+    /* One line of what is happening, or what was last said */
+    .s-chat-status {
+        @apply flex w-full cursor-pointer items-center gap-2 text-left text-soft;
+        padding: 10px 16px 0;
+        font-size: 12px;
+        transition: color 150ms ease;
+    }
+
+    .s-chat-status:hover {
+        @apply text-ink;
+    }
+
+    .s-chat-status-dot {
+        @apply block shrink-0 rounded-full bg-faint;
+        width: 6px;
+        height: 6px;
+        transition: background-color 300ms ease;
+    }
+
+    .s-chat-status-dot.is-live {
+        @apply animate-pulse bg-accent;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+    }
+
+    .s-chat-composer {
+        padding: 8px;
+    }
+
+    .s-chat.is-floating .s-chat-composer {
+        padding: 10px;
+    }
+
+    .s-chat-chips {
+        @apply mb-1.5 flex flex-wrap gap-1;
+    }
+
+    .s-chat.is-floating .s-chat-chips {
+        padding: 0 4px;
+    }
+
+    .s-chat-chip {
+        @apply inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] text-ink;
+        border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+        background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    }
+
+    .s-chat-chip.is-image {
+        @apply border-line bg-wash font-sans text-[11px] text-soft;
+    }
+
+    .s-chat-chip-x {
+        @apply ml-0.5 cursor-pointer text-faint;
+    }
+
+    .s-chat-chip-x:hover {
+        @apply text-ink;
+    }
+
+    /* The field: textarea on top, the tool row underneath */
+    .s-chat-field {
+        @apply rounded-xl border border-line bg-raised;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .s-chat-field:focus-within {
+        border-color: var(--color-line-strong);
+    }
+
+    .s-chat.is-floating .s-chat-field {
+        @apply rounded-2xl;
+        background: var(--color-wash-faint);
+    }
+
+    .s-chat.is-floating .s-chat-field:focus-within {
+        background: var(--color-wash);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
+    }
+
+    .s-chat-input {
+        @apply block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-ink;
+        max-height: 168px;
+        overflow-y: auto;
+    }
+
+    .s-chat-input::placeholder {
+        color: var(--color-faint);
+    }
+
+    .s-chat-input:focus {
+        outline: none;
+    }
+
+    .s-chat.is-floating .s-chat-input {
+        padding: 12px 14px 4px;
+        font-size: 13.5px;
+    }
+
+    .s-chat-tools {
+        @apply flex items-center gap-1 px-1.5 pb-1.5;
+    }
+
+    .s-chat.is-floating .s-chat-tools {
+        padding: 2px 8px 8px;
+    }
+
+    .s-chat-tool {
+        @apply inline-flex h-7 min-w-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 text-soft;
+        font-size: 11px;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-chat-tool:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-chat-tool.is-on {
+        @apply text-accent;
+    }
+
+    .s-chat-tool:disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    /* The composer's pick button keeps its label only where there is room */
+    .s-chat:not(.is-floating) .s-chat-tool-label {
+        display: none;
+    }
+
+    @media (max-width: 820px) {
+        .s-chat-tool-label { display: none; }
+    }
+
+    /* Ask | Build */
+    .s-chat-seg {
+        @apply inline-flex shrink-0 rounded-full bg-wash p-0.5;
+        gap: 1px;
+    }
+
+    .s-chat-seg-btn {
+        @apply flex cursor-pointer items-center justify-center rounded-full text-faint;
+        height: 24px;
+        padding: 0 10px;
+        font-size: 11.5px;
+        font-weight: 500;
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .s-chat-seg-btn:hover {
+        @apply text-ink;
+    }
+
+    .s-chat-seg-btn.is-active {
+        background: var(--color-ink);
+        color: var(--color-shell);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    .s-chat-seg-btn.is-active.is-build {
+        background: color-mix(in srgb, var(--color-accent) 80%, white);
+        color: #0e1140;
+    }
+
+    .s-chat-send {
+        @apply flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-white;
+        transition: opacity 150ms ease, transform 120ms ease, background-color 150ms ease;
+    }
+
+    .s-chat-send:hover {
+        background: var(--color-accent-hover);
+    }
+
+    .s-chat-send:active {
+        transform: scale(0.94);
+    }
+
+    .s-chat-send:disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    .s-chat-count {
+        @apply rounded-full bg-wash-strong px-1.5 text-[10px] font-medium text-soft;
+        min-width: 18px;
+        line-height: 16px;
+        text-align: center;
+    }
+
+    /* The dock's Assistant button carries a dot while a turn runs */
+    .s-dock-btn.is-busy::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-accent);
+        box-shadow: 0 0 0 2px var(--color-panel);
+        animation: s-chat-busy 1.2s ease-in-out infinite;
+    }
+
+    @keyframes s-chat-busy {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+    }
+
+    /* Workspace rows in the main menu: a glyph, a name and a hint */
+    .s-workspace-item {
+        align-items: flex-start;
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
+
+    .s-workspace-item > svg:first-child {
+        margin-top: 2px;
+    }
+
+    .s-workspace-item.is-active {
+        color: var(--color-ink);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-chat-host { animation: none; }
+        .s-chat.is-floating .s-chat-thread { transition: none; }
+        .s-chat-status-dot.is-live { animation: none; }
+        .s-dock-btn.is-busy::before { animation: none; }
+    }
 }
