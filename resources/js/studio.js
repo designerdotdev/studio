@@ -205,6 +205,17 @@ const StudioEditor = {
                     this.resolveFieldAction(data);
                     break;
 
+                case 'studio:open-collection-row':
+                    // Rides behind studio:open-inspector (same tick, so the
+                    // two Livewire dispatches pool into one request and the
+                    // selection lands before the row opens)
+                    window.Livewire?.dispatch('studio:open-collection-row', {
+                        sectionId: data.sectionId,
+                        key: data.key,
+                        index: data.index,
+                    });
+                    break;
+
                 case 'studio:field-upload':
                     this.uploadFieldFile(data);
                     break;
@@ -1281,6 +1292,29 @@ const StudioPreview = {
         return !!this.bindings[sectionId]?.[key]?.startsWith('collections.');
     },
 
+    /** The humanised name of the collection a field is bound to, or null. */
+    collectionNameFor(sectionId, key) {
+        const binding = this.bindings[sectionId]?.[key];
+
+        if (!binding?.startsWith('collections.')) return null;
+
+        const name = binding.slice('collections.'.length).replace(/[_-]+/g, ' ');
+
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    },
+
+    /**
+     * A collection-bound value was clicked: the row it came from opens in
+     * the inspector's inline collection editor. Two posts on purpose —
+     * `studio:open-inspector` is THE message that opens the panel (a plain
+     * selection never does), and the row request rides behind it so the
+     * panel lands on the selected section with the row form already open.
+     */
+    openCollectionRow(sectionId, key, index) {
+        this.post('studio:open-inspector', { sectionId });
+        this.post('studio:open-collection-row', { sectionId, key, index: index ?? null });
+    },
+
     /**
      * Whether a field entry is image-typed and actionable from the canvas:
      * an `<img src>`/`<source srcset>` attribute, or a field whose declared
@@ -1637,14 +1671,15 @@ const StudioPreview = {
                                 }
                             }
                         }
+                    } else if (this.isCollectionBound(hitSectionId, hit.entry.key)) {
+                        // A collections.*-bound value lives in a row, and
+                        // EditorPanel::saveVariables() silently discards a
+                        // canvas-side write to it — so no control opens
+                        // here; the row itself opens in the inspector.
+                        this.openCollectionRow(hitSectionId, hit.entry.key, hit.entry.index);
                     } else if (this.isImageField(hit.entry, hitSectionId)) {
                         this.fieldAction(hit.entry, hitSectionId, 'pick-media');
-                    } else if (!this.isCollectionBound(hitSectionId, hit.entry.key)) {
-                        // A collections.*-bound field only ever selects
-                        // (inspector focus / "Edit in Content") — its value
-                        // lives in Content, and EditorPanel::saveVariables()
-                        // silently discards a canvas-side write to it, so
-                        // the control must never open for one.
+                    } else {
                         const type = (hit.entry.kind === 'attr' && hit.entry.attribute === 'href')
                             ? 'url'
                             : StudioFields.typeFor(hitSectionId, hit.entry);
@@ -1667,6 +1702,11 @@ const StudioPreview = {
                 this.applySelection(hitSectionId, false);
                 this.selectItem(hit.item, hitSectionId);
                 this.post('studio:section-selected', { sectionId: hitSectionId });
+
+                // A row of a collection-bound repeater opens as that row
+                if (this.isCollectionBound(hitSectionId, hit.item.key)) {
+                    this.openCollectionRow(hitSectionId, hit.item.key, hit.item.index);
+                }
 
                 return;
             } else {
@@ -1843,10 +1883,10 @@ const StudioPreview = {
                 return this.paintHalo({ tier: 'field', entry: toggleEntry }, 'field', { target, sectionId });
             }
 
-            // Inside the rendered markup but on nothing Studio owns
-            const inContent = !!target.closest?.('[data-section-content]');
-
-            return inContent ? this.paintHalo(null, 'code', { target }) : this.clearHover();
+            // Inside the rendered markup but on nothing Studio owns —
+            // nothing to offer, so nothing is painted: a halo that can't
+            // be acted on only invites a click that goes nowhere.
+            return this.clearHover();
         }
 
         // An undeclared echo gets its own dashed hint — but only in dev
@@ -1856,14 +1896,17 @@ const StudioPreview = {
         if (hit.tier === 'field' && hit.entry.kind === 'undeclared') {
             const devMode = document.documentElement.classList.contains('studio-devmode');
 
-            return this.paintHalo(hit, devMode ? 'undeclared' : 'code', { target, sectionId: hitSectionId });
+            return devMode
+                ? this.paintHalo(hit, 'undeclared', { target, sectionId: hitSectionId })
+                : this.clearHover();
         }
 
-        // A php:/blade:-bound field hovers exactly like code-owned content
-        // — the click and the hover must agree on this (editabilityOf is
-        // the single source both consult).
-        if (hit.tier === 'field' && this.editabilityOf(hit.entry, sectionId) === 'code') {
-            return this.paintHalo(hit, 'code', { target, sectionId: hitSectionId });
+        // A php:/blade:-bound field is not a Studio field — it hovers
+        // exactly like bare markup: nothing. The click and the hover must
+        // agree on this (editabilityOf is the single source both consult,
+        // fed the section the hit resolved to).
+        if (hit.tier === 'field' && this.editabilityOf(hit.entry, hitSectionId) === 'code') {
+            return this.clearHover();
         }
 
         this.paintHalo(hit, hit.tier, { target, sectionId: hitSectionId });
@@ -1923,7 +1966,7 @@ const StudioPreview = {
      */
     paintHalo(hit, kind, event) {
         let box = null;
-        let label = 'Set in code';
+        let label = '';
         let source = '';
         let sectionId = null;
 
@@ -1933,24 +1976,23 @@ const StudioPreview = {
             label = this.labelFor(hit.entry, sectionId);
             const path = StudioFields.sourceFor(sectionId);
             source = path ? path.split('/').pop() + ':' + hit.entry.line : '';
+
+            // A collection-bound value names where it lives — the row is
+            // edited from the collection, not typed into the page.
+            const collection = this.collectionNameFor(sectionId, hit.entry.key);
+            if (collection) label = collection + ' · ' + label;
         } else if (kind === 'item') {
             sectionId = event.sectionId;
             const rect = hit.item.el.getBoundingClientRect();
             box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
             label = this.itemLabel(hit.item);
-        } else if (kind === 'code' && hit?.entry) {
-            // A code-bound field routed here by resolveHover()/select() —
-            // halo its own precise box (not the event target's, which can
-            // be a whole paragraph around several fields), keep the default
-            // "Set in code" label.
-            box = StudioFields.box(hit.entry);
+
+            const collection = this.collectionNameFor(sectionId, hit.item.key);
+            if (collection) label = collection + ' · ' + label;
         } else if (kind === 'undeclared') {
             sectionId = event.sectionId;
             box = StudioFields.box(hit.entry);
             label = `Add "${hit.entry.key}" as a field`;
-        } else {
-            const rect = event.target.getBoundingClientRect?.();
-            if (rect) box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
         }
 
         if (!box || box.width === 0) return this.clearHover();
@@ -2007,13 +2049,13 @@ const StudioPreview = {
 
         this.paintItemControls(itemControls || null);
 
-        halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'undeclared' ? ' is-undeclared' : '');
+        halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'undeclared' ? ' is-undeclared' : '');
         halo.style.left = box.left + 'px';
         halo.style.top = box.top + 'px';
         halo.style.width = box.width + 'px';
         halo.style.height = box.height + 'px';
 
-        chip.className = 'studio-fchip is-on' + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'undeclared' ? ' is-undeclared' : '');
+        chip.className = 'studio-fchip is-on' + (kind === 'item' ? ' is-item' : kind === 'undeclared' ? ' is-undeclared' : '');
         chip.innerHTML = '';
         chip.appendChild(document.createTextNode(label));
 
@@ -2312,10 +2354,16 @@ const StudioPreview = {
     },
 
     /**
-     * The oversized type cursor: one badge that follows the pointer and
-     * names what is under it. The native cursor is kept — an I-beam over
-     * text is correct while editing — so this reads as a type indicator
-     * rather than a cursor replacement.
+     * The type cursor. Over an editable field the pointer IS this badge:
+     * the native cursor is hidden (`html.studio-cursor-on` — see
+     * iframe.blade.php) and the badge's square corner sits exactly at the
+     * pointer, the way an arrow's tip does, so it reads as a cursor and
+     * not as a tag trailing one. The glyph inside names what a click will
+     * do — type, swap an image, pick a link, open a collection row — and
+     * everywhere the badge is absent the native cursor is back, which is
+     * the whole tell: no badge, nothing to edit. While typing the
+     * I-beam returns (`html.studio-editing`), because there the caret is
+     * the affordance.
      *
      * show()/hide() are writes (innerHTML, className) and are only ever
      * called from flushPaint() — the same single rAF-batched write phase
@@ -2323,61 +2371,58 @@ const StudioPreview = {
      * than once per frame, and stays in lockstep with whatever the halo/
      * chip are showing (including a scroll-driven rehover() re-resolve,
      * which flows through the same paintHalo -> queuePaint -> flushPaint
-     * path). track() is the one exception: it only ever writes a single
-     * `transform`, coalesced through its own rAF at pointer frequency, so
-     * merging it into queuePaint would gain nothing.
+     * path). track() is the one exception: it writes a single `transform`
+     * on a composited layer, synchronously, at pointer frequency — a
+     * cursor that lags its pointer by even a frame feels detached, and
+     * a transform write never invalidates layout, so there is nothing to
+     * batch.
      */
     cursor: {
         el: null,
+        shape: null,
         kind: null,
-        x: 0,
-        y: 0,
-        queued: false,
 
         glyphs: {
-            text: '<span>T</span>',
+            text: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M4.25 4.25h11.5v3.1h-4.2V16h-3.1V7.35h-4.2z"/></svg>',
             image: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 14.5v-9Zm3 1.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm8.5 7.75-3.6-4.5-2.6 3.1-1.4-1.6L5 15h9.5Z"/></svg>',
             url: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4h6a1 1 0 0 1 0 2H8.9l6.8 6.8a1 1 0 0 1-1.4 1.4L7.5 7.4v3.6a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1Z"/></svg>',
             select: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M5.2 7.7a1 1 0 0 1 1.4 0L10 11.1l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 9.1a1 1 0 0 1 0-1.4Z"/></svg>',
             color: '<svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="6"/></svg>',
             item: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 4.5h13v3h-13v-3Zm0 4.75h13v3h-13v-3Zm0 4.75h13v3h-13v-3Z"/></svg>',
-            code: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 5.2a1 1 0 0 1 .2 1.4L5.25 10l2.55 3.4a1 1 0 1 1-1.6 1.2l-3-4a1 1 0 0 1 0-1.2l3-4a1 1 0 0 1 1.4-.2Zm4.8 0a1 1 0 0 1 1.4.2l3 4a1 1 0 0 1 0 1.2l-3 4a1 1 0 1 1-1.6-1.2L14.75 10 12.2 6.6a1 1 0 0 1 .2-1.4Z"/></svg>',
+            collection: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c3.59 0 6.5 1.57 6.5 3.5S13.59 9 10 9 3.5 7.43 3.5 5.5 6.41 2 10 2Zm6.5 6.2v2.3c0 1.93-2.91 3.5-6.5 3.5S3.5 12.43 3.5 10.5V8.2C4.9 9.55 7.3 10.3 10 10.3s5.1-.75 6.5-2.1Zm0 4.4v1.9c0 1.93-2.91 3.5-6.5 3.5S3.5 16.43 3.5 14.5v-1.9c1.4 1.35 3.8 2.1 6.5 2.1s5.1-.75 6.5-2.1Z"/></svg>',
             toggle: '<svg viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="7" width="16" height="6" rx="3" opacity="0.35"/><circle cx="13" cy="10" r="4"/></svg>',
+            undeclared: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>',
         },
 
         mount() {
             this.el = document.getElementById('studio-cursor');
+            this.shape = this.el?.querySelector('.studio-cursor-shape') || null;
         },
 
         show(kind) {
-            if (!this.el) return;
+            if (!this.el || !this.shape) return;
 
             if (kind !== this.kind) {
                 this.kind = kind;
-                this.el.innerHTML = this.glyphs[kind] || this.glyphs.text;
-                this.el.className = 'studio-cursor is-on'
-                    + (kind === 'item' ? ' is-item' : kind === 'code' ? ' is-code' : kind === 'toggle' ? ' is-toggle' : '');
+                this.shape.innerHTML = this.glyphs[kind] || this.glyphs.text;
+                this.el.className = 'studio-cursor'
+                    + (kind === 'item' ? ' is-item' : kind === 'toggle' ? ' is-toggle' : kind === 'undeclared' ? ' is-undeclared' : '');
             }
 
             this.el.classList.add('is-on');
+            document.documentElement.classList.add('studio-cursor-on');
         },
 
         hide() {
             this.kind = null;
             this.el?.classList.remove('is-on');
+            document.documentElement.classList.remove('studio-cursor-on');
         },
 
         track(event) {
-            this.x = event.clientX;
-            this.y = event.clientY;
+            if (!this.el) return;
 
-            if (this.queued || !this.el) return;
-
-            this.queued = true;
-            requestAnimationFrame(() => {
-                this.queued = false;
-                this.el.style.transform = `translate3d(${this.x}px, ${this.y}px, 0) scale(1)`;
-            });
+            this.el.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0)`;
         },
     },
 
@@ -2393,12 +2438,15 @@ const StudioPreview = {
      * hover and the selection are on different sections.
      */
     cursorKind(hit, kind, sectionId) {
-        if (kind === 'item') return 'item';
-        if (kind === 'code' || kind === 'undeclared') return 'code';
+        if (kind === 'item') return this.isCollectionBound(sectionId, hit.item.key) ? 'collection' : 'item';
+        if (kind === 'undeclared') return 'undeclared';
 
         const entry = hit.entry;
 
         if (entry.kind === 'when') return 'toggle';
+
+        // The value comes from a collection row — the click opens the row
+        if (this.isCollectionBound(sectionId, entry.key)) return 'collection';
 
         if (entry.kind === 'attr') {
             if (entry.attribute === 'src' || entry.attribute === 'srcset') return 'image';

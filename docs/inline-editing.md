@@ -70,11 +70,16 @@ its render.
 |---|---|---|
 | no binding, declared `text`/`textarea`, plain text host | `edit` | edits in place |
 | bound `site.*` | `edit` | edits in place — `saveSiteValues()` genuinely persists these |
-| bound `collections.*` | `select` | selects only; rows belong to the Content panel |
-| bound `php:` / `blade:` | `code` | grey "Set in code" halo, not interactive |
+| bound `collections.*` | `select` | collection cursor; the click opens the row in the inspector's inline collection editor |
+| bound `php:` / `blade:` | `code` | **nothing** — no halo, no chip, no badge; the native cursor stays |
 | declared `image`/`url`/`select`/`colorpicker` | `select` | its own affordance opens |
 | an echo rendering an element (`{!! $icon !!}` → `<svg>`) | `select` | never editable — `innerText` would be empty and wipe it |
-| an undeclared echo (`sf?:`) | `code` | dashed halo + "Add as a field" |
+| an undeclared echo (`sf?:`) | `code` | dev mode only: dashed halo + "Add as a field"; otherwise nothing |
+
+**Only what the yml declares gets an affordance.** Bare markup, a `php:`/`blade:`-bound value and
+(outside dev mode) an undeclared echo paint nothing at all — no grey "Set in code" halo, no
+`</>` badge. A halo that cannot be acted on only invites a click that goes nowhere, so the absence
+of the badge is the signal: native cursor = nothing to edit here.
 
 **Why this matters:** `EditorPanel::saveVariables()` does `array_diff_key($variables, $bindings)`,
 so a write to a bound key is silently discarded — the user types, sees it, blurs, gets "Saved",
@@ -93,8 +98,20 @@ holds a single pending job behind a one-frame `requestAnimationFrame` guard. `fl
 the **only** function that assigns style, class or text to `#studio-fhalo`, `#studio-fchip` or
 `#studio-cursor`.
 
-`cursor.track()` keeps its own rAF, because it writes one `transform` at pointer frequency.
-That is the only sanctioned exception.
+`cursor.track()` writes one `transform` synchronously per pointer event — a composited-layer
+write that never invalidates layout, and a cursor that lags its pointer by a frame feels
+detached. That is the only sanctioned exception.
+
+## The cursor
+
+Over an editable field the pointer *is* the badge: `#studio-cursor` carries the translate, its
+inner `.studio-cursor-shape` is a 28px circle with one square corner (`border-radius: 0 50% 50%
+50%`, `#4053ff`) whose square corner sits exactly on the pointer, like an arrow's tip. While a
+badge shows, `html.studio-cursor-on` hides the native cursor over `[data-section-content]`;
+`html.studio-editing` lets the I-beam back while typing. The glyph names what a click will do:
+`text`, `image`, `url`, `select`, `color`, `item` (orange), `collection` (the value lives in a
+row), `toggle` (red — the click turns it off), `undeclared` (grey plus, dev mode). There is no
+`code` glyph any more.
 
 New interactive chrome — `#studio-control`, the repeater item toolbar, the canvas toast —
 owns its own element and lifecycle. **The chip is `pointer-events: none` and must stay so**: it
@@ -140,6 +157,14 @@ uses `setVariable()` instead.
   change.
 - **repeater items** — hover a row for flanking add-before/after, drag to reorder, delete with
   Undo. Not offered for a `collections.*`-bound repeater.
+- **collection rows** — a value or item of a `collections.*`-bound repeater shows the collection
+  badge and a `Kpis · Value` chip; the click posts `studio:open-inspector` and then
+  `studio:open-collection-row {sectionId, key, index}`. The editor relays the latter to Livewire
+  (`EditorPanel::openCollectionRowFromCanvas`), which maps the rendered index onto the
+  collection's row order and opens that row's form inside the bound repeater's card in the
+  inspector (`fields/repeater.blade.php`: the collection's rows listed in place, a row opens as
+  a form, Save writes `CollectionRepository::saveRow` and refreshes the canvas). Nothing on the
+  canvas ever writes a bound value.
 - **the inspector** — never opened by a click. Selecting a section only tells Livewire
   (`studio:section-selected`), so an already-open panel follows the selection and a closed one
   stays closed. The toolbar's leading Edit-fields button, the context menu's first item and `E`

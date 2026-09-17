@@ -77,6 +77,18 @@ class EditorPanel extends Component
     /** Active sidebar tab: sections | page | layout */
     public string $tab = 'sections';
 
+    /**
+     * The collection row open in a bound repeater's inline editor:
+     * {name, id} — id null while a new row is being written. The rows of
+     * a collection-bound repeater are edited right here, in place of the
+     * values a plain repeater would hold, and the canvas opens one by
+     * clicking its rendered value (`studio:open-collection-row`).
+     */
+    public ?array $collectionEditing = null;
+
+    /** The open row's values, bound to the inline form field by field */
+    public array $collectionRow = [];
+
     /** Runs every Livewire request — panel edits always target the draft */
     public function boot(): void
     {
@@ -689,7 +701,142 @@ class EditorPanel extends Component
     /** Detach a repeater from its collection, keeping the current rows as plain values */
     public function unbindRepeater(string $sectionId, string $key): void
     {
+        $this->closeCollectionRow();
         $this->unbindField($sectionId, $key);
+    }
+
+    /* ------------------------------------------------------------ */
+    /*  Inline collection rows (a bound repeater's editor)           */
+    /* ------------------------------------------------------------ */
+
+    protected function collectionRepo(): \Designer\Studio\Services\Storage\CollectionRepository
+    {
+        return app(\Designer\Studio\Services\Storage\CollectionRepository::class);
+    }
+
+    /** The collection document a bound repeater reads, or null when unbound/missing */
+    public function boundCollection(string $sectionId, string $key): ?array
+    {
+        $name = \Designer\Studio\Services\CollectionBinder::collectionName($this->bindings[$sectionId][$key] ?? null);
+
+        return $name ? $this->collectionRepo()->find($name) : null;
+    }
+
+    public function openCollectionRow(string $name, string $id): void
+    {
+        $row = $this->collectionRepo()->row($name, $id);
+
+        if (!$row) {
+            return;
+        }
+
+        $this->collectionEditing = ['name' => $name, 'id' => $id];
+        $this->collectionRow = $this->withAllCollectionFields($name, $row);
+    }
+
+    public function newCollectionRow(string $name): void
+    {
+        if (!$this->collectionRepo()->exists($name)) {
+            return;
+        }
+
+        $this->collectionEditing = ['name' => $name, 'id' => null];
+        $this->collectionRow = $this->withAllCollectionFields($name, []);
+    }
+
+    public function closeCollectionRow(): void
+    {
+        $this->collectionEditing = null;
+        $this->collectionRow = [];
+    }
+
+    /**
+     * Persist the inline row form. The canvas reloads so every section
+     * bound to the collection shows the row as saved — the same refresh
+     * the Content panel's own entry form triggers.
+     */
+    public function saveCollectionRow(): void
+    {
+        if (!$this->collectionEditing) {
+            return;
+        }
+
+        $name = $this->collectionEditing['name'];
+        $row = $this->collectionRow;
+
+        if ($this->collectionEditing['id']) {
+            $row['id'] = $this->collectionEditing['id'];
+        } else {
+            unset($row['id']);
+        }
+
+        $saved = $this->collectionRepo()->saveRow($name, $row);
+
+        if (!$saved) {
+            return;
+        }
+
+        $this->collectionEditing['id'] = $saved['id'];
+        $this->collectionRow = $this->withAllCollectionFields($name, $saved);
+
+        $this->dispatch('studio:refresh-preview');
+        $this->dispatch('studio:toast', message: 'Saved', type: 'success');
+    }
+
+    public function deleteCollectionRow(): void
+    {
+        if (!$this->collectionEditing || !$this->collectionEditing['id']) {
+            return;
+        }
+
+        $this->collectionRepo()->deleteRow($this->collectionEditing['name'], $this->collectionEditing['id']);
+        $this->closeCollectionRow();
+
+        $this->dispatch('studio:refresh-preview');
+    }
+
+    /**
+     * The canvas clicked a value (or a whole item) of a collection-bound
+     * repeater: open the row it was rendered from. The rendered index maps
+     * to the collection's row order — the order every section iterates
+     * `$entries` in — so an index past the end (a section that filters
+     * its rows) just lands on the list. Arrives behind `studio:select-section`
+     * in the same request, so the inspector already shows this section.
+     */
+    #[On('studio:open-collection-row')]
+    public function openCollectionRowFromCanvas(string $sectionId, string $key, ?int $index = null): void
+    {
+        $doc = $this->boundCollection($sectionId, $key);
+
+        if (!$doc) {
+            return;
+        }
+
+        $row = $index !== null ? ($doc['rows'][$index] ?? null) : null;
+
+        if ($row && !empty($row['id'])) {
+            $this->openCollectionRow($doc['name'], $row['id']);
+        } else {
+            $this->closeCollectionRow();
+        }
+
+        // Scroll the panel to the repeater (an item click never posts
+        // studio:field-selected, so the flash is requested from here)
+        $this->dispatch('studio:field-focus', key: $key);
+    }
+
+    /** Every schema field present on the form, so wire:model has a key to bind to */
+    protected function withAllCollectionFields(string $name, array $row): array
+    {
+        $doc = $this->collectionRepo()->find($name);
+
+        foreach ($doc['fields'] ?? [] as $key => $config) {
+            if (!array_key_exists($key, $row)) {
+                $row[$key] = ($config['type'] ?? 'text') === 'toggle' ? false : '';
+            }
+        }
+
+        return $row;
     }
 
     /**

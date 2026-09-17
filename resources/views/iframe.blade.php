@@ -133,10 +133,6 @@
                 border-radius: 5px;
             }
 
-            .studio-fhalo.is-code {
-                box-shadow: inset 0 0 0 1.5px rgba(148, 148, 158, 0.55);
-            }
-
             /* An undeclared echo — dashed, not solid: there is no field
                here yet to select, only one the chip offers to create. */
             .studio-fhalo.is-undeclared {
@@ -169,7 +165,6 @@
             }
 
             .studio-fchip.is-item { background: #e08c2e; }
-            .studio-fchip.is-code { background: rgba(88, 88, 98, 0.92); }
             .studio-fchip.is-undeclared { background: rgba(88, 88, 98, 0.92); }
             .studio-fchip.is-on { opacity: 1; }
 
@@ -179,39 +174,59 @@
                 font-variant-numeric: tabular-nums;
             }
 
-            /* ---- Oversized type cursor ---- */
+            /* ---- Type cursor ----
+               Over an editable field the pointer is this badge: a circle
+               with one square corner, that corner sitting exactly on the
+               pointer (an arrow's tip, not a tag beside it). The outer
+               element only translates (written per pointer event); the
+               inner shape carries the entrance/exit scale from that same
+               corner, so it grows out of the pointer rather than popping
+               in beside it. No badge = the native cursor = nothing to
+               edit here. */
             .studio-cursor {
                 position: fixed;
                 top: 0;
                 left: 0;
                 z-index: 2147483006;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 26px;
-                height: 26px;
-                margin: 14px 0 0 14px;
-                border-radius: 8px 8px 8px 2px;
-                background: #4c7dfa;
-                color: #fff;
-                box-shadow: 0 4px 12px -2px rgba(12, 12, 20, 0.4);
                 pointer-events: none;
-                opacity: 0;
-                transform: translate3d(-100px, -100px, 0) scale(0.8);
-                transition: opacity 90ms ease, transform 90ms ease, background-color 120ms ease;
+                transform: translate3d(-100px, -100px, 0);
                 will-change: transform;
             }
 
-            .studio-cursor.is-on {
-                opacity: 1;
+            .studio-cursor-shape {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                border-radius: 0 50% 50% 50%;
+                background: #4053ff;
+                color: #fff;
+                box-shadow: 0 1px 2px rgba(12, 12, 20, 0.2), 0 6px 16px -4px rgba(64, 83, 255, 0.55);
+                opacity: 0;
+                transform: scale(0.4);
+                transform-origin: 0 0;
+                transition: opacity 110ms cubic-bezier(0.2, 0, 0, 1), transform 160ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease;
             }
 
-            .studio-cursor.is-item { background: #e08c2e; border-radius: 8px 8px 2px 8px; }
-            .studio-cursor.is-code { background: rgba(70, 70, 80, 0.92); }
-            .studio-cursor.is-toggle { background: #e5484d; }
+            .studio-cursor.is-on .studio-cursor-shape {
+                opacity: 1;
+                transform: scale(1);
+            }
 
-            .studio-cursor svg { width: 14px; height: 14px; }
-            .studio-cursor span { font-size: 13px; font-weight: 700; line-height: 1; }
+            .studio-cursor.is-item .studio-cursor-shape { background: #e08c2e; }
+            .studio-cursor.is-toggle .studio-cursor-shape { background: #e5484d; }
+            .studio-cursor.is-undeclared .studio-cursor-shape { background: rgba(70, 70, 80, 0.92); }
+
+            .studio-cursor-shape svg { width: 15px; height: 15px; margin: 1px 0 0 1px; }
+
+            /* The badge replaces the native cursor over the site while it
+               shows; the moment it is gone, so is the replacement. Typing
+               keeps the I-beam — there the caret is the affordance. */
+            html.studio-cursor-on:not(.studio-editing) [data-section-content],
+            html.studio-cursor-on:not(.studio-editing) [data-section-content] * {
+                cursor: none !important;
+            }
 
             /* Preview mode owns the canvas — no field chrome at all */
             html.studio-preview .studio-fhalo,
@@ -1291,7 +1306,7 @@
     {{-- Field/item tier overlay, positioned from JS --}}
     <div class="studio-fhalo" id="studio-fhalo"></div>
     <div class="studio-fchip" id="studio-fchip"></div>
-    <div class="studio-cursor" id="studio-cursor"></div>
+    <div class="studio-cursor" id="studio-cursor"><span class="studio-cursor-shape"></span></div>
     <div class="studio-control" id="studio-control"></div>
 
     {{-- Repeater item controls — positioned from JS (paintItemControls),

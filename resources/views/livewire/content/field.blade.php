@@ -1,11 +1,13 @@
 {{--
-    One collection field on the entry form. Bound to $row.<key> on ContentPanel.
-    Receives: $key, $config
+    One collection field on an entry form. Bound to $row.<key> on ContentPanel
+    by default; a caller may name another property path via $model (the
+    inspector's inline row editor binds to EditorPanel::$collectionRow).
+    Receives: $key, $config, [$model]
 --}}
 @php
     $type = $config['type'] ?? 'text';
     $label = $config['label'] ?? \Illuminate\Support\Str::headline($key);
-    $model = 'row.' . $key;
+    $model = $model ?? ('row.' . $key);
 @endphp
 
 @if($type === 'toggle')
