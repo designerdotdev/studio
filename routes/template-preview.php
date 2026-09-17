@@ -11,23 +11,12 @@ use Illuminate\Support\Facades\Route;
 | Loaded by StudioServiceProvider only when TemplatePreview::enabled():
 | the app runs locally and `studio.template_preview.path` names a folder.
 |
-|   /templates                       gallery of every template, with thumbnails
-|   /templates/{slug}                a template framed in a viewer (device widths, prev/next)
 |   /template                        every template in the folder
 |   /template/{slug}                 its home page, rendered from the working tree
 |   /template/{slug}/{path}          any other page, including [collection.field] pages
 |   /template/{slug}/_files/{path}   its files/public
 |
 */
-
-Route::group([
-    'prefix' => config('studio.template_preview.gallery', 'templates'),
-    'middleware' => config('studio.middleware', ['web']),
-    'as' => 'studio.template-gallery.',
-], function () {
-    Route::get('/', [Preview::class, 'gallery'])->name('index');
-    Route::get('/{slug}', [Preview::class, 'viewer'])->where('slug', '[a-z0-9-]+')->name('show');
-});
 
 Route::group([
     'prefix' => config('studio.template_preview.prefix', 'template'),

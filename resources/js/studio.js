@@ -108,6 +108,10 @@ const StudioEditor = {
                     window.Alpine?.store('studio')?.openInspector?.();
                     break;
 
+                case 'studio:canvas-pointerdown':
+                    window.Alpine?.store('studio')?.dismissFloating?.();
+                    break;
+
                 case 'studio:deselected':
                     this.selectedId = null;
                     window.Livewire?.dispatch('studio:deselect-section');
@@ -1043,6 +1047,16 @@ const StudioPreview = {
         }, true);
 
         document.addEventListener('submit', (event) => event.preventDefault(), true);
+
+        // A press on the site tells the editor, so an open floating panel can
+        // close like a popover does (the editor decides — the pick tool keeps
+        // it open). The section toolbar and context menu are the editor's
+        // own chrome, not "outside": Edit fields would close then reopen it.
+        document.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+            if (event.target.closest?.('.studio-toolbar, .studio-menu')) return;
+            this.post('studio:canvas-pointerdown');
+        }, true);
 
         document.addEventListener('mousemove', (event) => {
             this.cursor.track(event);

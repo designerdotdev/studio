@@ -74,6 +74,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Edit Badge
+    |--------------------------------------------------------------------------
+    |
+    | A small "designer studio · Edit" badge at the bottom of every page the
+    | site serves, linking to that page in the editor. It follows the gate
+    | above when one is set. The default (null) shows it only in the local
+    | environment; set true/false to force it on or off.
+    |
+    */
+    'badge' => env('STUDIO_BADGE'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Storage Path
     |--------------------------------------------------------------------------
     |
