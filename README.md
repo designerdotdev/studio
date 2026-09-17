@@ -1,5 +1,7 @@
 # Designer Studio
 
+<img src="https://cdn.designer.dev/banner-graphic.png" style="width:100%; height:auto" alt="Designer Studio graphic banner" />
+
 **The visual editor for your Laravel site.** Pick a starting template, and its pages, sections,
 and assets are added to your app as ordinary Blade files. Then anyone on the team edits those
 pages visually with a live preview, and developers keep working on the same files in their own
