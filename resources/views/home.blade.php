@@ -138,6 +138,75 @@
                         return this.dock.edge === 'bottom' ? 46 + 24 : 16;
                     },
 
+                    /* --- joined ---------------------------------------------
+                       The toolbar and the composer as one object: a single
+                       shell with one radius around both, the toolbar tucked
+                       behind the composer with a strip of it showing, rising
+                       out from behind it when you point at either.
+
+                       `chatJoined` is the preference; `joined` is whether it
+                       can apply right now. Everything that would break the
+                       shape — pinning the toolbar, docking the chat, dragging
+                       to a side edge — therefore un-joins on its own and
+                       joins again by itself, and nothing has to clear the
+                       flag. The numbers are the CSS's too (--joined-*). */
+                    chatJoined: @js($devModeAvailable) && localStorage.getItem('studio.chat-joined') === '1',
+                    joinedBar: 46,    // the row at full height
+                    joinedPeek: 14,   // what clears the composer at rest
+                    // The row's box, computed by the chat card (the only
+                    // thing that knows the composer's height) and consumed
+                    // by the dock's own place(), so one element still has
+                    // exactly one writer. Null whenever it is not joined.
+                    joinedBox: null,
+                    setChatJoined(on) {
+                        if (!this.chatAvailable) return;
+                        this.chatJoined = !!on;
+                        localStorage.setItem('studio.chat-joined', this.chatJoined ? '1' : '0');
+                        window.dispatchEvent(new CustomEvent('studio:reflow'));
+                    },
+                    get joined() {
+                        return this.chatJoined && this.chatAvailable && this.chatFloating
+                            && !this.dock.pinned && this.dockHorizontal;
+                    },
+                    /* Pointer or caret on either surface brings the row
+                       out. The row and the composer butt together, so there
+                       is no dead zone between them: the delay only covers
+                       the instant the pointer spends crossing the seam, and
+                       arriving on the other surface cancels the close
+                       outright. One timer, shared by both. */
+                    joinedPeeked: false,
+                    joinTimer: null,
+                    joinIn() {
+                        clearTimeout(this.joinTimer);
+                        this.joinedPeeked = true;
+                    },
+                    joinOut() {
+                        clearTimeout(this.joinTimer);
+                        this.joinTimer = setTimeout(() => { this.joinedPeeked = false }, 150);
+                    },
+                    menuOpen: false,
+                    /* The grip can only be grabbed while the row is out, and
+                       the drag then puts a shield over the whole window —
+                       over the row too, which fires its mouseleave. Without
+                       this the row would collapse out from under the very
+                       drag that is carrying it. */
+                    joinedDragging: false,
+                    // Held out while anything is open off the row — a panel
+                    // popover, the menu — or while it is being dragged, any
+                    // of which would otherwise slide away under you.
+                    get joinedOut() {
+                        if (!this.joined || this.dockHidden) return false;
+                        if (this.menuOpen || this.joinedDragging) return true;
+                        if (this.sidebar && this.frame === 'popover') return true;
+                        return this.joinedPeeked;
+                    },
+                    // How much of the row clears the composer right now
+                    get joinedShown() {
+                        if (!this.joined) return 0;
+                        if (this.dockHidden) return 0;
+                        return this.joinedOut ? this.joinedBar : this.joinedPeek;
+                    },
+
                     /* --- workspaces ----------------------------------------
                        Three arrangements of the same chrome, one click each.
                        A workspace sets the toolbar, the chat and the panel —
@@ -668,7 +737,10 @@
             }"
             @click.outside="open = false; sub = null"
             @keydown.escape.window="if (sub) sub = null; else open = false"
-            x-effect="if (!open) sub = null"
+            {{-- Joined, the row must stay out while the menu is up: the
+                 pointer leaves the row for the flyout, which is a fixed
+                 sibling, and the row would otherwise slide away under it --}}
+            x-effect="if (!open) sub = null; $store.studio.menuOpen = open"
             @studio:dock-moved.window="if (open) { popStyle = window.StudioDock.anchor($refs.menu, $refs.menu.previousElementSibling, 272); if (sub) $nextTick(() => placeSub()) }"
         >
             <button @click="open = !open" class="s-dock-btn is-menu s-logo-btn" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu">
@@ -875,6 +947,35 @@
                     </span>
                 </div>
 
+                @if($devModeAvailable)
+                    {{-- Joined: the toolbar and the composer in one shell,
+                         the toolbar tucked behind the composer until you
+                         point at it. It needs the toolbar floating on a
+                         horizontal edge and the chat floating with it, so
+                         the row says which of those is missing rather than
+                         going quiet — the same way the Page switcher and
+                         Canvas width rows say "pinned bar". --}}
+                    <button
+                        type="button"
+                        class="s-menu-item"
+                        role="menuitemcheckbox"
+                        :aria-checked="$store.studio.joined"
+                        @click="$store.studio.setChatJoined(!$store.studio.chatJoined)"
+                        title="Draw the toolbar and the chat composer as one panel, with the toolbar sliding out from behind it on hover"
+                    >
+                        <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                            <svg x-show="$store.studio.chatJoined" class="h-3.5 w-3.5 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                        </span>
+                        <span class="min-w-0 flex-1 truncate" :class="$store.studio.joined && 'text-ink'">Join the chat composer</span>
+                        <span
+                            class="shrink-0 text-[10.5px] text-faint"
+                            x-show="$store.studio.chatJoined && !$store.studio.joined"
+                            x-cloak
+                            x-text="!$store.studio.chatFloating ? 'floating chat' : ($store.studio.dock.pinned ? 'unpinned toolbar' : 'top or bottom')"
+                        ></span>
+                    </button>
+                @endif
+
                 <div class="mt-0.5">
                     @foreach($viewSwitches as $key => [$label, $hint])
                         <button
@@ -972,25 +1073,129 @@
             <div
                 x-data="{
                     style: {},
+                    observer: null,
+                    slideTimer: null,
+
+                    init() {
+                        // Joined, the shell's box is written from this card's
+                        // height, and that height changes without any store
+                        // key moving: a keystroke grows the textarea, a
+                        // context chip appears, the thread folds open. One
+                        // observer catches all of it — no polling, and the
+                        // shell can never be caught lagging behind what it
+                        // is wrapping.
+                        this.observer = new ResizeObserver(() => this.place());
+                        this.observer.observe(this.$el);
+                        // A reveal is the one change allowed to animate the
+                        // shell's box, so it is the only one that arms the
+                        // transition. The re-place itself comes from the
+                        // effect below, which runs after this watcher.
+                        this.$watch('$store.studio.joinedOut', () => {
+                            if (this.$store.studio.joined) this.slide();
+                        });
+                    },
+                    destroy() { this.observer?.disconnect() },
+
                     // Centred in the stage — not the window — so a docked
                     // panel beside the site never sits under the card
-                    place() {
-                        if (!$store.studio.chatFloating) { this.style = {}; return; }
+                    frame() {
                         const stage = document.querySelector('main.s-stage');
                         const r = stage ? stage.getBoundingClientRect() : { left: 0, width: window.innerWidth };
                         // 530px: the floating toolbar's width, so the two read as one family
                         const w = Math.round(Math.min(530, Math.max(320, r.width - 32)));
-                        const left = Math.round(r.left + (r.width - w) / 2);
-                        this.style = { left: left + 'px', width: w + 'px', bottom: $store.studio.chatBottom + 'px' };
+                        return { w, left: Math.round(r.left + (r.width - w) / 2) };
+                    },
+
+                    place() {
+                        if (!$store.studio.chatFloating) { this.style = {}; return this.joinedReset() }
+                        const { w, left } = this.frame();
+                        if (!$store.studio.joined) {
+                            this.joinedReset();
+                            this.style = { left: left + 'px', width: w + 'px', top: 'auto', bottom: $store.studio.chatBottom + 'px' };
+                            return;
+                        }
+                        this.placeJoined(w, left);
+                    },
+
+                    /* Joined, this card is the whole unit's placer: it is the
+                       only thing that knows the composer's height, and
+                       writing all three boxes from one pass in one frame is
+                       what keeps the shell, the row and the composer from
+                       ever drifting apart by a pixel.
+
+                       The composer is the anchor and never moves. A composer
+                       that slid out from under the pointer on a reveal would
+                       un-hover itself, collapse, re-hover and flicker — so
+                       instead its edge is fixed a whole row's height from the
+                       window's, and the reveal only moves the shell's far
+                       edge and the row's contents. */
+                    placeJoined(w, left) {
+                        const shell = document.getElementById('studio-joined');
+                        const top = $store.studio.dock.edge === 'top';
+                        const bar = $store.studio.dockHidden ? 0 : $store.studio.joinedBar;
+                        const shown = $store.studio.joinedShown;
+                        const gap = 12;
+
+                        this.style = top
+                            ? { left: left + 'px', width: w + 'px', top: (gap + bar) + 'px', bottom: 'auto' }
+                            : { left: left + 'px', width: w + 'px', bottom: gap + 'px' };
+
+                        // The card's own box, now that it has been written
+                        const h = this.$el.offsetHeight;
+                        const cardTop = top ? gap + bar : Math.round(window.innerHeight - gap - h);
+
+                        // The row's box goes through the store rather than
+                        // straight onto the element: the dock binds its own
+                        // style attribute, and writing behind that binding
+                        // would leave it unpositioned the moment joining
+                        // ends and Alpine's diff sees no change to re-apply.
+                        $store.studio.joinedBox = { left, width: w, top: cardTop - bar };
+
+                        // The shell has no style binding of its own, so it
+                        // is written directly — but never through cssText,
+                        // which would wipe the display x-show put there
+                        if (shell) {
+                            shell.style.left = left + 'px';
+                            shell.style.width = w + 'px';
+                            shell.style.top = (cardTop - shown) + 'px';
+                            shell.style.height = (h + shown) + 'px';
+                        }
+                        // The open popover anchors to the unit, not the row
+                        this.$dispatch('studio:dock-moved');
+                    },
+
+                    // Leaving joined mode, hand the shell back. Only the
+                    // properties placeJoined set — cssText would take the
+                    // display x-show wrote with it. The row needs nothing:
+                    // clearing the box makes its own place() take over.
+                    joinedReset() {
+                        $store.studio.joinedBox = null;
+                        const shell = document.getElementById('studio-joined');
+                        if (!shell) return;
+                        for (const prop of ['left', 'width', 'top', 'height']) shell.style[prop] = '';
+                    },
+
+                    /* A reveal is the one thing allowed to animate the
+                       shell's box. It is on for its own 260ms and off again,
+                       so the content-driven resizes that come through the
+                       observer stay instant. */
+                    slide() {
+                        const shell = document.getElementById('studio-joined');
+                        if (!shell) return;
+                        shell.classList.add('is-sliding');
+                        clearTimeout(this.slideTimer);
+                        this.slideTimer = setTimeout(() => shell.classList.remove('is-sliding'), 320);
                     },
                 }"
                 class="flex h-full min-h-0 flex-col"
                 :class="$store.studio.chatFloating && 's-chat-host'"
                 :style="style"
-                x-effect="$store.studio.chatFloating; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $nextTick(() => place())"
+                x-effect="$store.studio.chatFloating; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
                 @resize.window.debounce.50ms="place()"
                 @studio:reflow.window="place()"
-                @studio:dock-moved.window="place()"
+                {{-- Joined, this card is the placer and fires that event
+                     itself — listening to it here would be a loop --}}
+                @studio:dock-moved.window="if (!$store.studio.joined) place()"
                 {{-- Floating, the card steps aside while a sheet is up: the
                      sheet is centred with a transform, which would capture a
                      fixed child, and the scrim covers the card anyway --}}

@@ -21,6 +21,8 @@
         'is-open': !$store.studio.chatFloating || $store.studio.chatOpen,
         'is-picking': picking,
         'is-busy': busy,
+        'is-joined': $store.studio.joined,
+        'is-bar-hidden': $store.studio.joined && $store.studio.dockHidden,
     }"
     x-data="{
         urls: {
@@ -220,6 +222,10 @@
     }"
     @studio:focus-chat.window="$nextTick(() => $refs.composer?.focus())"
     x-effect="$store.studio.chatFloating; $store.studio.chatOpen; $store.studio.rail; $store.studio.sidebar; $nextTick(() => grow())"
+    {{-- Joined, this is the unit's other half: pointing at it brings the
+         toolbar out from behind it, exactly as pointing at the strip does --}}
+    @mouseenter="$store.studio.joinIn()"
+    @mouseleave="$store.studio.joinOut()"
 >
     {{-- The conversation: the header and the transcript. In the rail it
          fills the panel; floating, it folds out of the composer. --}}

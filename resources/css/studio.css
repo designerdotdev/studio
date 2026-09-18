@@ -78,6 +78,14 @@ html.studio-light {
         background: var(--color-shell);
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
+
+        /* The joined unit — the toolbar and the composer as one object.
+           Three separate fixed boxes have to agree on these to the pixel,
+           and the store carries the same two numbers (joinedBar,
+           joinedPeek) because it writes the boxes. Keep them in step. */
+        --joined-radius: 24px;
+        --joined-bar: 46px;
+        --joined-peek: 14px;
     }
 
     .studio-app ::selection {
@@ -1518,6 +1526,175 @@ html.studio-light .s-pop-inverse {
 
     .s-chat.is-floating.is-picking:hover {
         opacity: 1;
+    }
+
+    /* --- joined: the toolbar and the composer as one object ------------
+       One shell carries the material and the radius for both, so the outer
+       corner is a single continuous curve instead of two that have to be
+       kept in step. The row and the composer go transparent and sit over
+       it. At rest the row is tucked behind the composer with only
+       --joined-peek of it clearing; pointing at either surface brings it
+       out. Nothing is ever clipped: while the row is down, the composer —
+       which is opaque and above it — is simply in front of it.
+
+       The three boxes are placed from one pass in the chat card's
+       place(), which is the only thing that knows the composer's height. */
+
+    .s-joined {
+        position: fixed;
+        /* The row has to sit between them: over the shell, which would
+           otherwise paint across it, and under the composer, which is what
+           it tucks behind. The chat host is z-8. */
+        z-index: 6;
+        /* It paints and nothing else — the row and the composer over it
+           are what you point at */
+        pointer-events: none;
+        border-radius: var(--joined-radius);
+        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow:
+            0 0 0 1px var(--color-line),
+            inset 0 1px 0 var(--color-wash),
+            0 24px 60px -24px rgba(0, 0, 0, 0.7),
+            0 6px 18px -8px rgba(0, 0, 0, 0.5);
+        /* No transition by default. This box tracks the composer, and the
+           composer's height changes on every keystroke that grows the
+           textarea, on a context chip, on the thread folding — animating
+           those would leave the shell visibly lagging behind the thing it
+           is wrapping. A reveal arms the transition for its own 260ms
+           (is-sliding) and nothing else ever animates this box. */
+        transition: none;
+    }
+
+    .s-joined.is-sliding {
+        transition:
+            top 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            box-shadow 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    /* The row out: the unit lifts off the site a little further */
+    .s-joined:has(~ .s-dock.is-joined.is-out) {
+        box-shadow:
+            0 0 0 1px var(--color-line-strong),
+            inset 0 1px 0 var(--color-wash),
+            0 34px 80px -28px rgba(0, 0, 0, 0.78),
+            0 10px 26px -10px rgba(0, 0, 0, 0.55);
+    }
+
+    /* The row, joined: an invisible frame. It paints nothing at all — no
+       surface, no ring, no radius — because the shell paints for it, and
+       anything it drew would show above the shell's top edge while the row
+       is tucked away. Its box is fixed; only its contents ride. */
+    .s-dock.is-joined {
+        z-index: 7;
+        height: var(--joined-bar);
+        padding: 5px 6px 5px 4px;
+        background: none;
+        border-radius: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        /* Its box is written, not slid — but ⌘. still fades it */
+        transition: opacity 200ms ease;
+    }
+
+    /* The reveal. The contents ride up the same 32px the shell's top edge
+       rises, in the same curve, so the row grows upward out from behind
+       the composer rather than appearing in place. Down, they are behind
+       the composer AND transparent: transparent because the tallest of
+       them — Publish, the mode pill — would otherwise poke out above the
+       composer's top edge by the few pixels they sit higher in the row. */
+    .s-dock.is-joined > * {
+        transform: translateY(calc(var(--joined-bar) - var(--joined-peek)));
+        opacity: 0;
+        pointer-events: none;
+        /* Leaving: the contents go before the edge closes over them */
+        transition:
+            transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            opacity 110ms ease;
+    }
+
+    .s-dock.is-joined.is-out > * {
+        transform: none;
+        opacity: 1;
+        pointer-events: auto;
+        /* Arriving: the edge leads, the contents follow it up */
+        transition:
+            transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            opacity 170ms ease 70ms;
+    }
+
+    /* Tucked away, the strip would be bare, which reads as a gap rather
+       than an affordance. A grabber says there is a row behind the
+       composer and that pointing at it brings it out. It rides the row's
+       bottom --joined-peek, which is the part that clears, and widens as
+       it fades so the two never overlap. */
+    .s-dock.is-joined::before {
+        content: '';
+        position: absolute;
+        bottom: 5px;
+        left: 50%;
+        width: 30px;
+        height: 3.5px;
+        translate: -50% 0;
+        border-radius: 999px;
+        background: var(--color-line-strong);
+        transition: opacity 140ms ease, width 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-dock.is-joined.is-out::before {
+        opacity: 0;
+        width: 44px;
+    }
+
+    /* Tooltips. Joined at the bottom edge the space above the row is open
+       canvas, so they go there. At the top edge they have nowhere to go —
+       the window's edge is 12px above, and below the row is the composer,
+       which is opaque and stacked over the row — so the row does without
+       them, the way it already does while a popover is open off it. The
+       buttons keep their aria-labels either way. */
+    .s-dock.is-joined.at-bottom .s-dock-btn[data-tip]::after {
+        top: auto;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        translate: -50% 0;
+    }
+
+    .s-dock.is-joined.at-top .s-dock-btn[data-tip]::after {
+        display: none;
+    }
+
+    /* The composer, joined: opaque, so it is what the row tucks behind,
+       and square where it meets the row. The seam is the same hairline
+       the conversation's header uses. */
+    .s-chat.is-floating.is-joined {
+        background: var(--color-panel);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-radius: 0 0 var(--joined-radius) var(--joined-radius);
+        box-shadow: 0 -1px 0 var(--color-line);
+    }
+
+    .s-chat.is-floating.is-joined.is-bar-hidden {
+        border-radius: var(--joined-radius);
+        box-shadow: none;
+    }
+
+    /* The host is only a frame now — the shell behind it does the drawing,
+       and the card's own entrance would fight the shell's placement */
+    .s-chat-host:has(> .s-chat.is-joined) {
+        animation: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-joined.is-sliding,
+        .s-dock.is-joined > *,
+        .s-dock.is-joined.is-out > *,
+        .s-dock.is-joined::before {
+            transition: none;
+        }
     }
 
     /* --- the conversation ---------------------------------------------

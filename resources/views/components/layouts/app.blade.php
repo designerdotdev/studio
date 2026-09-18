@@ -29,6 +29,7 @@
                  a timeout reveals regardless, so nothing can stay hidden. --}}
             <style>
                 html.studio-booting .s-dock,
+                html.studio-booting .s-joined,
                 html.studio-booting .s-float,
                 html.studio-booting .s-scrim,
                 html.studio-booting .s-stage {
@@ -40,6 +41,7 @@
                 }
 
                 html.studio-revealing .s-dock,
+                html.studio-revealing .s-joined,
                 html.studio-revealing .s-stage,
                 html.studio-revealing .s-float,
                 html.studio-revealing .s-scrim {
@@ -161,19 +163,25 @@
                         place() {
                             if ($store.studio.frame !== 'popover' || $store.studio.docked) return;
                             const button = document.querySelector(`#studio-dock [data-panel='${$store.studio.rail}']`);
-                            const dock = document.getElementById('studio-dock');
-                            if (!button || !dock) return;
+                            {{-- Joined, the row is only the top of a taller
+                                 object: anchoring to it would open the
+                                 popover straight onto the composer. The
+                                 shell is what has to be cleared. --}}
+                            const anchor = $store.studio.joined
+                                ? document.getElementById('studio-joined')
+                                : document.getElementById('studio-dock');
+                            if (!button || !anchor) return;
                             // A floating dock carries its own left/top. Until it
                             // has them — the frame it is in has just changed, and
                             // its effect runs after this one — its rect says
                             // nothing, so stay out of sight rather than anchor to
                             // the position it is leaving. It re-fires
                             // studio:dock-moved the moment it lands.
-                            if (!dock.style.left) { this.style = { visibility: 'hidden' }; return; }
+                            if (!anchor.style.left) { this.style = { visibility: 'hidden' }; return; }
                             const gap = 12, edgePad = 12;
                             const W = window.innerWidth, H = window.innerHeight;
                             const b = button.getBoundingClientRect();
-                            const d = dock.getBoundingClientRect();
+                            const d = anchor.getBoundingClientRect();
                             const edge = $store.studio.dock.edge;
                             let w = $store.studio.floatWidth;
                             let left, top, maxH;
@@ -260,6 +268,23 @@
                     x-transition.opacity.duration.150ms
                     class="s-scrim"
                     @click="$store.studio.closePanel()"
+                ></div>
+
+                {{-- The joined unit's shell. It is the only thing that
+                     carries the material and the radius when the toolbar and
+                     the composer are one object, so the outer corner is a
+                     single continuous curve rather than two that have to be
+                     kept in step. It paints and nothing else: the row and the
+                     composer sit over it and go transparent, and it never
+                     takes a pointer event. Placed by the chat card, which is
+                     the only thing that knows the composer's height. --}}
+                <div
+                    id="studio-joined"
+                    x-data
+                    class="s-joined"
+                    x-show="$store.studio.joined"
+                    x-cloak
+                    aria-hidden="true"
                 ></div>
 
                 @include('studio::partials.dock')
