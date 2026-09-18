@@ -28,6 +28,8 @@
         'is-dragging': dragging,
         'is-snapping': snap,
         'no-tips': !$store.studio.view.tips,
+        'is-joined': $store.studio.joined,
+        'is-out': $store.studio.joinedOut,
         ['at-' + edge]: true,
     }"
     :style="style"
@@ -54,6 +56,14 @@
         // Position from the store: the dock's centre sits `along` the edge
         place() {
             if (this.dragging) return;
+            // Joined, the box is the chat card's to compute — it is the
+            // only thing that knows the composer's height — but this is
+            // still the only writer of the row's style attribute
+            if ($store.studio.joined) {
+                const box = $store.studio.joinedBox;
+                if (box) this.style = `left:${box.left}px; top:${box.top}px; width:${box.width}px`;
+                return;
+            }
             const { edge, along, pinned } = $store.studio.dock;
             // Pinning and unpinning change the toolbar's frame — they are not
             // a slide along an edge. Land at once, so the open panel anchors
@@ -98,6 +108,9 @@
             const rect = this.$root.getBoundingClientRect();
             this.drag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, edge: $store.studio.dock.edge, pinned: $store.studio.dock.pinned };
             this.floatDrag = !this.drag.pinned;
+            // The shield goes over the row as well, and its mouseleave
+            // would otherwise fold the row away mid-drag
+            $store.studio.joinedDragging = true;
         },
         moveDrag(event) {
             if (!this.dragging) return;
@@ -128,6 +141,10 @@
             if (!this.drag.pinned) this.slide(x, y);
         },
         slide(x, y) {
+            // Joined, the unit is centred in the stage rather than placed
+            // `along` an edge, so there is nothing to slide: a drag only
+            // hops it between edges, and a side edge un-joins it on its own
+            if ($store.studio.joined) return;
             const gap = 12;
             const w = this.$root.offsetWidth, h = this.$root.offsetHeight;
             const W = window.innerWidth, H = window.innerHeight;
@@ -146,6 +163,7 @@
         endDrag() {
             if (!this.dragging) return;
             this.floatDrag = false;
+            $store.studio.joinedDragging = false;
             if (this.drag.pinned) {
                 // Already re-pinned on its edge while dragging
                 this.dragging = false;
@@ -165,20 +183,24 @@
         },
     }"
     x-init="place(); $nextTick(() => place())"
-    x-effect="$store.studio.dock; $store.studio.mode; $store.studio.codeAvailable; $store.studio.view; $nextTick(() => place())"
+    x-effect="$store.studio.dock; $store.studio.mode; $store.studio.codeAvailable; $store.studio.view; $store.studio.joined; $store.studio.joinedBox; $nextTick(() => place())"
     @resize.window.debounce.50ms="place()"
     @studio:reflow.window="place()"
     @transitionend.self="$dispatch('studio:dock-moved')"
     {{-- A peeked dock hides again when the pointer leaves it. The canvas
          iframe swallows pointer events, so this is per-element enter/leave,
          not a window-level watch. --}}
-    @mouseenter="over = true; clearTimeout(peekTimer)"
-    @mouseleave="over = false; if (!dragging) peek = false"
+    @mouseenter="over = true; clearTimeout(peekTimer); $store.studio.joinIn()"
+    @mouseleave="over = false; if (!dragging) peek = false; $store.studio.joinOut()"
+    {{-- Joined, the row is tucked behind the composer and untabbable until
+         it is out — so the caret arriving in it has to bring it out too --}}
+    @focusin="$store.studio.joinIn()"
+    @focusout="$store.studio.joinOut()"
     {{-- Moves and the release are tracked on the window: with the shield
          over the canvas iframe, the parent document sees every event --}}
     @pointermove.window="moveDrag($event)"
     @pointerup.window="endDrag($event)"
-    @pointercancel.window="if (dragging) { dragging = false; floatDrag = false; place() }"
+    @pointercancel.window="if (dragging) { dragging = false; floatDrag = false; $store.studio.joinedDragging = false; place() }"
 >
     {{-- The optional parts — grip, pin, page switcher, device widths,
          Back/Forward/Reload, the live-page link, tooltips — follow
@@ -369,7 +391,7 @@
     {{-- Hidden dock (⌘.): a hot strip on its edge peeks it back --}}
     <template x-teleport="body">
         <div
-            x-show="$store.studio.dockHidden"
+            x-show="$store.studio.dockHidden && !$store.studio.joined"
             x-cloak
             class="s-dock-peek"
             :style="({ bottom: 'left:0;right:0;bottom:0;height:6px', top: 'left:0;right:0;top:0;height:6px', left: 'top:0;bottom:0;left:0;width:6px', right: 'top:0;bottom:0;right:0;width:6px' })[$store.studio.dock.edge]"
