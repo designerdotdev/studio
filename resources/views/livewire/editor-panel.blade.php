@@ -187,7 +187,10 @@
                         $sitePath = \Designer\Studio\Services\CollectionBinder::sitePath($binding);
                     @endphp
 
-                    <div wire:key="field-{{ $selectedId }}-{{ $key }}" data-field-key="{{ $key }}">
+                    {{-- Developer mode off: a value written in code is not
+                         the editor's to change, so it is not listed at all —
+                         the same rule the canvas follows (no affordance) --}}
+                    <div wire:key="field-{{ $selectedId }}-{{ $key }}" data-field-key="{{ $key }}" @if(\Designer\Studio\Services\CollectionBinder::isCode($binding)) x-data x-show="$store.studio.developer" x-cloak @endif>
                         @if(\Designer\Studio\Services\CollectionBinder::isCode($binding))
                             {{-- Written as code in the page file: shown, not edited --}}
                             <span class="s-label">{{ $field['label'] ?? \Illuminate\Support\Str::headline($key) }}</span>
@@ -213,8 +216,8 @@
                                 {{-- Two-way: edits save into the site data every section shares --}}
                                 <p class="mt-1.5 flex items-center gap-1.5 text-[11px] leading-relaxed text-faint">
                                     <svg class="h-3 w-3 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1c3.866 0 7 1.79 7 4s-3.134 4-7 4-7-1.79-7-4 3.134-4 7-4Zm5.694 8.13c.464-.264.91-.583 1.306-.952V10c0 2.21-3.134 4-7 4s-7-1.79-7-4V8.178c.396.37.842.688 1.306.953C5.838 10.006 7.854 10.5 10 10.5s4.162-.494 5.694-1.37ZM3 13.179V15c0 2.21 3.134 4 7 4s7-1.79 7-4v-1.822c-.396.37-.842.688-1.306.953-1.532.875-3.548 1.369-5.694 1.369s-4.162-.494-5.694-1.37A7.009 7.009 0 0 1 3 13.179Z"/></svg>
-                                    <span class="min-w-0 flex-1">Site-wide — also changes it everywhere else <span class="font-mono">$site-&gt;{{ str_replace('.', '->', $sitePath) }}</span> is used.</span>
-                                    <button type="button" class="shrink-0 text-soft underline-offset-2 hover:text-ink hover:underline" wire:click="unbindField('{{ $selectedId }}', '{{ $key }}')">Unlink</button>
+                                    <span class="min-w-0 flex-1" x-data>Site-wide — changes it everywhere it is used<span x-show="$store.studio.developer" x-cloak> (<span class="font-mono">$site-&gt;{{ str_replace('.', '->', $sitePath) }}</span>)</span>.</span>
+                                    <button type="button" x-data x-show="$store.studio.developer" x-cloak class="shrink-0 text-soft underline-offset-2 hover:text-ink hover:underline" wire:click="unbindField('{{ $selectedId }}', '{{ $key }}')">Unlink</button>
                                 </p>
                             @endif
                         @endif
@@ -690,15 +693,16 @@
                                     <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Tints the browser chrome on mobile.</p>
                                 </div>
 
-                                <div class="s-divider"></div>
+                                {{-- Raw JSON and raw HTML are code: developer mode only --}}
+                                <div class="s-divider" x-data x-show="$store.studio.developer" x-cloak></div>
 
-                                <div>
+                                <div x-data x-show="$store.studio.developer" x-cloak>
                                     <label for="page-json-ld" class="s-label">Structured data (JSON-LD)</label>
                                     <textarea id="page-json-ld" rows="4" class="s-input !font-mono !text-[11px]" placeholder='{"@@context": "https://schema.org", …}' wire:model.blur="page.json_ld"></textarea>
                                     <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Raw JSON, rendered as a script tag. Invalid JSON is skipped.</p>
                                 </div>
 
-                                <div>
+                                <div x-data x-show="$store.studio.developer" x-cloak>
                                     <label for="page-head-html" class="s-label">Custom head HTML</label>
                                     <textarea id="page-head-html" rows="3" class="s-input !font-mono !text-[11px]" placeholder="<meta …> <link …>" wire:model.blur="page.head_html"></textarea>
                                     <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Injected verbatim into this page's &lt;head&gt;.</p>

@@ -338,6 +338,18 @@ class EditorPanel extends Component
     }
 
     /**
+     * Rows were edited in the canvas's collection card. Nothing of this
+     * component's own changed — the bound repeater's card reads the
+     * collection at render — so hearing the event is the whole job: Livewire
+     * re-renders, and an open row form steps aside for the newer values.
+     */
+    #[On('studio:collection-changed')]
+    public function refreshAfterCollectionChange(): void
+    {
+        $this->closeCollectionRow();
+    }
+
+    /**
      * Dev mode saved a section's source files — re-resolve everything so
      * the inspector reflects the new fields/defaults.
      */

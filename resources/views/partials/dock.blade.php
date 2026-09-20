@@ -30,6 +30,7 @@
         'no-tips': !$store.studio.view.tips,
         'is-joined': $store.studio.joined,
         'is-out': $store.studio.joinedOut,
+        'is-raised': $store.studio.joined && $store.studio.dockPopOpen,
         ['at-' + edge]: true,
     }"
     :style="style"
@@ -253,6 +254,8 @@
             :aria-pressed="{{ $active }}"
             @click="$store.studio.setRail('{{ $name }}')"
             aria-label="{{ $label }}"
+            {{-- The Assistant exists only in developer mode (the menu's switch) --}}
+            @if($name === 'assistant') x-show="$store.studio.chatAvailable" x-cloak @endif
         >
             <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $icon !!}</svg>
         </button>

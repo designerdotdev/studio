@@ -185,7 +185,16 @@
                 transition: opacity 100ms ease;
             }
 
+            /* A collection-bound list: one outline around every row, in the
+               colour of the collection badge — data, not a repeater item */
+            .studio-fhalo.is-collection {
+                box-shadow: inset 0 0 0 1.5px #4053ff;
+                background: rgba(64, 83, 255, 0.045);
+                border-radius: 8px;
+            }
+
             .studio-fchip.is-item { background: #e08c2e; }
+            .studio-fchip.is-collection { background: #4053ff; }
             .studio-fchip.is-undeclared { background: rgba(88, 88, 98, 0.92); }
             .studio-fchip.is-on { opacity: 1; }
 
@@ -319,6 +328,244 @@
             }
 
             html.studio-preview .studio-control { display: none !important; }
+
+            /* ---- Collection card ----
+               A collection-bound list, opened in place: its rows in a card
+               beside it, the clicked one unfolded into its fields. Same
+               material as the control above — it is the same idea, grown. */
+            .studio-coll-ring {
+                position: absolute;
+                z-index: 2147483002;
+                display: none;
+                pointer-events: none;
+                box-sizing: border-box;
+                border-radius: 10px;
+                box-shadow: 0 0 0 1.5px #4053ff, 0 0 0 5px rgba(64, 83, 255, 0.14);
+            }
+
+            .studio-coll-ring.is-on { display: block; }
+
+            /* The row the card is pointing at */
+            .studio-coll-spot {
+                outline: 1.5px solid rgba(64, 83, 255, 0.9) !important;
+                outline-offset: 2px;
+                border-radius: 6px;
+            }
+
+            .studio-coll {
+                position: absolute;
+                z-index: 2147483007;
+                display: none;
+                flex-direction: column;
+                width: 320px;
+                max-height: min(560px, calc(100vh - 100px));
+                border-radius: 14px;
+                background: rgba(14, 14, 17, 0.97);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 24px 60px -18px rgba(0, 0, 0, 0.6), 0 8px 20px -10px rgba(0, 0, 0, 0.45);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                font-family: Geist, ui-sans-serif, system-ui, sans-serif;
+                font-size: 12.5px;
+                line-height: 1.4;
+                letter-spacing: 0;
+                text-align: left;
+                color: rgba(255, 255, 255, 0.92);
+                overflow: hidden;
+                cursor: default;
+            }
+
+            .studio-coll.is-on {
+                display: flex;
+                animation: studio-coll-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            @keyframes studio-coll-in {
+                from { opacity: 0; transform: translateY(4px) scale(0.985); }
+                to { opacity: 1; transform: none; }
+            }
+
+            .studio-coll *, .studio-coll *::before, .studio-coll *::after { box-sizing: border-box; }
+
+            .studio-coll svg { width: 14px; height: 14px; flex: none; }
+
+            .studio-coll button {
+                margin: 0;
+                border: 0;
+                background: none;
+                color: inherit;
+                font: inherit;
+                cursor: pointer;
+            }
+
+            .studio-coll-head {
+                display: flex;
+                align-items: center;
+                gap: 2px;
+                padding: 8px 8px 8px 12px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .studio-coll-mark { display: flex; margin-right: 6px; color: #7c8cff; }
+
+            .studio-coll-title {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-weight: 600;
+                font-size: 13px;
+            }
+
+            .studio-coll-state {
+                margin-right: 4px;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.4);
+                font-variant-numeric: tabular-nums;
+                transition: color 150ms ease;
+            }
+
+            .studio-coll-state.is-saved { color: #4ade80; }
+            .studio-coll-state.is-error { color: #f87171; }
+
+            .studio-coll-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 26px;
+                border-radius: 7px;
+                color: rgba(255, 255, 255, 0.55) !important;
+                transition: background-color 120ms ease, color 120ms ease;
+            }
+
+            .studio-coll-icon:hover { background: rgba(255, 255, 255, 0.08); color: #fff !important; }
+
+            .studio-coll-rows {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                padding: 4px;
+                overscroll-behavior: contain;
+            }
+
+            .studio-coll-empty { margin: 0; padding: 18px 10px; text-align: center; color: rgba(255, 255, 255, 0.45); }
+
+            .studio-coll-row { border-radius: 10px; }
+
+            .studio-coll-row.is-open {
+                margin: 2px 0;
+                background: rgba(255, 255, 255, 0.045);
+                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+            }
+
+            .studio-coll-rowhead {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                padding: 7px 8px 7px 10px !important;
+                border-radius: 10px;
+                text-align: left;
+                transition: background-color 120ms ease;
+            }
+
+            .studio-coll-row:not(.is-open) .studio-coll-rowhead:hover { background: rgba(255, 255, 255, 0.06); }
+
+            .studio-coll-rowtext { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+
+            .studio-coll-rowtitle,
+            .studio-coll-rowhint {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .studio-coll-rowtitle { font-weight: 500; }
+            .studio-coll-rowhint { font-size: 11.5px; color: rgba(255, 255, 255, 0.42); }
+
+            .studio-coll-chevron {
+                display: flex;
+                color: rgba(255, 255, 255, 0.3);
+                transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            .studio-coll-row.is-open .studio-coll-chevron { transform: rotate(90deg); }
+
+            .studio-coll-form { display: flex; flex-direction: column; gap: 9px; padding: 2px 10px 10px; }
+
+            .studio-coll-field { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+
+            .studio-coll-field.is-inline { flex-direction: row; align-items: center; justify-content: space-between; }
+
+            .studio-coll-label { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
+
+            .studio-coll input[type="text"],
+            .studio-coll input[type="number"],
+            .studio-coll select,
+            .studio-coll textarea {
+                width: 100%;
+                margin: 0;
+                padding: 6px 9px;
+                border-radius: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.05);
+                color: #fff;
+                font: inherit;
+                line-height: 1.45;
+                outline: none;
+                box-shadow: none;
+                transition: border-color 120ms ease, box-shadow 120ms ease;
+            }
+
+            .studio-coll textarea { min-height: 64px; resize: vertical; }
+
+            .studio-coll input:focus,
+            .studio-coll select:focus,
+            .studio-coll textarea:focus {
+                border-color: #5b6bff;
+                box-shadow: 0 0 0 3px rgba(64, 83, 255, 0.28);
+            }
+
+            .studio-coll-switch { width: 16px; height: 16px; accent-color: #4053ff; }
+
+            .studio-coll-tools { display: flex; align-items: center; gap: 2px; margin: 2px -4px -4px; }
+
+            .studio-coll-spacer { flex: 1; }
+
+            .studio-coll-tool {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                height: 26px;
+                padding: 0 8px !important;
+                border-radius: 7px;
+                font-size: 11.5px !important;
+                color: rgba(255, 255, 255, 0.55) !important;
+                transition: background-color 120ms ease, color 120ms ease;
+            }
+
+            .studio-coll-tool svg { width: 12px; height: 12px; }
+            .studio-coll-tool:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: #fff !important; }
+            .studio-coll-tool:disabled { opacity: 0.3; cursor: default; }
+            .studio-coll-tool.is-danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.14); color: #fca5a5 !important; }
+
+            .studio-coll-foot {
+                padding: 8px 12px 9px;
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.38);
+            }
+
+            html.studio-preview .studio-coll,
+            html.studio-preview .studio-coll-ring,
+            html.studio-element-select .studio-coll,
+            html.studio-element-select .studio-coll-ring { display: none !important; }
+
+            @media (prefers-reduced-motion: reduce) {
+                .studio-coll.is-on { animation: none; }
+            }
 
             /* ---- Repeater item controls ----
                Flanking + buttons (add before/after) and a small toolbar
@@ -1114,6 +1361,7 @@
             bindings: @js($componentBindings ?? []),
             blocks: @js($blockByInstance),
             renderUrl: @js(route('studio.api.render')),
+            collectionsUrl: @js(route('studio.api.collections.show', ['name' => '__NAME__'])),
             csrf: @js(csrf_token()),
             paths: @js($componentPaths),
             contracts: @js($componentContracts),
@@ -1334,6 +1582,10 @@
     <div class="studio-fchip" id="studio-fchip"></div>
     <div class="studio-cursor" id="studio-cursor"><span class="studio-cursor-shape"></span></div>
     <div class="studio-control" id="studio-control"></div>
+    {{-- The collection card + the ring that keeps its list outlined while
+         it is open. Document coordinates: they scroll with the page. --}}
+    <div class="studio-coll-ring" id="studio-collection-ring"></div>
+    <div class="studio-coll" id="studio-collection" role="dialog" aria-label="Collection rows"></div>
 
     {{-- Repeater item controls — positioned from JS (paintItemControls),
          same rAF write phase as the halo/chip above. Their own visibility

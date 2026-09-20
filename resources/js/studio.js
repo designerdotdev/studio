@@ -220,6 +220,21 @@ const StudioEditor = {
                     this.uploadFieldFile(data);
                     break;
 
+                case 'studio:open-collection':
+                    // The card's "Open in Content": the full editor — the
+                    // schema, every row — for the collection it was showing
+                    window.Alpine?.store('studio')?.setRail('content', true);
+                    window.dispatchEvent(new CustomEvent('studio:open-collection', { detail: { name: data.name } }));
+                    break;
+
+                case 'studio:collection-changed':
+                    // Rows were edited on the canvas. They are draft changes
+                    // like any other (Publish lights up), and whatever in the
+                    // editor lists that collection reads it again.
+                    window.dispatchEvent(new CustomEvent('studio:status', { detail: { state: 'saved' } }));
+                    window.Livewire?.dispatch('studio:collection-changed', { name: data.name });
+                    break;
+
                 case 'studio:open-code-at':
                     window.Alpine?.store('studio')?.setMode('code');
                     window.Alpine?.store('code')?.openFileAt(data.path, data.line);
@@ -856,6 +871,73 @@ const StudioFields = {
     },
 
     /**
+     * The whole list a repeater item belongs to: every row of the same
+     * field rendered beside it, and the box around them all. A collection
+     * is one thing on the canvas — its rows share one card — so the list is
+     * the target, not the row.
+     *
+     * The scope is the nearest ancestor of the item that holds one full
+     * rendering (a row for every index): a list rendered twice — a marquee's
+     * duplicate, a nav's mobile sheet — stays two groups, the same way
+     * renderings() keeps its copies two items. The box is the union of the
+     * rows' own rects rather than the scope's, so it hugs the list and not
+     * the padding of whatever wraps it.
+     */
+    groupFor(sectionId, item) {
+        const all = (this.maps[sectionId]?.items || []).filter((other) => other.key === item.key);
+        const total = new Set(all.map((other) => other.index)).size;
+        const wrapper = document.querySelector(`[data-section="${sectionId}"]`);
+
+        let members = [item];
+        let scope = item.el.parentElement;
+
+        while (scope && total > 1) {
+            members = all.filter((other) => scope.contains(other.el));
+
+            if (new Set(members.map((other) => other.index)).size >= total || scope === wrapper) break;
+
+            scope = scope.parentElement;
+        }
+
+        const rects = members.map((member) => member.el.getBoundingClientRect()).filter((rect) => rect.width && rect.height);
+
+        if (!rects.length) return null;
+
+        const left = Math.min(...rects.map((r) => r.left));
+        const top = Math.min(...rects.map((r) => r.top));
+        const right = Math.max(...rects.map((r) => r.right));
+        const bottom = Math.max(...rects.map((r) => r.bottom));
+
+        return { key: item.key, members, count: total, box: { left, top, width: right - left, height: bottom - top } };
+    },
+
+    /**
+     * The group of `keys` whose box holds the point — the gaps between the
+     * rows (a divider, the list's own gutter) belong to the list too, or the
+     * outline would flicker off every time the pointer crossed one.
+     */
+    groupAt(sectionId, x, y, keys) {
+        const seen = new Set();
+
+        for (const item of this.maps[sectionId]?.items || []) {
+            if (!keys.includes(item.key) || seen.has(item)) continue;
+
+            const group = this.groupFor(sectionId, item);
+
+            if (!group) continue;
+            group.members.forEach((member) => seen.add(member));
+
+            const { left, top, width, height } = group.box;
+
+            if (x >= left && x <= left + width && y >= top && y <= top + height) {
+                return { group, item: group.members[0] };
+            }
+        }
+
+        return null;
+    },
+
+    /**
      * The toggle governing the point, when nothing more specific is there.
      *
      * `StudioFields.at()` deliberately never returns a `when` entry — a
@@ -996,7 +1078,7 @@ const StudioPreview = {
         }
     },
 
-    init({ variables, bindings, refs, blocks, renderUrl, csrf, paths, contracts }) {
+    init({ variables, bindings, refs, blocks, renderUrl, collectionsUrl, csrf, paths, contracts }) {
         this.variables = variables || {};
         // Per-section {field: 'collections.<name>'} — sent with every render
         // so bound repeaters keep reading the collection, not stale values
@@ -1004,6 +1086,7 @@ const StudioPreview = {
         this.refs = refs || {};
         this.blocks = blocks || {};
         this.renderUrl = renderUrl || null;
+        this.collectionsUrl = collectionsUrl || null;
         this.csrf = csrf || null;
 
         // Dev-mode chrome (Edit-code buttons) follows the editor's toggle —
@@ -1025,6 +1108,7 @@ const StudioPreview = {
 
         this.cursor.mount();
         this.control.mount();
+        this.collection.mount();
 
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
@@ -1069,6 +1153,7 @@ const StudioPreview = {
                     // Code hides the canvas entirely; while it is on screen at
                     // all (the split) it stays selectable, like Edit.
                     this.setMode(data.mode === 'preview' ? 'preview' : 'edit');
+                    if (data.mode === 'preview') this.collection.close();
                     break;
 
                 case 'studio:menu-close':
@@ -1138,7 +1223,14 @@ const StudioPreview = {
         document.addEventListener('click', (event) => {
             if (this.mode === 'preview') return;
             if (this.control.el && this.control.el.contains(event.target)) return;
+            // The collection card is the editor's own surface too — and a
+            // toast's Undo must not take the card it belongs to with it.
+            // Asked of the event's path, not of the target: a row's toggle
+            // redraws the card before the click gets here, so the target
+            // is already detached and has no card above it to find
+            if (event.composedPath().some((node) => node.id === 'studio-collection' || node.id === 'studio-toasts')) return;
 
+            this.collection.close();
             this.closeMenu();
             this.clearSelection();
             this.post('studio:deselected');
@@ -1150,6 +1242,13 @@ const StudioPreview = {
             if (event.key === 'Escape' && this.menu) {
                 event.preventDefault();
                 this.closeMenu();
+                return;
+            }
+
+            // The collection card closes first, the way a popover would
+            if (event.key === 'Escape' && this.collection.isOpen) {
+                event.preventDefault();
+                this.collection.close();
                 return;
             }
 
@@ -1346,6 +1445,13 @@ const StudioPreview = {
         return !!this.bindings[sectionId]?.[key]?.startsWith('collections.');
     },
 
+    /** The fields of a section that read a collection's rows. */
+    collectionKeys(sectionId) {
+        return Object.entries(this.bindings[sectionId] || {})
+            .filter(([, binding]) => typeof binding === 'string' && binding.startsWith('collections.'))
+            .map(([key]) => key);
+    },
+
     /** The humanised name of the collection a field is bound to, or null. */
     collectionNameFor(sectionId, key) {
         const binding = this.bindings[sectionId]?.[key];
@@ -1367,6 +1473,27 @@ const StudioPreview = {
     openCollectionRow(sectionId, key, index) {
         this.post('studio:open-inspector', { sectionId });
         this.post('studio:open-collection-row', { sectionId, key, index: index ?? null });
+    },
+
+    /**
+     * A collection-bound list was clicked: its rows open in a card beside
+     * it, on the page, with the clicked row unfolded. The inspector is not
+     * involved — like a link's destination, the thing you clicked is edited
+     * where it is. `item` is the row under the click (any row of the list
+     * when the click landed in a gap).
+     */
+    openCollection(sectionId, item, index) {
+        const binding = this.bindings[sectionId]?.[item.key];
+
+        if (!binding?.startsWith('collections.')) return;
+
+        this.collectionKept = true;
+        this.collection.open({
+            sectionId,
+            key: item.key,
+            name: binding.slice('collections.'.length),
+            index: index ?? null,
+        });
     },
 
     /**
@@ -1519,6 +1646,457 @@ const StudioPreview = {
         },
     },
 
+    /**
+     * The collection card: a collection-bound list, opened in place.
+     *
+     * Click anywhere on the list and its rows open in a card beside it —
+     * the way a link's destination opens under the link — with the row you
+     * clicked unfolded into its fields. Typing saves the row (debounced, to
+     * CollectionController) and re-renders every section reading that
+     * collection, so the page follows the keystrokes. Rows can be added,
+     * moved and deleted here too; the schema stays in the Content panel,
+     * one click away from the header.
+     *
+     * This never writes a bound VALUE — saveVariables() would discard it.
+     * It writes the row in the collection, which is where the value lives.
+     *
+     * Its own elements and lifecycle, like the control: the card and the
+     * ring that keeps the list outlined while it is open. Both sit in
+     * document coordinates so they scroll with the page; the ring re-reads
+     * the list each frame while it shows (rows grow as you type, and a rect
+     * is never cached across frames — see the docs).
+     */
+    collection: {
+        el: null,
+        ring: null,
+        ctx: null,        // { sectionId, key, name }
+        doc: null,        // { name, title, fields, rows }
+        openRow: null,    // the unfolded row's id
+        state: 'idle',    // idle | saving | saved | error
+        timers: {},
+        frame: null,
+
+        mount() {
+            this.el = document.getElementById('studio-collection');
+            this.ring = document.getElementById('studio-collection-ring');
+        },
+
+        get isOpen() { return !!this.ctx },
+
+        url(path = '') {
+            return StudioPreview.collectionsUrl.replace('__NAME__', encodeURIComponent(this.ctx.name)) + path;
+        },
+
+        async request(method, path = '', body = null) {
+            const response = await fetch(this.url(path), {
+                method,
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': StudioPreview.csrf },
+                body: body ? JSON.stringify(body) : null,
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data.success) throw new Error(data.message || 'Could not save the collection.');
+
+            return data;
+        },
+
+        async open({ sectionId, key, name, index }) {
+            if (!this.el || StudioPreview.mode === 'preview') return;
+
+            // Already showing this list: the click picks the row
+            if (this.doc && this.ctx.sectionId === sectionId && this.ctx.key === key) {
+                const id = index !== null ? (this.doc.rows[index]?.id ?? null) : null;
+
+                if (id && id !== this.openRow) {
+                    this.openRow = id;
+                    this.draw();
+                    this.place();
+                }
+
+                this.el.querySelector('.studio-coll-row.is-open input, .studio-coll-row.is-open textarea')?.focus({ preventScroll: true });
+
+                return;
+            }
+
+            this.close();
+            this.ctx = { sectionId, key, name };
+            this.state = 'idle';
+
+            try {
+                const data = await this.request('GET');
+
+                // Closed, or reopened on another list, while it loaded
+                if (!this.ctx || this.ctx.name !== name || this.ctx.sectionId !== sectionId) return;
+
+                this.doc = data.collection;
+            } catch (e) {
+                this.close();
+                toast(e.message, 'error');
+
+                return;
+            }
+
+            // The rendered index is the row's position in the collection
+            this.openRow = index !== null ? (this.doc.rows[index]?.id ?? null) : null;
+            this.draw();
+            this.el.classList.add('is-on');
+            this.place();
+            this.track();
+
+            this.el.querySelector('.studio-coll-row.is-open input, .studio-coll-row.is-open textarea')?.focus({ preventScroll: true });
+        },
+
+        close() {
+            if (!this.ctx) return;
+
+            // A pending keystroke still gets saved
+            Object.keys(this.timers).forEach((id) => this.flush(id));
+
+            this.ctx = null;
+            this.doc = null;
+            this.openRow = null;
+            cancelAnimationFrame(this.frame);
+            this.frame = null;
+            this.el?.classList.remove('is-on');
+            this.ring?.classList.remove('is-on');
+            if (this.el) this.el.innerHTML = '';
+        },
+
+        /** The list on the page right now (its nodes are replaced on every render). */
+        group() {
+            const items = (StudioFields.maps[this.ctx.sectionId]?.items || []).filter((item) => item.key === this.ctx.key);
+
+            return items.length ? StudioFields.groupFor(this.ctx.sectionId, items[0]) : null;
+        },
+
+        /** Beside the list — right, else left, else under it — inside the viewport. */
+        place() {
+            const group = this.group();
+
+            if (!group || !this.el) return;
+
+            const box = group.box;
+            const gap = 14, pad = 12;
+            const width = this.el.offsetWidth, height = this.el.offsetHeight;
+            const W = document.documentElement.clientWidth, H = window.innerHeight;
+            let left, top = box.top;
+
+            if (box.left + box.width + gap + width <= W - pad) left = box.left + box.width + gap;
+            else if (box.left - gap - width >= pad) left = box.left - gap - width;
+            else { left = Math.min(Math.max(pad, box.left), W - width - pad); top = box.top + box.height + gap; }
+
+            // The editor's toolbar floats over the bottom of the canvas
+            // more often than not — stay clear of where it would be
+            top = Math.max(pad, Math.min(top, H - height - 76));
+
+            this.el.style.left = Math.round(left + window.scrollX) + 'px';
+            this.el.style.top = Math.round(top + window.scrollY) + 'px';
+        },
+
+        track() {
+            const step = () => {
+                if (!this.ctx) return;
+
+                const group = this.group();
+
+                if (group && this.ring) {
+                    const { left, top, width, height } = group.box;
+                    const next = `${Math.round(left + window.scrollX - 4)}|${Math.round(top + window.scrollY - 4)}|${Math.round(width + 8)}|${Math.round(height + 8)}`;
+
+                    if (next !== this.ring.dataset.box) {
+                        const [l, t, w, h] = next.split('|');
+
+                        this.ring.dataset.box = next;
+                        this.ring.style.cssText = `left:${l}px; top:${t}px; width:${w}px; height:${h}px`;
+                    }
+
+                    this.ring.classList.add('is-on');
+                }
+
+                this.frame = requestAnimationFrame(step);
+            };
+
+            this.frame = requestAnimationFrame(step);
+        },
+
+        /* --- drawing ------------------------------------------------- */
+
+        h(tag, attrs = {}, children = []) {
+            const el = document.createElement(tag);
+
+            for (const [name, value] of Object.entries(attrs)) {
+                if (name === 'class') el.className = value;
+                else if (name === 'text') el.textContent = value;
+                else if (name === 'html') el.innerHTML = value;
+                else if (name.startsWith('on')) el.addEventListener(name.slice(2), value);
+                else if (value !== false && value !== null && value !== undefined) el.setAttribute(name, value === true ? '' : value);
+            }
+
+            [].concat(children).forEach((child) => child && el.appendChild(child));
+
+            return el;
+        },
+
+        icons: {
+            stack: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2c3.59 0 6.5 1.57 6.5 3.5S13.59 9 10 9 3.5 7.43 3.5 5.5 6.41 2 10 2Zm6.5 6.2v2.3c0 1.93-2.91 3.5-6.5 3.5S3.5 12.43 3.5 10.5V8.2C4.9 9.55 7.3 10.3 10 10.3s5.1-.75 6.5-2.1Zm0 4.4v1.9c0 1.93-2.91 3.5-6.5 3.5S3.5 16.43 3.5 14.5v-1.9c1.4 1.35 3.8 2.1 6.5 2.1s5.1-.75 6.5-2.1Z"/></svg>',
+            plus: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>',
+            open: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .41.34.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Zm7.5-2.25a.75.75 0 0 1 .75-.75h4.75a.75.75 0 0 1 .75.75V8a.75.75 0 0 1-1.5 0V5.06l-5.72 5.72a.75.75 0 1 1-1.06-1.06l5.72-5.72H12.5a.75.75 0 0 1-.75-.75Z"/></svg>',
+            close: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>',
+            chevron: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>',
+            up: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.56L5.28 9.53a.75.75 0 0 1-1.06-1.06l5.25-5.25a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 1 1-1.06 1.06l-3.97-3.97v10.69A.75.75 0 0 1 10 17Z" clip-rule="evenodd"/></svg>',
+            down: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v10.69l3.97-3.97a.75.75 0 1 1 1.06 1.06l-5.25 5.25a.75.75 0 0 1-1.06 0l-5.25-5.25a.75.75 0 1 1 1.06-1.06l3.97 3.97V3.75A.75.75 0 0 1 10 3Z" clip-rule="evenodd"/></svg>',
+            trash: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.44c-.8.08-1.59.19-2.37.32a.75.75 0 1 0 .24 1.48l.17-.03.84 10.52A2.75 2.75 0 0 0 7.62 19h4.76a2.75 2.75 0 0 0 2.74-2.52l.84-10.52.17.03a.75.75 0 1 0 .24-1.48A41 41 0 0 0 14 4.19v-.44A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.67.03 2.5.08v-.33c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.33C8.33 4.03 9.16 4 10 4Z" clip-rule="evenodd"/></svg>',
+        },
+
+        /** What a row is called in the list: its first two text values. */
+        summary(row) {
+            const texts = Object.entries(this.doc.fields)
+                .filter(([, config]) => ['text', 'textarea', 'number', 'select', 'url'].includes(config.type || 'text'))
+                .map(([key]) => String(row[key] ?? '').trim())
+                .filter(Boolean);
+
+            return { title: texts[0] || 'Untitled row', hint: texts[1] || '' };
+        },
+
+        draw() {
+            const h = this.h.bind(this);
+            const rows = this.doc.rows;
+
+            const header = h('div', { class: 'studio-coll-head' }, [
+                h('span', { class: 'studio-coll-mark', html: this.icons.stack }),
+                h('span', { class: 'studio-coll-title', text: this.doc.title }),
+                h('span', { class: 'studio-coll-state is-' + this.state, text: { saving: 'Saving…', saved: 'Saved', error: 'Not saved' }[this.state] || rows.length + (rows.length === 1 ? ' row' : ' rows') }),
+                h('button', { type: 'button', class: 'studio-coll-icon', title: 'Add a row', 'aria-label': 'Add a row', html: this.icons.plus, onclick: () => this.addRow() }),
+                h('button', { type: 'button', class: 'studio-coll-icon', title: 'Open in Content', 'aria-label': 'Open in Content', html: this.icons.open, onclick: () => { StudioPreview.post('studio:open-collection', { name: this.doc.name }); this.close(); } }),
+                h('button', { type: 'button', class: 'studio-coll-icon', title: 'Close', 'aria-label': 'Close', html: this.icons.close, onclick: () => this.close() }),
+            ]);
+
+            const list = h('div', { class: 'studio-coll-rows' }, rows.length
+                ? rows.map((row, i) => this.drawRow(row, i))
+                : [h('p', { class: 'studio-coll-empty', text: 'No rows yet. Add the first one.' })]);
+
+            const foot = h('div', { class: 'studio-coll-foot', text: `Shared everywhere ${this.doc.title} is used.` });
+
+            const scroll = this.el.querySelector('.studio-coll-rows')?.scrollTop || 0;
+
+            this.el.innerHTML = '';
+            this.el.append(header, list, foot);
+            list.scrollTop = scroll;
+        },
+
+        drawRow(row, i) {
+            const h = this.h.bind(this);
+            const isOpen = row.id === this.openRow;
+            const { title, hint } = this.summary(row);
+            const last = this.doc.rows.length - 1;
+
+            const head = h('button', {
+                type: 'button',
+                class: 'studio-coll-rowhead',
+                'aria-expanded': isOpen ? 'true' : 'false',
+                onclick: () => { this.openRow = isOpen ? null : row.id; this.draw(); this.place(); if (!isOpen) this.el.querySelector('.studio-coll-row.is-open input, .studio-coll-row.is-open textarea')?.focus({ preventScroll: true }); },
+                onmouseenter: () => this.spotlight(i),
+                onmouseleave: () => this.spotlight(null),
+            }, [
+                h('span', { class: 'studio-coll-rowtext' }, [
+                    h('span', { class: 'studio-coll-rowtitle', text: title, 'data-title': row.id }),
+                    hint && !isOpen ? h('span', { class: 'studio-coll-rowhint', text: hint, 'data-hint': row.id }) : null,
+                ]),
+                h('span', { class: 'studio-coll-chevron', html: this.icons.chevron }),
+            ]);
+
+            if (!isOpen) return h('div', { class: 'studio-coll-row', 'data-row': row.id }, [head]);
+
+            const fields = Object.entries(this.doc.fields).map(([key, config]) => this.drawField(row, key, config));
+
+            const tools = h('div', { class: 'studio-coll-tools' }, [
+                h('button', { type: 'button', class: 'studio-coll-tool', disabled: i === 0, html: this.icons.up + '<span>Up</span>', onclick: () => this.move(row.id, -1) }),
+                h('button', { type: 'button', class: 'studio-coll-tool', disabled: i === last, html: this.icons.down + '<span>Down</span>', onclick: () => this.move(row.id, 1) }),
+                h('span', { class: 'studio-coll-spacer' }),
+                h('button', { type: 'button', class: 'studio-coll-tool is-danger', html: this.icons.trash + '<span>Delete</span>', onclick: () => this.removeRow(row.id) }),
+            ]);
+
+            return h('div', { class: 'studio-coll-row is-open', 'data-row': row.id }, [head, h('div', { class: 'studio-coll-form' }, [...fields, tools])]);
+        },
+
+        drawField(row, key, config) {
+            const h = this.h.bind(this);
+            const type = config.type || 'text';
+            const value = row[key] ?? '';
+            const set = (next) => this.setValue(row.id, key, next);
+            let input;
+
+            if (type === 'toggle') {
+                input = h('input', { type: 'checkbox', class: 'studio-coll-switch', checked: !!value && value !== '0', onchange: (e) => set(e.target.checked) });
+
+                return h('label', { class: 'studio-coll-field is-inline' }, [h('span', { class: 'studio-coll-label', text: config.label || key }), input]);
+            }
+
+            if (type === 'select') {
+                const options = config.options || {};
+                const pairs = Array.isArray(options) ? options.map((o) => [o, o]) : Object.entries(options);
+
+                input = h('select', { onchange: (e) => set(e.target.value) }, pairs.map(([v, label]) => h('option', { value: v, text: label, selected: String(v) === String(value) })));
+            } else if (type === 'textarea' || type === 'richtext') {
+                input = h('textarea', { rows: 3, oninput: (e) => set(e.target.value) });
+                input.value = value;
+            } else {
+                input = h('input', { type: type === 'number' ? 'number' : 'text', oninput: (e) => set(e.target.value) });
+                input.value = value;
+            }
+
+            // Enter moves on rather than submitting anything; Escape is the card's
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.tagName === 'INPUT') { e.preventDefault(); input.blur(); } });
+
+            return h('label', { class: 'studio-coll-field' }, [h('span', { class: 'studio-coll-label', text: config.label || key }), input]);
+        },
+
+        /** Hovering a row in the card points at it on the page. */
+        spotlight(index) {
+            document.querySelectorAll('.studio-coll-spot').forEach((el) => el.classList.remove('studio-coll-spot'));
+
+            if (index === null || !this.ctx) return;
+
+            this.group()?.members.filter((member) => member.index === index).forEach((member) => member.el.classList.add('studio-coll-spot'));
+        },
+
+        /* --- writes -------------------------------------------------- */
+
+        setState(state) {
+            this.state = state;
+
+            const el = this.el?.querySelector('.studio-coll-state');
+
+            if (!el) return;
+
+            const count = this.doc?.rows.length ?? 0;
+
+            el.className = 'studio-coll-state is-' + state;
+            el.textContent = { saving: 'Saving…', saved: 'Saved', error: 'Not saved' }[state] || count + (count === 1 ? ' row' : ' rows');
+        },
+
+        setValue(id, key, value) {
+            const row = this.doc.rows.find((r) => r.id === id);
+
+            if (!row) return;
+
+            row[key] = value;
+
+            // The row's name in the list follows what is typed
+            const title = this.el.querySelector(`[data-title="${id}"]`);
+            if (title) title.textContent = this.summary(row).title;
+
+            this.setState('saving');
+            clearTimeout(this.timers[id]);
+            this.timers[id] = setTimeout(() => this.flush(id), 280);
+        },
+
+        async flush(id) {
+            if (!(id in this.timers)) return;
+
+            clearTimeout(this.timers[id]);
+            delete this.timers[id];
+
+            const ctx = this.ctx;
+            const row = this.doc?.rows.find((r) => r.id === id);
+
+            if (!ctx || !row) return;
+
+            const { id: _, ...values } = row;
+
+            try {
+                await this.request('PUT', '/rows/' + encodeURIComponent(id), { values });
+                this.changed(ctx);
+                if (this.ctx === ctx && !Object.keys(this.timers).length) this.setState('saved');
+            } catch (e) {
+                if (this.ctx === ctx) this.setState('error');
+                toast(e.message, 'error');
+            }
+        },
+
+        /** Every section reading this collection re-renders; the editor hears about it. */
+        changed(ctx) {
+            const binding = StudioPreview.bindings[ctx.sectionId]?.[ctx.key];
+
+            for (const [sectionId, bindings] of Object.entries(StudioPreview.bindings)) {
+                if (Object.values(bindings || {}).includes(binding)) StudioPreview.render(sectionId);
+            }
+
+            StudioPreview.post('studio:collection-changed', { name: this.doc?.name || ctx.name });
+        },
+
+        async structural(run, openRow) {
+            const ctx = this.ctx;
+
+            // Anything still being typed lands first, so it is not lost
+            await Promise.all(Object.keys(this.timers).map((id) => this.flush(id)));
+
+            try {
+                const data = await run();
+
+                if (this.ctx !== ctx) return null;
+
+                this.doc = data.collection;
+                if (openRow !== undefined) this.openRow = typeof openRow === 'function' ? openRow(data) : openRow;
+                this.state = 'saved';
+                this.draw();
+                this.place();
+                this.changed(ctx);
+
+                return data;
+            } catch (e) {
+                toast(e.message, 'error');
+
+                return null;
+            }
+        },
+
+        async addRow() {
+            const data = await this.structural(() => this.request('POST', '/rows', { values: {} }), (d) => d.row.id);
+
+            if (data) this.el.querySelector('.studio-coll-row.is-open input, .studio-coll-row.is-open textarea')?.focus({ preventScroll: true });
+        },
+
+        move(id, by) {
+            const ids = this.doc.rows.map((r) => r.id);
+            const from = ids.indexOf(id), to = from + by;
+
+            if (from < 0 || to < 0 || to >= ids.length) return;
+
+            ids.splice(to, 0, ids.splice(from, 1)[0]);
+
+            return this.structural(() => this.request('POST', '/reorder', { ids }));
+        },
+
+        async removeRow(id) {
+            const before = this.doc.rows.map((r) => ({ ...r }));
+            const removed = before.find((r) => r.id === id);
+            const ctx = this.ctx;
+
+            if (!await this.structural(() => this.request('DELETE', '/rows/' + encodeURIComponent(id)), null)) return;
+
+            const name = this.summary(removed).title.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+            toast(`“${name}” deleted`, 'success', 5000, {
+                label: 'Undo',
+                // Back where it was: the row is re-created (a new id), then
+                // the old order is restored around it
+                onClick: async () => {
+                    if (this.ctx !== ctx) return;
+
+                    const { id: _, ...values } = removed;
+                    const created = await this.structural(() => this.request('POST', '/rows', { values }), (d) => d.row.id);
+
+                    if (!created) return;
+
+                    const ids = before.map((r) => (r.id === id ? created.row.id : r.id));
+
+                    await this.structural(() => this.request('POST', '/reorder', { ids }));
+                },
+            });
+        },
+    },
+
     /** The value the canvas currently holds for a field. */
     currentValue(sectionId, entry) {
         const vars = this.variables[sectionId] || {};
@@ -1584,6 +2162,14 @@ const StudioPreview = {
     // have overridden, so a stale read is a visible rename mismatch
     // rather than a silent wrong-section bug.
     select(clickedSectionId, event) {
+        // A click on the list whose card is already open moves the card to
+        // that row; any other click closes it. openCollection() says which.
+        this.collectionKept = false;
+        this.resolveSelect(clickedSectionId, event);
+        if (!this.collectionKept) this.collection.close();
+    },
+
+    resolveSelect(clickedSectionId, event) {
         if (event) event.stopPropagation();
 
         // The mouseup ending an item drag almost always lands off the
@@ -1730,7 +2316,10 @@ const StudioPreview = {
                         // EditorPanel::saveVariables() silently discards a
                         // canvas-side write to it — so no control opens
                         // here; the row itself opens in the inspector.
-                        this.openCollectionRow(hitSectionId, hit.entry.key, hit.entry.index);
+                        const row = StudioFields.itemAt(hitSectionId, event.clientX, event.clientY);
+
+                        if (row && row.key === hit.entry.key) this.openCollection(hitSectionId, row, hit.entry.index);
+                        else this.openCollectionRow(hitSectionId, hit.entry.key, hit.entry.index);
                     } else if (this.isImageField(hit.entry, hitSectionId)) {
                         this.fieldAction(hit.entry, hitSectionId, 'pick-media');
                     } else {
@@ -1759,7 +2348,10 @@ const StudioPreview = {
 
                 // A row of a collection-bound repeater opens as that row
                 if (this.isCollectionBound(hitSectionId, hit.item.key)) {
-                    this.openCollectionRow(hitSectionId, hit.item.key, hit.item.index);
+                    // A click in a gap resolved to the list, not to a row
+                    const onRow = StudioFields.itemAt(hitSectionId, event.clientX, event.clientY);
+
+                    this.openCollection(hitSectionId, hit.item, onRow && onRow.key === hit.item.key ? onRow.index : null);
                 }
 
                 return;
@@ -1850,6 +2442,17 @@ const StudioPreview = {
         const item = StudioFields.itemAt(sectionId, x, y);
 
         if (item) return { tier: 'item', item };
+
+        // Between the rows of a collection-bound list — a divider, the
+        // list's own gutter — is still the list: it is one target, and an
+        // outline that dropped out over every hairline would say otherwise.
+        const boundKeys = this.collectionKeys(sectionId);
+
+        if (boundKeys.length) {
+            const within = StudioFields.groupAt(sectionId, x, y, boundKeys);
+
+            if (within) return { tier: 'item', item: within.item };
+        }
 
         return { tier: 'section' };
     },
@@ -2031,6 +2634,7 @@ const StudioPreview = {
         let label = '';
         let source = '';
         let sectionId = null;
+        let isCollection = false;
 
         if (kind === 'field') {
             sectionId = event.sectionId;
@@ -2049,8 +2653,25 @@ const StudioPreview = {
             box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
             label = this.itemLabel(hit.item);
 
+            // A collection is one thing on the page: the outline takes in
+            // every row and the chip names the collection, because the click
+            // opens all of it
             const collection = this.collectionNameFor(sectionId, hit.item.key);
-            if (collection) label = collection + ' · ' + label;
+
+            if (collection) {
+                const group = StudioFields.groupFor(sectionId, hit.item);
+
+                // The open card's ring already outlines this list
+                if (group && this.collection.isOpen && this.collection.ctx.sectionId === sectionId && this.collection.ctx.key === hit.item.key) {
+                    return this.queuePaint({ kind, box: group.box, label: '', source: '', quiet: true, cursorKind: this.cursorKind(hit, kind, sectionId), itemControls: null });
+                }
+
+                if (group) {
+                    box = group.box;
+                    label = collection + ' · ' + group.count + (group.count === 1 ? ' row' : ' rows');
+                    isCollection = true;
+                }
+            }
         } else if (kind === 'undeclared') {
             sectionId = event.sectionId;
             box = StudioFields.box(hit.entry);
@@ -2069,7 +2690,7 @@ const StudioPreview = {
             ? { sectionId, key: hit.item.key, index: hit.item.index, box }
             : null;
 
-        this.queuePaint({ kind, box, label, source, cursorKind: this.cursorKind(hit || {}, kind, sectionId), itemControls });
+        this.queuePaint({ kind, box, label, source, isCollection, cursorKind: this.cursorKind(hit || {}, kind, sectionId), itemControls });
     },
 
     /**
@@ -2107,17 +2728,18 @@ const StudioPreview = {
             return;
         }
 
-        const { kind, box, label, source, cursorKind, itemControls } = job;
+        const { kind, box, label, source, cursorKind, itemControls, isCollection } = job;
+        const tone = isCollection ? ' is-collection' : kind === 'item' ? ' is-item' : kind === 'undeclared' ? ' is-undeclared' : '';
 
         this.paintItemControls(itemControls || null);
 
-        halo.className = 'studio-fhalo is-on' + (kind === 'item' ? ' is-item' : kind === 'undeclared' ? ' is-undeclared' : '');
+        halo.className = 'studio-fhalo' + (job.quiet ? '' : ' is-on') + tone;
         halo.style.left = box.left + 'px';
         halo.style.top = box.top + 'px';
         halo.style.width = box.width + 'px';
         halo.style.height = box.height + 'px';
 
-        chip.className = 'studio-fchip is-on' + (kind === 'item' ? ' is-item' : kind === 'undeclared' ? ' is-undeclared' : '');
+        chip.className = 'studio-fchip' + (job.quiet ? '' : ' is-on') + tone;
         chip.innerHTML = '';
         chip.appendChild(document.createTextNode(label));
 

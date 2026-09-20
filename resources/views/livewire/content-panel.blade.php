@@ -12,7 +12,7 @@
     @if($view === 'list')
         <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3">
             <p class="s-microlabel flex-1">Content</p>
-            <button type="button" class="s-icon-btn" title="New collection" aria-label="New collection" wire:click="startCreate">
+            <button type="button" x-data x-show="$store.studio.developer" x-cloak class="s-icon-btn" title="New collection" aria-label="New collection" wire:click="startCreate">
                 <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
             </button>
             @include('studio::partials.float-close')
@@ -34,7 +34,7 @@
                 <div class="px-3 py-10 text-center">
                     <p class="text-[13px] text-soft">No collections yet.</p>
                     <p class="mt-1 text-[11.5px] leading-relaxed text-faint">A collection is a list of rows — posts, team members, FAQs — that any repeater can bind to.</p>
-                    <button type="button" class="s-btn-outline mt-4 !text-[11.5px]" wire:click="startCreate">New collection</button>
+                    <button type="button" x-data x-show="$store.studio.developer" x-cloak class="s-btn-outline mt-4 !text-[11.5px]" wire:click="startCreate">New collection</button>
                 </div>
             @endforelse
         </div>
@@ -62,7 +62,7 @@
         <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
             <button type="button" class="s-icon-btn" wire:click="back" title="All collections"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg></button>
             <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{{ $doc['title'] }}</p>
-            <button type="button" class="s-icon-btn" wire:click="startSchema" title="Manage fields"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg></button>
+            <button type="button" x-data x-show="$store.studio.developer" x-cloak class="s-icon-btn" wire:click="startSchema" title="Manage fields — developer mode"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg></button>
             <button type="button" class="s-icon-btn" wire:click="newRow" title="Add row"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg></button>
             @include('studio::partials.float-close')
         </div>

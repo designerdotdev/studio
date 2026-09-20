@@ -63,6 +63,13 @@ Route::group([
         Route::post('/media/duplicate', [\Designer\Studio\Http\Controllers\MediaController::class, 'duplicate'])->middleware('throttle:60,1')->name('api.media.duplicate');
         Route::delete('/media', [\Designer\Studio\Http\Controllers\MediaController::class, 'destroy'])->middleware('throttle:60,1')->name('api.media.destroy');
 
+        // Collection rows — the canvas's collection card edits them in place
+        Route::get('/collections/{name}', [\Designer\Studio\Http\Controllers\CollectionController::class, 'show'])->where('name', '[A-Za-z0-9_-]+')->name('api.collections.show');
+        Route::post('/collections/{name}/rows', [\Designer\Studio\Http\Controllers\CollectionController::class, 'storeRow'])->where('name', '[A-Za-z0-9_-]+')->middleware('throttle:60,1')->name('api.collections.rows.store');
+        Route::put('/collections/{name}/rows/{id}', [\Designer\Studio\Http\Controllers\CollectionController::class, 'updateRow'])->where(['name' => '[A-Za-z0-9_-]+', 'id' => '[A-Za-z0-9_-]+'])->middleware('throttle:240,1')->name('api.collections.rows.update');
+        Route::delete('/collections/{name}/rows/{id}', [\Designer\Studio\Http\Controllers\CollectionController::class, 'destroyRow'])->where(['name' => '[A-Za-z0-9_-]+', 'id' => '[A-Za-z0-9_-]+'])->middleware('throttle:60,1')->name('api.collections.rows.destroy');
+        Route::post('/collections/{name}/reorder', [\Designer\Studio\Http\Controllers\CollectionController::class, 'reorder'])->where('name', '[A-Za-z0-9_-]+')->middleware('throttle:60,1')->name('api.collections.reorder');
+
         // Onboarding
         Route::post('/onboarding/apply-template', [StudioController::class, 'applyTemplate'])->name('api.onboarding.apply');
 

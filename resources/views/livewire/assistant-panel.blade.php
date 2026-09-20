@@ -22,6 +22,7 @@
         'is-picking': picking,
         'is-busy': busy,
         'is-joined': $store.studio.joined,
+        'is-row-out': $store.studio.joinedOut,
         'is-bar-hidden': $store.studio.joined && $store.studio.dockHidden,
     }"
     x-data="{

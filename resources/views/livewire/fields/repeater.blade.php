@@ -130,8 +130,8 @@
                 @endforelse
             </div>
             <div class="flex items-center gap-2 border-t border-line px-2.5 py-1.5">
-                <p class="min-w-0 flex-1 truncate text-[10.5px] text-faint">Shared with every section bound to {{ $title }}.</p>
-                <button type="button" class="shrink-0 text-[10.5px] text-soft underline-offset-2 hover:text-ink hover:underline" wire:click="unbindRepeater('{{ $sectionId }}', '{{ $key }}')" title="Copy the rows into this section and edit them here instead">Unbind</button>
+                <p class="min-w-0 flex-1 truncate text-[10.5px] text-faint">Shared everywhere {{ $title }} is used.</p>
+                <button type="button" x-data x-show="$store.studio.developer" x-cloak class="shrink-0 text-[10.5px] text-soft underline-offset-2 hover:text-ink hover:underline" wire:click="unbindRepeater('{{ $sectionId }}', '{{ $key }}')" title="Copy the rows into this section and edit them here instead">Unbind</button>
             </div>
         @endif
     </div>
@@ -243,7 +243,8 @@
     </button>
 
     @if(!empty($collectionOptions) && $bound === null)
-        <div class="flex items-center gap-1.5 pt-0.5" x-data="{ pick: '' }">
+        {{-- Binding is wiring, not content: developer mode only --}}
+        <div class="flex items-center gap-1.5 pt-0.5" x-data="{ pick: '' }" x-show="$store.studio.developer" x-cloak>
             <select class="s-input !h-7 flex-1 !text-[11px]" x-model="pick" @change="if (pick) { $wire.bindRepeater('{{ $sectionId }}', '{{ $key }}', pick); pick = '' }">
                 <option value="">Bind to a collection…</option>
                 @foreach($collectionOptions as $name => $title)

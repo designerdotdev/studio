@@ -70,10 +70,11 @@
                         this.closePanel();
                     },
                     // The rail: which panel the floating surface shows.
-                    rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) ? s : 'sections')(localStorage.getItem('studio.rail')),
+                    rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) && !(s === 'assistant' && !(@js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0')) ? s : 'sections')(localStorage.getItem('studio.rail')),
                     setRail(name, force = false) {
                         // Floating, the chat is not a rail panel: its button
                         // opens the conversation over the site instead
+                        if (name === 'assistant' && !this.chatAvailable) return;
                         if (name === 'assistant' && this.chatFloating) {
                             force ? this.setChatOpen(true) : this.toggleChat();
                             return;
@@ -103,15 +104,25 @@
                        independent of the rail, so the inspector and the chat
                        can be open at the same time. Only where the Assistant
                        exists at all (the server's dev-mode gate). */
-                    chatAvailable: @js($devModeAvailable),
-                    chatFloating: @js($devModeAvailable) && localStorage.getItem('studio.chat-float') === '1',
+                    // The Assistant is a developer surface — it runs a coding
+                    // agent against the app — so it exists only in developer
+                    // mode: the server's gate AND the menu's switch. Off, the
+                    // editor is the one a marketing team uses.
+                    get chatAvailable() { return this.developer },
+                    // The preference (on unless turned off: where the
+                    // Assistant exists the first-run arrangement is the
+                    // Composer workspace) and whether it applies right now.
+                    // Leaving developer mode puts the chat away without
+                    // forgetting where it was.
+                    chatFloatPref: localStorage.getItem('studio.chat-float') !== '0',
+                    get chatFloating() { return this.chatFloatPref && this.chatAvailable },
                     chatOpen: localStorage.getItem('studio.chat-open') === '1',
                     chatBusy: false,   // a turn is streaming
                     setChatFloating(on) {
                         if (!this.chatAvailable) return;
                         on = !!on;
                         if (on === this.chatFloating) return;
-                        this.chatFloating = on;
+                        this.chatFloatPref = on;
                         localStorage.setItem('studio.chat-float', on ? '1' : '0');
                         if (on) {
                             // The float takes over from the panel
@@ -152,7 +163,7 @@
                        to a side edge — therefore un-joins on its own and
                        joins again by itself, and nothing has to clear the
                        flag. The numbers are the CSS's too (--joined-*). */
-                    chatJoined: @js($devModeAvailable) && localStorage.getItem('studio.chat-joined') === '1',
+                    chatJoined: @js($devModeAvailable) && localStorage.getItem('studio.chat-joined') !== '0',
                     joinedBar: 46,    // the row at full height
                     joinedPeek: 14,   // what clears the composer at rest
                     // The row's box, computed by the chat card (the only
@@ -187,6 +198,14 @@
                         this.joinTimer = setTimeout(() => { this.joinedPeeked = false }, 150);
                     },
                     menuOpen: false,
+                    publishOpen: false,
+                    /* Joined, the row sits under the composer (it tucks
+                       behind it), which also puts everything it opens — the
+                       menu, its flyouts, Publish — under the composer and
+                       under an open panel. While one of those is up the row
+                       is out, clear of the composer, so it can take the
+                       dock's usual place on top (is-raised). */
+                    get dockPopOpen() { return this.menuOpen || this.publishOpen },
                     /* The grip can only be grabbed while the row is out, and
                        the drag then puts a shield over the whole window —
                        over the row too, which fires its mouseleave. Without
@@ -198,7 +217,7 @@
                     // of which would otherwise slide away under you.
                     get joinedOut() {
                         if (!this.joined || this.dockHidden) return false;
-                        if (this.menuOpen || this.joinedDragging) return true;
+                        if (this.dockPopOpen || this.joinedDragging) return true;
                         if (this.sidebar && this.frame === 'popover') return true;
                         return this.joinedPeeked;
                     },
@@ -210,40 +229,50 @@
                     },
 
                     /* --- workspaces ----------------------------------------
-                       Three arrangements of the same chrome, one click each.
-                       A workspace sets the toolbar, the chat and the panel —
-                       never the mode or the canvas width — and the menu shows
+                       Arrangements of the same chrome, one click each. A
+                       workspace is three answers — where the toolbar is,
+                       where the chat is, whether the panel is docked — and
+                       never the mode or the canvas width. The menu shows
                        which one you are in (none, when you have moved things
-                       yourself). */
+                       yourself). Listed from the most chat-led to the most
+                       panel-led; the two with `chat` only exist where the
+                       Assistant does.
+
+                       The first-run arrangement is one of these too, and it
+                       comes from the defaults below rather than from a call
+                       here: Composer where the Assistant exists (chatFloating
+                       and chatJoined default on), Minimal everywhere else. */
                     workspaces: {
-                        chat: { label: 'Chat focused', hint: 'Header bar, the chat floating over the site', needsChat: true },
-                        minimal: { label: 'Minimal', hint: 'A floating toolbar and nothing else', needsChat: false },
-                        classic: { label: 'Classic', hint: 'Header bar with the panel docked beside the site', needsChat: false },
+                        composer: { label: 'Composer', hint: 'The toolbar and the chat as one object', edge: 'bottom', pinned: false, chat: true, panel: false },
+                        chat: { label: 'Chat focused', hint: 'Header bar, the chat floating over the site', edge: 'top', pinned: true, chat: true, panel: false },
+                        minimal: { label: 'Minimal', hint: 'A floating toolbar and nothing else', edge: 'bottom', pinned: false, chat: false, panel: false },
+                        classic: { label: 'Classic', hint: 'Header bar with the panel docked beside the site', edge: 'top', pinned: true, chat: false, panel: true },
+                        sidebar: { label: 'Sidebar', hint: 'A rail on the left with the panel beside it', edge: 'left', pinned: true, chat: false, panel: true },
                     },
                     applyWorkspace(name) {
-                        if (!this.workspaces[name]) return;
-                        if (name === 'chat') {
-                            if (!this.chatAvailable) return;
-                            if (this.sidebar) this.closePanel();
-                            this.setDock('top', 0.5, true);
-                            this.setChatFloating(true);
-                        } else if (name === 'minimal') {
-                            this.setChatFloating(false);
-                            if (this.sidebar) this.closePanel();
-                            this.setDock('bottom', 0.5, false);
-                        } else {
-                            this.setChatFloating(false);
-                            this.setDock('top', 0.5, true);
-                            this.setRail('sections', true);
-                        }
+                        const to = this.workspaces[name];
+                        if (!to || (to.chat && !this.chatAvailable)) return;
+                        if (!to.panel && this.sidebar) this.closePanel();
+                        this.setDock(to.edge, 0.5, to.pinned);
+                        this.setChatFloating(to.chat);
+                        // Joining is a preference the other workspaces leave
+                        // alone — pinned or docked it simply cannot apply
+                        if (name === 'composer') this.setChatJoined(true);
+                        if (to.panel) this.setRail('sections', true);
                         if (this.dockHidden) this.toggleDock();
                         window.dispatchEvent(new CustomEvent('studio:workspace', { detail: { name } }));
                     },
+                    // Read back from the real state. An open popover or a
+                    // closed column is a moment, not an arrangement, so the
+                    // panel is not part of the match.
                     get workspace() {
-                        const top = this.dock.pinned && this.dock.edge === 'top';
-                        if (this.chatFloating) return top ? 'chat' : null;
-                        if (!this.dock.pinned) return 'minimal';
-                        return top ? 'classic' : null;
+                        const { edge, pinned } = this.dock;
+                        if (this.chatFloating) {
+                            if (this.joined) return 'composer';
+                            return pinned && edge === 'top' ? 'chat' : null;
+                        }
+                        if (!pinned) return 'minimal';
+                        return { top: 'classic', left: 'sidebar' }[edge] ?? null;
                     },
                     // Which frame the open panel takes: the two data screens
                     // are sheets, everything else a popover on the dock.
@@ -360,10 +389,25 @@
                         // Monaco themes are global and set in JS, not CSS
                         window.StudioMonaco?.syncTheme();
                     },
+                    /* --- developer mode -------------------------------------
+                       One switch, two editors. On: Code mode, the Assistant,
+                       edit-code buttons, source lines on the canvas, field
+                       bindings, collection schemas, a page's raw head HTML.
+                       Off: the editor a marketing team uses — the page, its
+                       fields, pages, content rows, media, Publish — with
+                       nothing that reads as code. `developer` is THE gate for
+                       chrome (the switch, where the server allows one at
+                       all); the canvas mirrors it as html.studio-devmode. */
                     devMode: localStorage.getItem('studio.devmode') !== '0',
+                    get developer() { return this.devModeAvailable && this.devMode },
                     toggleDevMode() {
                         this.devMode = !this.devMode;
                         localStorage.setItem('studio.devmode', this.devMode ? '1' : '0');
+                        // The Assistant goes with it: a panel showing it has
+                        // nothing left to show
+                        if (!this.devMode && this.sidebar && this.rail === 'assistant') this.closePanel();
+                        if (!this.devMode && this.rail === 'assistant') this.rail = 'sections';
+                        window.dispatchEvent(new CustomEvent('studio:reflow'));
                         window.dispatchEvent(new CustomEvent('studio:to-iframe', {
                             detail: { type: 'studio:devmode', on: this.devMode },
                         }));
@@ -378,7 +422,7 @@
                        Code is the file tree + editor, and only exists when the
                        server gate AND the dev-mode toggle are both on. */
                     devModeAvailable: @js($devModeAvailable),
-                    get codeAvailable() { return this.devModeAvailable && this.devMode },
+                    get codeAvailable() { return this.developer },
                     mode: (() => {
                         const saved = localStorage.getItem('studio.mode');
                         const codeOk = @js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0';
@@ -559,6 +603,8 @@
         }"
         @click.outside="open = false"
         @keydown.escape.window="open = false"
+        {{-- Joined, the row stays out — and on top — while this is up --}}
+        x-effect="$store.studio.publishOpen = open"
         @studio:status.window="if ($event.detail.state === 'saved' && status) status.dirty = true"
         @studio:open-publish.window="open = true; refreshStatus()"
         >
@@ -777,7 +823,7 @@
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                     New page…
                 </button>
-                <button @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item">
+                <button x-show="$store.studio.developer" @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item">
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
                     New layout…
                 </button>
@@ -788,10 +834,10 @@
         
                 <div class="s-divider my-1"></div>
                 @if(\Designer\Studio\Support\DevMode::enabled())
-                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" title="Edit the site's source files — sections, layouts, data — from the editor">
+                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" role="switch" :aria-checked="$store.studio.devMode" title="On: Code mode, the Assistant, source lines and field bindings. Off: the editor your marketing team uses — content only, nothing that reads as code.">
                         <span class="flex items-center gap-2.5">
                             <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
-                            Dev mode
+                            Developer mode
                         </span>
                         <span class="s-chip" :class="$store.studio.devMode && '!border-accent/50 !text-accent'" x-text="$store.studio.devMode ? 'On' : 'Off'"></span>
                     </button>
@@ -824,7 +870,7 @@
                     </span>
                     <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                 </button>
-                {{-- Workspace: three arrangements of the chrome, in a flyout like View --}}
+                {{-- Workspace: arrangements of the chrome, in a flyout like View --}}
                 <button
                     type="button"
                     class="s-menu-item justify-between"
@@ -960,6 +1006,7 @@
                     <button
                         type="button"
                         class="s-menu-item"
+                        x-show="$store.studio.chatAvailable"
                         role="menuitemcheckbox"
                         :aria-checked="$store.studio.joined"
                         @click="$store.studio.setChatJoined(!$store.studio.chatJoined)"
@@ -1015,7 +1062,7 @@
                 </div>
             </div>
 
-            {{-- The Workspace flyout: three presets. The check follows the real
+            {{-- The Workspace flyout: the presets. The check follows the real
                  state, so moving the toolbar or the chat by hand leaves none
                  of them checked. --}}
             <div
@@ -1038,11 +1085,12 @@
                 @keydown.arrow-left.prevent="sub = null; $refs.workspaceRow.focus()"
             >
                 <p class="s-microlabel px-2.5 pb-1 pt-2">Workspace</p>
-                @foreach(['chat', 'minimal', 'classic'] as $workspace)
-                    @if($workspace !== 'chat' || $devModeAvailable)
+                @foreach(['composer', 'chat', 'minimal', 'classic', 'sidebar'] as $workspace)
+                    @if($devModeAvailable || ! in_array($workspace, ['composer', 'chat']))
                         <button
                             type="button"
                             class="s-menu-item s-workspace-item"
+                            @if(in_array($workspace, ['composer', 'chat'])) x-show="$store.studio.chatAvailable" @endif
                             :class="$store.studio.workspace === '{{ $workspace }}' && 'is-active'"
                             role="menuitemradio"
                             :aria-checked="$store.studio.workspace === '{{ $workspace }}'"
@@ -1234,7 +1282,7 @@
                 const all = [
                     { label: 'Add section…', hint: 'Insert', run: () => window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} })) },
                     { label: 'New page…', hint: 'Create', run: () => window.dispatchEvent(new CustomEvent('studio:open-create-page')) },
-                    { label: 'New layout…', hint: 'Create', run: () => window.Livewire?.dispatch('studio:new-layout') },
+                    { label: 'New layout…', hint: 'Create', when: studio.developer, run: () => window.Livewire?.dispatch('studio:new-layout') },
                     { label: 'Preview mode', hint: 'Mode', when: studio.mode !== 'preview', run: () => studio.setMode('preview') },
                     { label: 'Edit mode', hint: 'Mode', when: studio.mode !== 'edit', run: () => studio.setMode('edit') },
                     { label: 'Code mode', hint: 'Mode', when: studio.codeAvailable && studio.mode !== 'code', run: () => studio.setMode('code') },
@@ -1249,13 +1297,18 @@
                     { label: 'Content panel', hint: 'Panel', run: () => studio.setRail('content', true) },
                     { label: 'Media panel', hint: 'Panel', run: () => studio.setRail('media', true) },
                     @if($devModeAvailable)
-                    { label: 'Assistant panel', hint: 'Panel', when: !studio.chatFloating, run: () => studio.setRail('assistant', true) },
-                    { label: 'Focus the chat', hint: 'Chat', run: () => studio.focusChat() },
-                    { label: studio.chatFloating ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', run: () => studio.setChatFloating(!studio.chatFloating) },
-                    { label: 'Workspace: Chat focused', hint: 'Workspace', when: studio.workspace !== 'chat', run: () => studio.applyWorkspace('chat') },
+                    { label: 'Assistant panel', hint: 'Panel', when: studio.chatAvailable && !studio.chatFloating, run: () => studio.setRail('assistant', true) },
+                    { label: 'Focus the chat', hint: 'Chat', when: studio.chatAvailable, run: () => studio.focusChat() },
+                    { label: studio.chatFloating ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', when: studio.chatAvailable, run: () => studio.setChatFloating(!studio.chatFloating) },
+                    { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Editor', run: () => studio.toggleDevMode() },
                     @endif
-                    { label: 'Workspace: Minimal', hint: 'Workspace', when: studio.workspace !== 'minimal', run: () => studio.applyWorkspace('minimal') },
-                    { label: 'Workspace: Classic', hint: 'Workspace', when: studio.workspace !== 'classic', run: () => studio.applyWorkspace('classic') },
+                    // One per workspace, minus the one you are in and the
+                    // chat-led ones where there is no Assistant
+                    ...Object.entries(studio.workspaces).map(([name, to]) => ({
+                        label: 'Workspace: ' + to.label, hint: 'Workspace',
+                        when: studio.workspace !== name && (!to.chat || studio.chatAvailable),
+                        run: () => studio.applyWorkspace(name),
+                    })),
                     @if($devModeAvailable)
                     { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
                     @endif

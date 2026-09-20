@@ -70,7 +70,7 @@ its render.
 |---|---|---|
 | no binding, declared `text`/`textarea`, plain text host | `edit` | edits in place |
 | bound `site.*` | `edit` | edits in place — `saveSiteValues()` genuinely persists these |
-| bound `collections.*` | `select` | collection cursor; the click opens the row in the inspector's inline collection editor |
+| bound `collections.*` | `select` | collection cursor over the whole list; the click opens the collection card in place, on that row |
 | bound `php:` / `blade:` | `code` | **nothing** — no halo, no chip, no badge; the native cursor stays |
 | declared `image`/`url`/`select`/`colorpicker` | `select` | its own affordance opens |
 | an echo rendering an element (`{!! $icon !!}` → `<svg>`) | `select` | never editable — `innerText` would be empty and wipe it |
@@ -157,15 +157,28 @@ uses `setVariable()` instead.
   change.
 - **repeater items** — hover a row for flanking add-before/after, drag to reorder, delete with
   Undo. Not offered for a `collections.*`-bound repeater.
-- **collection rows** — a `collections.*`-bound repeater's row is the only target: its values
-  never get their own halo (`tierAt()` resolves them to the row, since each would open the same
-  row). The row shows the collection badge and a `Kpis · Kpi` chip; the click posts `studio:open-inspector` and then
-  `studio:open-collection-row {sectionId, key, index}`. The editor relays the latter to Livewire
-  (`EditorPanel::openCollectionRowFromCanvas`), which maps the rendered index onto the
-  collection's row order and opens that row's form inside the bound repeater's card in the
-  inspector (`fields/repeater.blade.php`: the collection's rows listed in place, a row opens as
-  a form, Save writes `CollectionRepository::saveRow` and refreshes the canvas). Nothing on the
-  canvas ever writes a bound value.
+- **collections** — a `collections.*`-bound repeater is **one target: the whole list**. Its
+  values never get their own halo (`tierAt()` resolves them to the row, and the gaps between
+  rows — a divider, the list's gutter — resolve to the list too, via `StudioFields.groupAt()`),
+  and `paintHalo()` swaps the row's box for `StudioFields.groupFor()`: the union of every row in
+  the same rendering, outlined in the collection badge's indigo with a `Digest · 3 rows` chip.
+  The click opens the **collection card** (`StudioPreview.collection`, `#studio-collection`) in
+  place — beside the list (right, else left, else under it), the way a link's destination opens
+  under the link — with the clicked row unfolded into its fields. Typing saves the row
+  (280ms debounce → `CollectionController`, `PUT /studio/api/collections/{name}/rows/{id}`) and
+  re-renders every section whose bindings name that collection, so the page follows the
+  keystrokes; rows can be added, moved and deleted (Undo re-creates the row and restores the
+  order). The card's inputs live outside every section, so the caret rule does not apply to
+  them. While it is open a ring (`#studio-collection-ring`) keeps the list outlined, re-read per
+  frame; both elements sit in **document** coordinates so they scroll with the page. A click on
+  another row of the same list moves the card to that row (`select()` →
+  `collectionKept`); any other click, Esc or Preview closes it, flushing a pending save. It
+  posts `studio:collection-changed {name}` (the editor marks the draft dirty and tells Livewire,
+  so the inspector's bound-repeater card and an open Content entry re-read) and
+  `studio:open-collection {name}` for the header's "Open in Content". **It never writes a bound
+  value** — `saveVariables()` would discard that — it writes the row, where the value lives.
+  `openCollectionRow()` (the inspector's inline row form) remains as the fallback when a bound
+  value resolves to no row on the canvas.
 - **the inspector** — never opened by a click. Selecting a section only tells Livewire
   (`studio:section-selected`), so an already-open panel follows the selection and a closed one
   stays closed. The toolbar's leading Edit-fields button, the context menu's first item and `E`

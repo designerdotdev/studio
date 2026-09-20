@@ -1600,6 +1600,15 @@ html.studio-light .s-pop-inverse {
         transition: opacity 200ms ease;
     }
 
+    /* A menu, its flyouts and Publish are children of the row, so they
+       stack wherever it does — and z-7 is under the composer and under an
+       open panel (both live in the z-30 float). While one of them is up the
+       row is out, clear of the composer, so it takes the dock's usual place
+       above everything and what it opened comes with it. */
+    .s-dock.is-joined.is-raised {
+        z-index: 40;
+    }
+
     /* The reveal. The contents ride up the same 32px the shell's top edge
        rises, in the same curve, so the row grows upward out from behind
        the composer rather than appearing in place. Down, they are behind
@@ -1668,18 +1677,38 @@ html.studio-light .s-pop-inverse {
 
     /* The composer, joined: opaque, so it is what the row tucks behind,
        and square where it meets the row. The seam is the same hairline
-       the conversation's header uses. */
+       the conversation's header uses.
+
+       Square is only right while the whole row is out. Tucked, the seam
+       sits --joined-peek under the shell's top edge, which is inside the
+       shell's --joined-radius corner: the arc is still turning there, and
+       a square composer corner pokes out past it (2px at 14 under 24 —
+       enough to read as a notch). So the composer is clipped to the
+       shell's own outline — its box carried up by however much of the row
+       is showing, same radius — and the unit's silhouette is one curve
+       whatever the two numbers are. The seam's hairline lies inside that
+       outline and ends on the arc with it. The inset moves in the shell's
+       curve and time, so the two edges travel together on a reveal. */
     .s-chat.is-floating.is-joined {
         background: var(--color-panel);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
         border-radius: 0 0 var(--joined-radius) var(--joined-radius);
         box-shadow: 0 -1px 0 var(--color-line);
+        clip-path: inset(calc(-1 * var(--joined-peek)) 0 0 0 round var(--joined-radius));
+        transition:
+            opacity 180ms ease,
+            clip-path 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-chat.is-floating.is-joined.is-row-out {
+        clip-path: inset(calc(-1 * var(--joined-bar)) 0 0 0 round var(--joined-radius));
     }
 
     .s-chat.is-floating.is-joined.is-bar-hidden {
         border-radius: var(--joined-radius);
         box-shadow: none;
+        clip-path: none;
     }
 
     /* The host is only a frame now — the shell behind it does the drawing,
@@ -1692,7 +1721,8 @@ html.studio-light .s-pop-inverse {
         .s-joined.is-sliding,
         .s-dock.is-joined > *,
         .s-dock.is-joined.is-out > *,
-        .s-dock.is-joined::before {
+        .s-dock.is-joined::before,
+        .s-chat.is-floating.is-joined {
             transition: none;
         }
     }

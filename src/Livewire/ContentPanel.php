@@ -118,6 +118,19 @@ class ContentPanel extends Component
     /*  Navigation                                                   */
     /* ------------------------------------------------------------ */
 
+    /**
+     * Rows were edited in the canvas's collection card. The table reads the
+     * collection at render; an open entry form holds a copy, so it takes
+     * the newer values rather than saving stale ones over them.
+     */
+    #[\Livewire\Attributes\On('studio:collection-changed')]
+    public function refreshAfterCanvasEdit(string $name = ''): void
+    {
+        if ($this->rowId && $this->collection === $name && ($row = $this->repo()->row($name, $this->rowId))) {
+            $this->row = [...$this->row, ...$row];
+        }
+    }
+
     public function open(string $name): void
     {
         if (!$this->repo()->exists($name)) {
