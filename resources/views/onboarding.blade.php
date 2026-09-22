@@ -17,16 +17,18 @@
         class="s-canvas relative h-full w-full overflow-y-auto"
         x-data="{
             step: 1,
-            selected: @js(array_key_first($templates)),
+            selected: @js(array_key_first(array_filter($templates, fn ($t) => $t['active'])) ?? array_key_first($templates)),
             filter: 'all',
             theme: 'all',
             query: '',
+            showInactive: false,
             applying: false,
             templates: @js(array_map(fn ($key, $t) => [
                 'key' => $key,
                 'title' => $t['title'],
                 'category' => $t['category'],
                 'theme' => $t['theme'],
+                'active' => $t['active'],
                 'search' => \Illuminate\Support\Str::lower($t['title'] . ' ' . $key . ' ' . $t['category'] . ' ' . $t['theme'] . ' ' . $t['description']),
             ], array_keys($templates), $templates)),
 
@@ -37,13 +39,19 @@
             matches(template) {
                 const needle = this.query.trim().toLowerCase();
 
-                return (this.filter === 'all' || template.category === this.filter)
+                return (template.active || this.showInactive)
+                    && (this.filter === 'all' || template.category === this.filter)
                     && (this.theme === 'all' || template.theme === this.theme)
                     && (!needle || template.search.includes(needle));
             },
 
             get shown() {
                 return this.templates.filter((t) => this.matches(t)).length;
+            },
+
+            /* What the count is out of: the offered templates, or all of them. */
+            get offered() {
+                return this.showInactive ? this.templates.length : this.templates.filter((t) => t.active).length;
             },
 
             get selectedTitle() {
@@ -160,7 +168,19 @@
                         </div>
                     @endif
 
-                    <span class="text-xs text-faint tabular-nums" x-text="shown + ' of {{ count($templates) }} templates'">{{ count($templates) }} templates</span>
+                    @if($local && count(array_filter($templates, fn ($t) => ! $t['active'])) > 0)
+                        <button
+                            type="button"
+                            class="s-btn-ghost !h-7 px-2.5 text-[12.5px]"
+                            :class="showInactive && '!text-ink !bg-wash'"
+                            :aria-pressed="showInactive"
+                            @click="showInactive = ! showInactive"
+                        >
+                            <span x-text="showInactive ? 'Hide inactive' : 'Show inactive'">Show inactive</span>
+                        </button>
+                    @endif
+
+                    <span class="text-xs text-faint tabular-nums" x-text="shown + ' of ' + offered + ' templates'">{{ count(array_filter($templates, fn ($t) => $t['active'])) }} templates</span>
                 </div>
             @endif
 
@@ -208,6 +228,9 @@
                         <span class="flex flex-1 flex-col border-t border-line p-4">
                             <span class="flex items-center gap-2">
                                 <span class="text-[13.5px] font-semibold text-ink">{{ $template['title'] }}</span>
+                                @unless($template['active'])
+                                    <span class="s-chip !border-dashed !text-faint">inactive</span>
+                                @endunless
                                 @if($template['pages'] > 1)
                                     <span class="s-chip">{{ $template['pages'] }} pages</span>
                                 @endif

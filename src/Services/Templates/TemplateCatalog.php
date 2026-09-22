@@ -17,6 +17,13 @@ use Illuminate\Support\Str;
  * folder of template repositories being worked on), that folder is the
  * catalog instead: every template in it is offered, straight from its
  * working tree, and installing one copies from there — no clone.
+ *
+ * A template's manifest says whether it is `active`. Only the active ones are
+ * offered; the rest are held back, and returned (flagged) only for the local
+ * folder, where the picker keeps them behind a "show inactive" toggle. A
+ * template that says nothing is active. This filters what is *offered* —
+ * `has()` and `directory()` still reach an inactive template by slug, so
+ * `studio:templates:import <slug>` installs one either way.
  */
 class TemplateCatalog
 {
@@ -34,11 +41,14 @@ class TemplateCatalog
      * Every offered template, in catalog order (alphabetical for the local
      * folder).
      *
-     * @return array<string, array{name: string, title: string, description: string, category: string, theme: string, pages: int, preview: string, preview_url: ?string}>
+     * @return array<string, array{name: string, title: string, description: string, category: string, theme: string, pages: int, active: bool, preview: string, preview_url: ?string}>
      */
     public function all(): array
     {
-        return $this->local() ? $this->fromFolder() : $this->fromConfig();
+        $entries = $this->local() ? $this->fromFolder() : $this->fromConfig();
+
+        // The local folder keeps its inactive templates, flagged, for the toggle.
+        return $this->local() ? $entries : array_filter($entries, fn ($entry) => $entry['active']);
     }
 
     /** @return array<string, array> */
@@ -58,6 +68,7 @@ class TemplateCatalog
                 'category' => (string) ($declared['category'] ?? $manifest['category'] ?? ''),
                 'theme' => (string) ($manifest['theme'] ?? ''),
                 'pages' => count($manifest['pages'] ?? $declared['pages'] ?? []),
+                'active' => (bool) ($declared['active'] ?? $manifest['active'] ?? true),
                 'preview' => 'thumbnail',
                 'preview_url' => null,
             ];
@@ -80,6 +91,7 @@ class TemplateCatalog
                 'category' => $row['category'],
                 'theme' => $row['theme'],
                 'pages' => count($row['pages']),
+                'active' => $row['active'],
                 'preview' => 'thumbnail',
                 'preview_url' => '/' . $preview->prefix() . '/' . $row['slug'],
             ];

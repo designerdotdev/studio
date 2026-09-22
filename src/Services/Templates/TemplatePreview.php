@@ -95,7 +95,7 @@ class TemplatePreview
     /**
      * Every template in the folder, for the index page.
      *
-     * @return list<array{slug: string, name: string, description: string, category: string, theme: string, accent: ?string, status: ?string, pages: list<string>, thumbnail: bool}>
+     * @return list<array{slug: string, name: string, description: string, category: string, theme: string, accent: ?string, active: bool, status: ?string, pages: list<string>, thumbnail: bool}>
      */
     public function catalog(): array
     {
@@ -119,6 +119,9 @@ class TemplatePreview
                 'category' => (string) ($manifest['category'] ?? ''),
                 'theme' => (string) ($manifest['theme'] ?? ''),
                 'accent' => is_string($manifest['accent'] ?? null) && preg_match('/^#[0-9a-fA-F]{3,8}$/', $manifest['accent']) ? $manifest['accent'] : null,
+                // Only the active templates are offered; the rest are kept in the folder
+                // and shown behind the picker's and the gallery's "show inactive" toggle.
+                'active' => (bool) ($manifest['active'] ?? true),
                 'status' => $ledger[$slug] ?? null,
                 'pages' => array_values(array_filter((array) ($manifest['pages'] ?? []), 'is_string')),
                 'thumbnail' => $this->thumbnail($slug) !== null,

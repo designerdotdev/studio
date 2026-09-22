@@ -179,6 +179,12 @@ return [
     | first use into `path`, a cache inside Studio's storage
     | (`php artisan studio:templates:sync` refreshes it).
     |
+    | `active` (here, or in the template's own template.json) is what the picker
+    | offers: an entry that says false is held back — still installable by slug
+    | with `studio:templates:import`, but not shown. An entry that says nothing
+    | is active. Locally, where the template folder is the catalog, the picker
+    | keeps the inactive ones behind a "show inactive" toggle instead.
+    |
     */
     'templates' => [
         'path' => storage_path('studio/templates'),
@@ -189,6 +195,7 @@ return [
                 'repo' => 'https://github.com/designer-templates/blank',
                 'name' => 'Blank',
                 'category' => 'starter',
+                'active' => false,
                 'description' => 'An empty site: the token layer, a nav and a footer, a home page with nothing on it, and a 404 — build every section yourself.',
             ],
             'starter' => [
