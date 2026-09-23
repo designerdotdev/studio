@@ -400,10 +400,6 @@ html.studio-light .s-dock-peek {
         background-image: radial-gradient(ellipse 60% 45% at 0% 100%, rgba(149, 191, 71, 0.10), transparent 70%);
     }
 
-    .s-app-row {
-        gap: var(--studio-gutter);
-    }
-
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
         border-radius: var(--studio-radius, 0);
@@ -843,8 +839,15 @@ html.studio-light .s-dock-peek {
     }
 
     /* --- docked panel: a real column beside a pinned rail ------------- */
-    /* A container on the frame like the site beside it: same radius, a
-       gutter apart, no hairline (the black between them is the edge). */
+    /* The column beside the site. Dark, it is the frame itself — the
+       panel sits straight on the black and only the site is a card. Light,
+       it is a white container like the site: same radius, a gutter apart.
+
+       It stays in the row open or shut (the store's `column`), so opening
+       and closing are one width + margin transition, the old sidebar's
+       curve. The panel inside is held at the full width and pinned to the
+       column's outer edge, so it slides out under that edge rather than
+       reflowing as the column narrows. */
     .s-float.is-docked {
         position: relative;
         inset: auto;
@@ -852,9 +855,53 @@ html.studio-light .s-dock-peek {
         height: auto;
         min-height: 0;
         flex: none;
+        align-items: flex-end;
+        margin-right: var(--studio-gutter, 5px);
         border-radius: var(--studio-radius, 12px);
         box-shadow: none;
         animation: none;
+        transition:
+            width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* The panels fade as they go. Not the column itself: the floating
+       chat is its child too, and an ancestor's opacity would take it
+       along even though it is fixed over the site. */
+    .s-float.is-docked > div:first-child > :not(.s-chat-host) {
+        transition: opacity 220ms ease;
+    }
+
+    .s-float.is-docked.is-collapsed > div:first-child > :not(.s-chat-host) {
+        opacity: 0;
+    }
+
+    .s-float.is-docked.at-right {
+        align-items: flex-start;
+        margin-right: 0;
+        margin-left: var(--studio-gutter, 5px);
+    }
+
+    .s-float.is-docked.is-collapsed {
+        margin-right: 0;
+        margin-left: 0;
+        pointer-events: none;
+    }
+
+    /* Collapsed while the chat floats, the aside is also the chat's ghost —
+       but the ghost's own rules would blank the panel mid-slide */
+    .s-float.is-docked.is-ghost {
+        visibility: visible;
+        background: var(--color-panel);
+    }
+
+    html:not(.studio-light) .s-float.is-docked {
+        background: transparent;
+    }
+
+    /* While the seam is dragged the width follows the pointer, not a curve */
+    body.select-none .s-float.is-docked {
+        transition: none;
     }
 
     /* Its resize seam: a 6px grab strip on the inner edge, accent while held */

@@ -332,6 +332,10 @@
                     // Only while a panel is open: with the chat floating the
                     // aside stays mounted as a ghost, and a ghost is no column
                     get docked() { return this.sidebar && this.dock.pinned && this.frame === 'popover' },
+                    // The column's slot: while the toolbar is pinned it stays
+                    // in the row open or shut, so closing the panel collapses
+                    // it to nothing (width, then gone) instead of cutting it
+                    get column() { return this.dock.pinned && this.frame === 'popover' },
                     get panelSide() { return this.dock.edge === 'right' ? 'right' : 'left' },
                     panelWidth: (n => (n >= 260 && n <= 560) ? n : 320)(parseInt(localStorage.getItem('studio.panel-width'), 10)),
                     setPanelWidth(px) {
@@ -1243,6 +1247,8 @@
                 x-effect="$store.studio.chatFloating; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
                 @resize.window.debounce.50ms="place()"
                 @studio:reflow.window="place()"
+                {{-- Every frame while a docked panel slides the site over --}}
+                @studio:stage-resized.window="place()"
                 {{-- Joined, this card is the placer and fires that event
                      itself — listening to it here would be a loop --}}
                 @studio:dock-moved.window="if (!$store.studio.joined) place()"

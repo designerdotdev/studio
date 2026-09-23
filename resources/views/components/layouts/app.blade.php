@@ -15,8 +15,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 
         <script>
-            // Apply the saved editor theme before first paint (light is the default)
-            if (localStorage.getItem('studio.theme') !== 'dark') document.documentElement.classList.add('studio-light');
+            // Apply the saved editor theme before first paint (dark is the default)
+            if (localStorage.getItem('studio.theme') === 'light') document.documentElement.classList.add('studio-light');
         </script>
         @isset($sidebar)
             {{-- The editor boots hidden. The dock is placed by script, the
@@ -153,13 +153,14 @@
                     class="s-float"
                     :class="{
                         'is-sheet': $store.studio.sidebar && $store.studio.frame === 'sheet',
-                        'is-docked': $store.studio.docked,
-                        'at-right': $store.studio.docked && $store.studio.panelSide === 'right',
+                        'is-docked': $store.studio.column,
+                        'is-collapsed': $store.studio.column && !$store.studio.sidebar,
+                        'at-right': $store.studio.column && $store.studio.panelSide === 'right',
                         'is-ghost': !$store.studio.sidebar && $store.studio.chatFloating,
                     }"
                     {{-- An object binding: a string would replace the style
                          attribute and wipe the display:none x-show sets --}}
-                    :style="$store.studio.docked ? { width: $store.studio.panelWidth + 'px' } : ($store.studio.frame === 'popover' ? style : {})"
+                    :style="$store.studio.column ? { width: ($store.studio.sidebar ? $store.studio.panelWidth : 0) + 'px' } : ($store.studio.frame === 'popover' ? style : {})"
                     x-data="{
                         style: {},
                         place() {
@@ -212,12 +213,29 @@
                     {{-- With the chat floating the aside stays mounted as an
                          invisible ghost (is-ghost): the chat card is one of
                          its children, fixed over the site --}}
-                    x-show="$store.studio.sidebar || $store.studio.chatFloating"
+                    x-show="$store.studio.sidebar || $store.studio.chatFloating || $store.studio.column"
                     x-cloak
                     :aria-hidden="!$store.studio.sidebar && !$store.studio.chatFloating"
                     :inert="!$store.studio.sidebar && !$store.studio.chatFloating"
+                    {{-- The row's width changes under the site: whatever is
+                         placed against the stage (the floating chat) re-places
+                         every frame of the slide, so it glides with the site
+                         instead of jumping when the slide ends --}}
+                    @transitionrun.self="
+                        if ($event.propertyName !== 'width') return;
+                        cancelAnimationFrame($el._slide);
+                        const tick = () => { window.dispatchEvent(new CustomEvent('studio:stage-resized')); $el._slide = requestAnimationFrame(tick); };
+                        tick();
+                    "
+                    @transitionend.self="if ($event.propertyName === 'width') { cancelAnimationFrame($el._slide); window.dispatchEvent(new CustomEvent('studio:reflow')); }"
+                    @transitioncancel.self="if ($event.propertyName === 'width') cancelAnimationFrame($el._slide)"
                 >
-                    <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+                    {{-- Held at exactly the column's width while it collapses,
+                         so the panel slides out of view rather than reflowing.
+                         Exactly, not at least: a panel with wide content (a
+                         long pick path in the chat) would otherwise grow past
+                         the column and be clipped on its far side --}}
+                    <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden" :style="$store.studio.column ? { width: $store.studio.panelWidth + 'px', minWidth: $store.studio.panelWidth + 'px', maxWidth: $store.studio.panelWidth + 'px' } : {}">
                         {{ $sidebar }}
                     </div>
 
