@@ -9,57 +9,102 @@
     --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    /* Surfaces (cool near-black family) */
-    --color-shell: #0b0b0d;
-    --color-panel: #121215;
-    --color-raised: #1a1a1f;
-    --color-overlay: #1e1e24;
+    /* The frame — the black the whole editor sits in. The site and the
+       panels are rounded containers laid on it; a pinned toolbar is part
+       of it. The same in both chrome themes. */
+    --color-frame: #0b0b0b;
+
+    /* Surfaces (dark chrome: neutral near-blacks, no blue cast) */
+    --color-shell: #111111;
+    --color-panel: #1a1a1a;
+    --color-raised: #222222;
+    --color-overlay: #242424;
 
     /* Hairlines */
-    --color-line: rgba(255, 255, 255, 0.11);
-    --color-line-strong: rgba(255, 255, 255, 0.14);
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-line-strong: rgba(255, 255, 255, 0.15);
 
     /* Text */
-    --color-ink: #f4f4f6;
-    --color-soft: #9d9da7;
-    --color-faint: #61616b;
+    --color-ink: #f3f3f3;
+    --color-soft: #a8a8a8;
+    --color-faint: #6e6e6e;
 
     /* Accent + status */
-    --color-accent: #4c7dfa;
-    --color-accent-hover: #3d6ef2;
+    --color-accent: #4a8cff;
+    --color-accent-hover: #3a7cf2;
     --color-layout: #a78bfa;
     --color-block: #2dd4bf;
-    --color-ok: #34d399;
-    --color-warn: #fbbf24;
-    --color-danger: #f37272;
+    --color-ok: #36c285;
+    --color-warn: #ffb800;
+    --color-danger: #ff6b5b;
 
-    /* Canvas */
-    --color-canvas: #101014;
+    /* Canvas — the site's container, behind a narrow preview */
+    --color-canvas: #151515;
 
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
     --color-wash-strong: rgba(255, 255, 255, 0.1);
     --color-wash-faint: rgba(255, 255, 255, 0.025);
+
+    /* Scrollbar thumb */
+    --color-scroll: rgba(255, 255, 255, 0.14);
+    --color-scroll-hover: rgba(255, 255, 255, 0.24);
 }
 
-/* Light chrome — the Sites builder look. Toggled from the menu; dark stays the default. */
+/* Light chrome — the default. White panels and a soft grey canvas on the
+   black frame: near-black ink, neutral greys, one blue for what is
+   interactive, black for the primary action. */
 html.studio-light {
-    --color-shell: #f4f4f5;
+    --color-shell: #f1f1f1;
     --color-panel: #ffffff;
     --color-raised: #ffffff;
     --color-overlay: #ffffff;
-    --color-line: rgba(17, 17, 20, 0.08);
-    --color-line-strong: rgba(17, 17, 20, 0.14);
-    --color-ink: #141417;
-    --color-soft: #5f6069;
-    --color-faint: #9a9aa4;
-    --color-accent: #3b6ff0;
-    --color-accent-hover: #2f5fe0;
-    --color-canvas: #e8e9ed;
-    --color-wash: rgba(17, 17, 20, 0.05);
-    --color-wash-strong: rgba(17, 17, 20, 0.09);
-    --color-wash-faint: rgba(17, 17, 20, 0.025);
+    --color-line: rgba(0, 0, 0, 0.08);
+    --color-line-strong: rgba(0, 0, 0, 0.13);
+    --color-ink: #303030;
+    --color-soft: #616161;
+    --color-faint: #8a8a8a;
+    --color-accent: #005bd3;
+    --color-accent-hover: #004299;
+    --color-layout: #8051ff;
+    --color-block: #0f9b8e;
+    --color-ok: #29845a;
+    --color-warn: #b98900;
+    --color-danger: #e51c00;
+    --color-canvas: #f1f1f1;
+    --color-wash: rgba(0, 0, 0, 0.05);
+    --color-wash-strong: rgba(0, 0, 0, 0.08);
+    --color-wash-faint: rgba(0, 0, 0, 0.02);
+    --color-scroll: rgba(0, 0, 0, 0.16);
+    --color-scroll-hover: rgba(0, 0, 0, 0.28);
     color-scheme: light;
+}
+
+/* The toolbar belongs to the frame, so it is dark in either theme — the
+   floating pill, a pinned bar, and what opens off them. Joined to the
+   composer it is part of that card instead and keeps the theme's own. */
+html.studio-light .s-dock:not(.is-joined),
+html.studio-light .s-dock-peek {
+    --color-shell: #0b0b0b;
+    --color-panel: #141414;
+    --color-raised: #1f1f1f;
+    --color-overlay: #1c1c1c;
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-line-strong: rgba(255, 255, 255, 0.16);
+    --color-ink: #f3f3f3;
+    --color-soft: #b5b5b5;
+    --color-faint: #7a7a7a;
+    --color-accent: #4a8cff;
+    --color-accent-hover: #3a7cf2;
+    --color-ok: #36c285;
+    --color-warn: #ffb800;
+    --color-danger: #ff6b5b;
+    --color-wash: rgba(255, 255, 255, 0.07);
+    --color-wash-strong: rgba(255, 255, 255, 0.12);
+    --color-wash-faint: rgba(255, 255, 255, 0.03);
+    --color-scroll: rgba(255, 255, 255, 0.14);
+    --color-scroll-hover: rgba(255, 255, 255, 0.24);
+    color-scheme: dark;
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,7 +140,7 @@ html.studio-light {
     /* Slim, quiet scrollbars everywhere in the chrome */
     .studio-app * {
         scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+        scrollbar-color: var(--color-scroll) transparent;
     }
 
     .studio-app *::-webkit-scrollbar {
@@ -104,14 +149,14 @@ html.studio-light {
     }
 
     .studio-app *::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.12);
+        background: var(--color-scroll);
         border-radius: 99px;
         border: 2px solid transparent;
         background-clip: content-box;
     }
 
     .studio-app *::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.22);
+        background: var(--color-scroll-hover);
         background-clip: content-box;
     }
 
@@ -283,7 +328,7 @@ html.studio-light {
     }
 
     .s-group.is-open {
-        background: rgba(255, 255, 255, 0.03);
+        background: var(--color-wash-faint);
     }
 
     .s-group-head {
@@ -342,8 +387,26 @@ html.studio-light {
 
     /* --- the stage: the site is the screen ---------------------------- */
 
+    /* The frame: the editor's black ground. Everything on it is a
+       rounded container a gutter apart — the site always, a docked panel
+       beside it. A pinned toolbar's edge swaps the gutter for the bar
+       (appInsets writes that side inline, over this padding). A faint
+       warm glow low on the left keeps the black from reading as a void. */
+    .s-app {
+        --studio-gutter: 5px;
+        --studio-radius: 12px;
+        padding: var(--studio-gutter);
+        background-color: var(--color-frame);
+        background-image: radial-gradient(ellipse 60% 45% at 0% 100%, rgba(149, 191, 71, 0.10), transparent 70%);
+    }
+
+    .s-app-row {
+        gap: var(--studio-gutter);
+    }
+
     .s-stage {
-        @apply relative min-h-0 min-w-0 flex-1 bg-canvas;
+        @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
+        border-radius: var(--studio-radius, 0);
     }
 
     /* Behind a sheet: dims the site, click closes */
@@ -679,7 +742,7 @@ html.studio-light {
     .s-dock.is-pinned {
         gap: 2px;
         border-radius: 0;
-        background: var(--color-panel);
+        background: transparent;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
         box-shadow: none;
@@ -698,13 +761,11 @@ html.studio-light {
     .s-dock.is-pinned.at-top {
         top: 0;
         bottom: auto;
-        border-bottom: 1px solid var(--color-line);
     }
 
     .s-dock.is-pinned.at-bottom {
         top: auto;
         bottom: 0;
-        border-top: 1px solid var(--color-line);
     }
 
     .s-dock.is-pinned.at-left,
@@ -719,13 +780,11 @@ html.studio-light {
     .s-dock.is-pinned.at-left {
         left: 0;
         right: auto;
-        border-right: 1px solid var(--color-line);
     }
 
     .s-dock.is-pinned.at-right {
         left: auto;
         right: 0;
-        border-left: 1px solid var(--color-line);
     }
 
     /* A pinned rail has nowhere to slide, so its grip only starts a drag */
@@ -784,6 +843,8 @@ html.studio-light {
     }
 
     /* --- docked panel: a real column beside a pinned rail ------------- */
+    /* A container on the frame like the site beside it: same radius, a
+       gutter apart, no hairline (the black between them is the edge). */
     .s-float.is-docked {
         position: relative;
         inset: auto;
@@ -791,22 +852,16 @@ html.studio-light {
         height: auto;
         min-height: 0;
         flex: none;
-        border-radius: 0;
+        border-radius: var(--studio-radius, 12px);
         box-shadow: none;
         animation: none;
-        border-right: 1px solid var(--color-line);
-    }
-
-    .s-float.is-docked.at-right {
-        border-right: 0;
-        border-left: 1px solid var(--color-line);
     }
 
     /* Its resize seam: a 6px grab strip on the inner edge, accent while held */
     .s-panel-seam {
         position: absolute;
-        top: 0;
-        bottom: 0;
+        top: 12px;
+        bottom: 12px;
         right: 0;
         width: 6px;
         z-index: 5;
@@ -1101,10 +1156,8 @@ html.studio-light {
        edge, so the dots only show beside a narrow (tablet/mobile) preview */
     .s-canvas {
         background-color: var(--color-canvas);
-        background-image:
-            radial-gradient(ellipse 80% 50% at 50% -10%, rgba(76, 125, 250, 0.05), transparent),
-            radial-gradient(circle, var(--color-wash) 1px, transparent 1px);
-        background-size: 100% 100%, 22px 22px;
+        background-image: radial-gradient(circle, var(--color-wash-strong) 1px, transparent 1px);
+        background-size: 22px 22px;
     }
 
     /* Square, flush frame for the preview and Code mode's editor */
@@ -1219,7 +1272,7 @@ html.studio-light {
         padding: 3px 10px;
         border: 1px solid var(--color-line-strong);
         border-radius: 8px;
-        background: rgba(255, 255, 255, 0.06);
+        background: var(--color-wash);
         color: var(--color-ink);
         font: inherit;
         font-size: 12px;
@@ -1230,8 +1283,8 @@ html.studio-light {
     }
 
     .studio-toast__action:hover {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.28);
+        background: var(--color-wash-strong);
+        border-color: var(--color-line-strong);
     }
 
     .studio-toast__icon {
@@ -1422,8 +1475,80 @@ html.studio-light {
 /*  Light chrome adjustments                                           */
 /* ------------------------------------------------------------------ */
 
+@layer components {
+
 html.studio-light .s-pop {
-    box-shadow: 0 10px 30px rgba(17, 17, 20, 0.12), 0 0 0 1px rgba(17, 17, 20, 0.06);
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 12px 32px -8px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Off the dark toolbar a popover is dark too, so it keeps the dark lift */
+html.studio-light .s-dock:not(.is-joined) .s-pop {
+    border-color: var(--color-line-strong);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Floating surfaces over the site — a white card lifts with a soft,
+   neutral shadow rather than the dark theme's deep one */
+html.studio-light .s-float:not(.is-docked):not(.is-ghost),
+html.studio-light .s-chat.is-floating,
+html.studio-light .s-joined {
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.08),
+        0 24px 56px -20px rgba(0, 0, 0, 0.28),
+        0 6px 16px -8px rgba(0, 0, 0, 0.12);
+}
+
+html.studio-light .s-chat.is-floating.is-joined {
+    box-shadow: 0 -1px 0 var(--color-line);
+}
+
+html.studio-light .s-chat.is-floating.is-joined.is-bar-hidden {
+    box-shadow: none;
+}
+
+/* Buttons with a little depth: the primary is a black key with a lit top
+   edge; the outline button a white one with a heavier bottom edge */
+html.studio-light .s-btn-primary {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #303030;
+    color: #ffffff;
+    box-shadow:
+        inset 0 -1px 0 1px rgba(0, 0, 0, 0.8),
+        inset 0 0 0 1px #303030,
+        inset 0 0.5px 0 1.5px rgba(255, 255, 255, 0.22);
+}
+
+html.studio-light .s-btn-primary:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #1a1a1a;
+}
+
+html.studio-light .s-btn-outline {
+    border-color: transparent;
+    background: #ffffff;
+    box-shadow:
+        inset 0 -1px 0 0 #b5b5b5,
+        inset 0 0 0 1px rgba(0, 0, 0, 0.1),
+        inset 0 0.5px 0 1.5px #ffffff;
+}
+
+html.studio-light .s-btn-outline:hover {
+    background: #fafafa;
+}
+
+html.studio-light .s-input {
+    border-color: rgba(0, 0, 0, 0.16);
+}
+
+html.studio-light .s-input:hover {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+/* The selected row is a quiet grey key, not a blue box */
+html.studio-light .s-section-row.is-active {
+    background: rgba(0, 0, 0, 0.07);
+    box-shadow: none;
+}
+
 }
 
 
@@ -1776,8 +1901,7 @@ html.studio-light .s-pop-inverse {
 
     /* Messages */
     .s-chat-msg-user {
-        @apply ml-6 rounded-xl rounded-br-sm px-3 py-2 text-[12.5px] leading-relaxed text-white;
-        background: color-mix(in srgb, var(--color-accent) 90%, transparent);
+        @apply ml-6 rounded-xl rounded-br-sm bg-wash-strong px-3 py-2 text-[12.5px] leading-relaxed text-ink;
     }
 
     .s-chat-msg {
@@ -1962,12 +2086,12 @@ html.studio-light .s-pop-inverse {
     }
 
     .s-chat-send {
-        @apply flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-white;
+        @apply flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-ink text-shell;
         transition: opacity 150ms ease, transform 120ms ease, background-color 150ms ease;
     }
 
     .s-chat-send:hover {
-        background: var(--color-accent-hover);
+        background: color-mix(in srgb, var(--color-ink) 88%, var(--color-shell));
     }
 
     .s-chat-send:active {

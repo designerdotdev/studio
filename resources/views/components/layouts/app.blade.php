@@ -15,8 +15,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 
         <script>
-            // Apply the saved editor theme before first paint (dark is the default)
-            if (localStorage.getItem('studio.theme') === 'light') document.documentElement.classList.add('studio-light');
+            // Apply the saved editor theme before first paint (light is the default)
+            if (localStorage.getItem('studio.theme') !== 'dark') document.documentElement.classList.add('studio-light');
         </script>
         @isset($sidebar)
             {{-- The editor boots hidden. The dock is placed by script, the
@@ -132,15 +132,17 @@
             </button>
         </div>
 
-        {{-- The app root. A pinned toolbar reserves its edge here as padding
-             (appInsets), so the rail below is flush and the site is pushed
-             over rather than covered. --}}
-        <div class="flex h-dvh flex-col" x-data :style="$store.studio?.appInsets || {}">
+        {{-- The app root. In the editor it is the black frame: the site and
+             a docked panel are rounded containers laid on it, a gutter apart
+             (s-app). A pinned toolbar is part of the frame and takes its
+             edge's gutter as its own size (appInsets), so the rail below is
+             flush and the site is pushed over rather than covered. --}}
+        <div class="flex h-dvh flex-col @isset($sidebar) s-app @endisset" x-data :style="$store.studio?.appInsets || {}">
             @isset($sidebar)
                 {{-- One row: the docked panel (when the toolbar is pinned)
                      and the stage. A right rail flips the row so the panel
                      sits beside it. --}}
-                <div class="flex min-h-0 min-w-0 flex-1" :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'">
+                <div class="s-app-row flex min-h-0 min-w-0 flex-1" :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'">
 
                 {{-- The floating surface: every panel lives here, one visible
                      at a time. Anchored to its dock button (popover), centred
