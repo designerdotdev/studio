@@ -7,6 +7,7 @@ use Designer\Studio\Services\Site\PhpLiteral;
 use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Support\DevMode;
 use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\TemplateLink;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\File;
@@ -84,6 +85,7 @@ class DevModeController extends Controller
 
         File::put($files['yaml'], $validated['yaml']);
         File::put($files['blade'], $validated['html']);
+        app(TemplateLink::class)->touch();
 
         // Pull the edit into the library and the documents (a changed field
         // contract changes how the site's pages read)
@@ -178,6 +180,7 @@ class DevModeController extends Controller
 
         File::put($files['yaml'], $newYaml);
         File::put($files['blade'], $newBlade);
+        app(TemplateLink::class)->touch();
 
         if (config('studio.draft_mode', true)) {
             app(\Designer\Studio\Services\Storage\StudioStorage::class)->useDraft();

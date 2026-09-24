@@ -186,6 +186,8 @@ caches — a fresh server rebuilds it on the first visit to `/studio`.
 ```bash
 php artisan studio:templates:import <slug>   # install a template (--force replaces the site)
 php artisan studio:templates:sync            # clone/update the catalogued templates (--list)
+php artisan studio:templates:link <path>     # local dev: export what Studio writes back into a template folder
+php artisan studio:templates:export          # push the installed site into the linked template by hand
 php artisan studio:sync                      # re-read the site's files into the editor
 php artisan studio:publish                   # publish the editor's assets to public/vendor/studio
 php artisan studio:dev-reset                 # back to a fresh install (development only)

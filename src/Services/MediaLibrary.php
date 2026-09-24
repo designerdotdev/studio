@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\TemplateLink;
 use InvalidArgumentException;
 
 /**
@@ -103,6 +104,7 @@ final class MediaLibrary
         $name = $this->uniqueName($absoluteDir, $base, $extension);
 
         $file->move($absoluteDir, $name);
+        app(TemplateLink::class)->touch();
 
         return $this->entry(ltrim($dir . '/' . $name, '/'));
     }
@@ -154,6 +156,7 @@ final class MediaLibrary
         }
 
         File::move($absolute, $this->absolute($target));
+        app(TemplateLink::class)->touch();
 
         return $target;
     }
@@ -189,6 +192,7 @@ final class MediaLibrary
         }
 
         File::move($absolute, $this->absolute($target));
+        app(TemplateLink::class)->touch();
 
         return $target;
     }
@@ -209,6 +213,7 @@ final class MediaLibrary
         $name = $this->uniqueName($this->absolute($dir), $stem, $extension);
 
         File::copy($absolute, $this->absolute(ltrim($dir . '/' . $name, '/')));
+        app(TemplateLink::class)->touch();
 
         return $this->entry(ltrim($dir . '/' . $name, '/'));
     }
@@ -230,6 +235,7 @@ final class MediaLibrary
             }
 
             File::deleteDirectory($absolute);
+            app(TemplateLink::class)->touch();
 
             return;
         }
@@ -239,6 +245,7 @@ final class MediaLibrary
         }
 
         File::delete($absolute);
+        app(TemplateLink::class)->touch();
     }
 
     /** Every folder path, for "Move to…" menus */

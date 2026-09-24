@@ -4,9 +4,11 @@ namespace Designer\Studio\Services\Site;
 
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Templates\TemplateAssets;
+use Designer\Studio\Services\Templates\TemplateExporter;
 use Designer\Studio\Services\Templates\TemplateCatalog;
 use Designer\Studio\Services\Templates\TemplateSync;
 use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\TemplateLink;
 use Designer\Studio\Support\WelcomeRoutePruner;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -31,7 +33,7 @@ use RuntimeException;
 class SiteInstaller
 {
     /** Files whose text may carry URLs to the template's public files. */
-    protected const TEXT_EXTENSIONS = ['php', 'html', 'css', 'js', 'mjs', 'json', 'yml', 'yaml', 'md', 'txt', 'svg', 'xml', 'webmanifest'];
+    public const TEXT_EXTENSIONS = ['php', 'html', 'css', 'js', 'mjs', 'json', 'yml', 'yaml', 'md', 'txt', 'svg', 'xml', 'webmanifest'];
 
     public function __construct(
         protected TemplateSync $sync,
@@ -39,6 +41,7 @@ class SiteInstaller
         protected SiteMirror $mirror,
         protected RuntimeInstaller $runtime,
         protected ComponentRepository $components,
+        protected TemplateLink $link,
     ) {}
 
     /**
@@ -53,7 +56,19 @@ class SiteInstaller
 
         // A catalogued repository is cloned on first use; a template in the
         // local template folder is copied straight from its working tree
-        $dir = $this->catalog->directory($slug);
+        return $this->installFrom($slug, $this->catalog->directory($slug), $replace);
+    }
+
+    /**
+     * Install from a template folder on disk, wherever it is.
+     *
+     * @return array{template: string, pages: string[], code_pages: string[], sections: int, files: int, runtime: array, home_claimed: bool}
+     */
+    public function installFrom(string $slug, string $dir, bool $replace = false): array
+    {
+        if (SitePaths::installed() && !$replace) {
+            throw new RuntimeException('A site is already installed in ' . SitePaths::relative(SitePaths::resources()) . '. Remove it first, or install with --force to replace it.');
+        }
 
         if ($problem = $this->sync->validate($dir)) {
             throw new RuntimeException("Template [{$slug}] can't be installed: {$problem}.");
@@ -77,6 +92,11 @@ class SiteInstaller
         $runtime = $this->runtime->install();
 
         $this->mirror->rebuild();
+
+        // A fresh copy of the linked template is, by definition, in step with it
+        if (($linked = $this->link->directory()) !== null && realpath($linked) === realpath($dir)) {
+            $this->link->baseline(app(TemplateExporter::class)->fingerprint($dir));
+        }
 
         $state = $this->mirror->state();
 

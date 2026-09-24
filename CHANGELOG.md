@@ -22,6 +22,7 @@ Everything below ships in the first public release.
 ### Content model
 
 - The site is ordinary files in the app (`resources/designer`); Studio's JSON in `storage/studio` is a mirror plus a draft, and publishing edits the files in place, attribute by attribute — no database.
+- `studio:templates:link` (local only): link the installed site to a template folder and every write Studio makes is exported back into its `files/` — the inverse of installing, with `template.json`'s page list kept in step. Refuses to overwrite hand edits made in the folder; `studio:templates:export --force` does.
 - **Layouts**: shared header/footer sections wrapping pages, edited in place from any page (violet canvas chrome).
 - **Global blocks**: synced section instances placeable on any page — edit once, updates everywhere; detachable per placement (teal canvas chrome).
 - Field types: text, textarea, url, select, toggle, colorpicker, image (with uploads), repeater (nestable).

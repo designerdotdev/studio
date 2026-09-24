@@ -7,6 +7,7 @@ use Designer\Studio\Services\Storage\CollectionRepository;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\LayoutRepository;
 use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\TemplateLink;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -86,6 +87,8 @@ class SiteWriter
         }
 
         SiteManifest::write($this->manifest($docs));
+
+        app(TemplateLink::class)->touch();
 
         return ['state' => $next, 'notes' => $this->notes];
     }

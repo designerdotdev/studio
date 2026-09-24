@@ -6,7 +6,9 @@ use Designer\Studio\Console\Commands\DevReset;
 use Designer\Studio\Console\Commands\InlineVerify;
 use Designer\Studio\Console\Commands\PublishAssets;
 use Designer\Studio\Console\Commands\SyncDesigns;
+use Designer\Studio\Console\Commands\TemplatesExport;
 use Designer\Studio\Console\Commands\TemplatesImport;
+use Designer\Studio\Console\Commands\TemplatesLink;
 use Designer\Studio\Console\Commands\TemplatesSync;
 use Designer\Studio\Console\Commands\Uninstall;
 use Designer\Studio\Livewire\EditorPanel;
@@ -55,6 +57,8 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(\Designer\Studio\Services\Site\SiteWriter::class);
         $this->app->singleton(SiteMirror::class);
         $this->app->singleton(\Designer\Studio\Services\Site\SiteInstaller::class);
+        $this->app->singleton(\Designer\Studio\Support\TemplateLink::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateExporter::class);
         $this->app->singleton(\Designer\Studio\Services\Site\RuntimeInstaller::class);
         $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
         $this->app->singleton(\Designer\Studio\Services\Inline\EchoScanner::class);
@@ -101,7 +105,9 @@ class StudioServiceProvider extends ServiceProvider
                 DevReset::class,
                 PublishAssets::class,
                 SyncDesigns::class,
+                TemplatesExport::class,
                 TemplatesImport::class,
+                TemplatesLink::class,
                 TemplatesSync::class,
                 Uninstall::class,
             ];
@@ -154,6 +160,28 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->terminating(function () {
             if ($this->app->resolved(StudioStorage::class) && $this->app->make(StudioStorage::class)->consumeLiveChanges()) {
                 $this->app->make(SiteMirror::class)->flush();
+            }
+        });
+
+        // The site is linked to a template folder (studio:templates:link):
+        // whatever this request wrote to the site is exported back into it.
+        // Registered after the flush above so a draft-mode-off write is
+        // on disk before it is copied.
+        $this->app->terminating(function () {
+            if (!$this->app->resolved(\Designer\Studio\Support\TemplateLink::class)) {
+                return;
+            }
+
+            $link = $this->app->make(\Designer\Studio\Support\TemplateLink::class);
+
+            if (!$link->consumePending() || !$link->linked()) {
+                return;
+            }
+
+            try {
+                $this->app->make(\Designer\Studio\Services\Templates\TemplateExporter::class)->export();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Studio template link: ' . $e->getMessage());
             }
         });
     }

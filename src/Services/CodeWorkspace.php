@@ -3,6 +3,7 @@
 namespace Designer\Studio\Services;
 
 use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\TemplateLink;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -286,6 +287,7 @@ class CodeWorkspace
         }
 
         File::put($absolute, $contents);
+        app(TemplateLink::class)->touch();
 
         return ['path' => $path, 'display' => $this->displayPath($absolute)];
     }
@@ -318,6 +320,7 @@ class CodeWorkspace
         File::ensureDirectoryExists(dirname($base));
         File::put($base . '.yml', $this->sectionYamlStub($label, $category));
         File::put($base . '.blade.php', $this->sectionBladeStub($label));
+        app(TemplateLink::class)->touch();
 
         return [
             'path' => SitePaths::relative($base . '.blade.php'),
@@ -347,6 +350,8 @@ class CodeWorkspace
         } else {
             File::delete($absolute);
         }
+
+        app(TemplateLink::class)->touch();
 
         return ['removed' => $removed];
     }

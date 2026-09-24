@@ -8,6 +8,7 @@ use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\TemplateLink;
 use Designer\Studio\Support\SiteUrls;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -153,6 +154,19 @@ class StudioController extends Controller
                 'tone' => 'warn',
                 'dismissible' => true,
                 'text' => "Your app defines its own / route, so your homepage is served at /{$homeSlug} instead. Remove that route from routes/web.php to serve it at /.",
+            ];
+        }
+
+        // The site is linked to a template folder and the last export
+        // refused to overwrite it — what was published never reached it
+        $link = app(TemplateLink::class);
+
+        if ($link->linked() && ($blocked = $link->blocked()) !== null) {
+            $notices[] = [
+                'id' => 'template-link-blocked',
+                'tone' => 'warn',
+                'dismissible' => false,
+                'text' => 'Template link: ' . $blocked,
             ];
         }
 
@@ -650,6 +664,7 @@ class StudioController extends Controller
 
         $filename = Str::uuid() . '.' . strtolower($file->getClientOriginalExtension());
         $file->move($directory, $filename);
+        app(TemplateLink::class)->touch();
 
         return response()->json([
             'success' => true,

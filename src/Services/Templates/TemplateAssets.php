@@ -63,4 +63,25 @@ class TemplateAssets
 
         return $text;
     }
+
+    /**
+     * The inverse of rewrite(): move every reference back to the web root,
+     * for writing an installed site back into its template folder.
+     */
+    public function restore(string $text): string
+    {
+        if ($text === '' || $this->entries === []) {
+            return $text;
+        }
+
+        foreach ($this->entries as $entry) {
+            $text = preg_replace(
+                '#(?<![A-Za-z0-9_./-])' . preg_quote($this->base . '/' . $entry, '#') . '(?=[/\'")\s,;?\#]|$)#',
+                '/' . $entry,
+                $text
+            ) ?? $text;
+        }
+
+        return $text;
+    }
 }

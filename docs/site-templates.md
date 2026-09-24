@@ -141,6 +141,39 @@ draft had no unpublished edits of its own, so nobody's work is overwritten silen
 Studio's own storage holds nothing the site needs: a fresh deploy with empty storage rebuilds
 it from the files on the first visit to `/studio`.
 
+## Editing a template in Studio
+
+A template folder can be edited through Studio by linking the installed site to it. Install
+the template into a throwaway app, link it, and from then on everything Studio writes to the
+site — a publish, a Code mode save, an upload or a change in the media library — is written
+back into the template's `files/` at the end of the same request. Commit from the template
+folder as usual. Links only work in the local environment.
+
+```bash
+php artisan studio:templates:link /path/to/templates/starter   # an absolute path…
+php artisan studio:templates:link starter                      # …or a slug in STUDIO_TEMPLATE_PREVIEW_PATH
+php artisan studio:templates:link                              # what is linked, and whether it is in step
+php artisan studio:templates:export                            # push by hand (--force, see below)
+php artisan studio:templates:link --unlink
+```
+
+The export is the inverse of installing: `resources/designer/**` goes to `files/resources/**`
+and `public/designer/**` to `files/public/**`, with `/designer/images/…` URLs moved back to
+`/images/…` and `@vite` entries back to `resources/…`. Files the site no longer has are removed
+from `files/`; `designer.json` never enters the template. The only write outside `files/` is
+the `pages` list in `template.json`, kept in step so a page added in Studio keeps its title on
+the next install.
+
+Linking needs the installed site and the folder to agree, because the export mirrors the whole
+site over `files/`. An app with no site yet gets the template installed from that folder.
+An app whose site differs is refused until you say which side wins: `--install` replaces the
+site with the folder (the usual choice), `--export` overwrites the folder with the site.
+
+An export never overwrites work done in the folder by hand: when `files/` changed since the
+last export, the export is skipped, the editor shows a notice, and `studio:templates:link`
+reports it. Re-install from the folder (`studio:templates:import <slug> --force`) to take the
+hand edits, or `studio:templates:export --force` to overwrite them.
+
 ## Removing Studio
 
 ```bash
