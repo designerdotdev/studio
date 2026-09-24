@@ -41,9 +41,10 @@
                 Alpine.store('studio', {
                     device: 'desktop',
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
-                    // A panel is open (the floating surface is showing). Off
-                    // on first run: the site is the screen until you ask.
-                    sidebar: localStorage.getItem('studio.sidebar') === '1',
+                    // A panel is open (the floating surface is showing). On
+                    // for the first run: the Sidebar workspace opens with
+                    // its panel docked beside the site.
+                    sidebar: localStorage.getItem('studio.sidebar') !== '0',
                     toggleSidebar() {
                         this.sidebar = !this.sidebar;
                         localStorage.setItem('studio.sidebar', this.sidebar ? '1' : '0');
@@ -70,7 +71,7 @@
                         this.closePanel();
                     },
                     // The rail: which panel the floating surface shows.
-                    rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) && !(s === 'assistant' && !(@js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0')) ? s : 'sections')(localStorage.getItem('studio.rail')),
+                    rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) && !(s === 'assistant' && !(@js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0')) ? s : (@js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0' ? 'assistant' : 'sections'))(localStorage.getItem('studio.rail')),
                     setRail(name, force = false) {
                         // Floating, the chat is not a rail panel: its button
                         // opens the conversation over the site instead
@@ -114,7 +115,7 @@
                     // Composer workspace) and whether it applies right now.
                     // Leaving developer mode puts the chat away without
                     // forgetting where it was.
-                    chatFloatPref: localStorage.getItem('studio.chat-float') !== '0',
+                    chatFloatPref: localStorage.getItem('studio.chat-float') === '1',
                     get chatFloating() { return this.chatFloatPref && this.chatAvailable },
                     chatOpen: localStorage.getItem('studio.chat-open') === '1',
                     chatBusy: false,   // a turn is streaming
@@ -239,9 +240,11 @@
                        Assistant does.
 
                        The first-run arrangement is one of these too, and it
-                       comes from the defaults below rather than from a call
-                       here: Composer where the Assistant exists (chatFloating
-                       and chatJoined default on), Minimal everywhere else. */
+                       comes from the defaults rather than from a call here:
+                       Sidebar — the dock pinned left, the panel open and
+                       docked (the Assistant where it exists, Sections
+                       elsewhere), the chat in the column rather than
+                       floating. */
                     workspaces: {
                         composer: { label: 'Composer', hint: 'The toolbar and the chat as one object', edge: 'bottom', pinned: false, chat: true, panel: false },
                         chat: { label: 'Chat focused', hint: 'Header bar, the chat floating over the site', edge: 'top', pinned: true, chat: true, panel: false },
@@ -299,7 +302,8 @@
                                 };
                             }
                         } catch (e) { /* fall through */ }
-                        return { edge: 'bottom', along: 0.5, pinned: false };
+                        // First run: the Sidebar workspace — a rail pinned left
+                        return { edge: 'left', along: 0.5, pinned: true };
                     })(),
                     setDock(edge, along = null, pinned = null) {
                         if (!['bottom', 'left', 'right', 'top'].includes(edge)) return;
@@ -746,7 +750,7 @@
                     if (!this.sub) return;
                     const menu = this.$refs.menu.getBoundingClientRect();
                     const row = this.$refs[this.sub + 'Row'].getBoundingClientRect();
-                    const width = 300, gap = 6, pad = 12;
+                    const width = 300, gap = 2, pad = 12;
                     const h = this.$refs[this.sub].offsetHeight || 420;
                     let left = menu.right + gap;
                     if (left + width > window.innerWidth - pad) left = menu.left - gap - width;
