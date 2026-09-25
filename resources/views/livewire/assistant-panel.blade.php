@@ -1,10 +1,11 @@
-{{-- The Assistant, in either of its two homes. In the rail it is a panel
+{{-- The Assistant, in any of its three homes. In the rail it is a panel
      like the others: header, transcript, composer. Floating
      ($store.studio.chatFloating) the same markup becomes the chat card over
      the bottom of the site: the composer is always there, and the
      conversation (with the header) folds upward out of it
-     ($store.studio.chatOpen). The wrapper in home.blade.php does the
-     positioning; this file only changes shape. --}}
+     ($store.studio.chatOpen). Pinned to the right ($store.studio.chatSide)
+     it is a full-height column beside the site, always open. The wrapper
+     in home.blade.php does the positioning; this file only changes shape. --}}
 @php
     $engines = $this->engines;
     $thread = $this->thread;
@@ -18,6 +19,7 @@
     class="s-chat flex h-full min-h-0 flex-col"
     :class="{
         'is-floating': $store.studio.chatFloating,
+        'is-side': $store.studio.chatSide,
         'is-open': !$store.studio.chatFloating || $store.studio.chatOpen,
         'is-picking': picking,
         'is-busy': busy,
@@ -49,6 +51,7 @@
         count: @js(count($messages)),
 
         get floating() { return $store.studio.chatFloating },
+        get side() { return $store.studio.chatSide },
         get open() { return !this.floating || $store.studio.chatOpen },
 
         init() {
@@ -222,7 +225,7 @@
         },
     }"
     @studio:focus-chat.window="$nextTick(() => $refs.composer?.focus())"
-    x-effect="$store.studio.chatFloating; $store.studio.chatOpen; $store.studio.rail; $store.studio.sidebar; $nextTick(() => grow())"
+    x-effect="$store.studio.chatFloating; $store.studio.chatSide; $store.studio.chatOpen; $store.studio.rail; $store.studio.sidebar; $nextTick(() => grow())"
     {{-- Joined, this is the unit's other half: pointing at it brings the
          toolbar out from behind it, exactly as pointing at the strip does --}}
     @mouseenter="$store.studio.joinIn()"
@@ -262,18 +265,22 @@
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                 </button>
 
-                {{-- Where the chat lives: float it over the site, or dock it back as a panel --}}
-                <button type="button" class="s-icon-btn" x-show="!floating" title="Float the chat over the site" aria-label="Float the chat over the site" @click="$store.studio.setChatFloating(true)">
+                {{-- Where the chat lives: float it over the site, pin it to the right, or dock it back as a panel --}}
+                <button type="button" class="s-icon-btn" x-show="!floating && !side" title="Float the chat over the site" aria-label="Float the chat over the site" @click="$store.studio.setChatFloating(true)">
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="5.5" y="11.25" width="9" height="3" rx="1.5" fill="currentColor" stroke="none"/></svg>
                 </button>
-                <button type="button" class="s-icon-btn" x-show="floating" x-cloak title="Dock the chat as a panel" aria-label="Dock the chat as a panel" @click="$store.studio.setChatFloating(false); $store.studio.setRail('assistant', true)">
+                <button type="button" class="s-icon-btn" x-show="floating || side" x-cloak title="Dock the chat as a panel" aria-label="Dock the chat as a panel" @click="$store.studio.setChatPlace('panel'); $store.studio.setRail('assistant', true)">
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="2.75" y="3.25" width="5.5" height="13.5" rx="2.5" fill="currentColor" stroke="none"/></svg>
                 </button>
 
                 <button type="button" class="s-close" x-show="floating" x-cloak title="Fold the conversation (Esc)" aria-label="Fold the conversation" @click="$store.studio.setChatOpen(false)">
                     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6.5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
-                <span x-show="!floating">@include('studio::partials.float-close')</span>
+                {{-- Pinned to the right: closing slides the column away and leaves the composer --}}
+                <button type="button" class="s-close" x-show="side" x-cloak title="Close — back to the composer" aria-label="Close the chat column" @click="$store.studio.setChatPlace('float')">
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+                <span x-show="!floating && !side">@include('studio::partials.float-close')</span>
             </div>
 
             @if(!$anyEngine)
@@ -465,6 +472,20 @@
                         </div>
 
                         <span class="flex-1"></span>
+
+                        {{-- Floating or pinned: the chat as a column on the right of the site, and back --}}
+                        <button
+                            type="button"
+                            class="s-chat-tool"
+                            :class="side && 'is-on'"
+                            x-show="floating || side"
+                            x-cloak
+                            :title="side ? 'Back to the composer' : 'Pin the chat to the right of the site'"
+                            :aria-pressed="side"
+                            @click="$store.studio.toggleChatSide()"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="11.75" y="3.25" width="5.5" height="13.5" rx="2.5" fill="currentColor" stroke="none"/></svg>
+                        </button>
 
                         {{-- Floating: fold / unfold the conversation --}}
                         <button

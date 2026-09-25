@@ -80,6 +80,12 @@
                             force ? this.setChatOpen(true) : this.toggleChat();
                             return;
                         }
+                        // Pinned to the right the chat is always showing: its
+                        // button closes it (back to the composer)
+                        if (name === 'assistant' && this.chatSide) {
+                            if (!force) this.setChatPlace('float');
+                            return;
+                        }
                         // Every dock button toggles its own panel; a forced
                         // call (picker, palette, inspector) always opens it.
                         if (!force && this.rail === name && this.sidebar) {
@@ -115,23 +121,74 @@
                     // Composer workspace) and whether it applies right now.
                     // Leaving developer mode puts the chat away without
                     // forgetting where it was.
-                    chatFloatPref: localStorage.getItem('studio.chat-float') === '1',
-                    get chatFloating() { return this.chatFloatPref && this.chatAvailable },
+                    /* Three homes: `panel` (a rail item like the others),
+                       `float` (the composer card over the bottom of the
+                       site) and `side` (a full-height column pinned to the
+                       right of the site, the site pushed over by its width).
+                       The old boolean key is read once for anyone upgrading. */
+                    chatPlace: (() => {
+                        const saved = localStorage.getItem('studio.chat-place');
+                        if (['panel', 'float', 'side'].includes(saved)) return saved;
+                        return localStorage.getItem('studio.chat-float') === '1' ? 'float' : 'panel';
+                    })(),
+                    get chatFloating() { return this.chatPlace === 'float' && this.chatAvailable },
+                    get chatSide() { return this.chatPlace === 'side' && this.chatAvailable },
+                    // Out of the panel, either way: the aside is then a ghost
+                    get chatOut() { return this.chatFloating || this.chatSide },
                     chatOpen: localStorage.getItem('studio.chat-open') === '1',
                     chatBusy: false,   // a turn is streaming
-                    setChatFloating(on) {
-                        if (!this.chatAvailable) return;
-                        on = !!on;
-                        if (on === this.chatFloating) return;
-                        this.chatFloatPref = on;
-                        localStorage.setItem('studio.chat-float', on ? '1' : '0');
-                        if (on) {
-                            // The float takes over from the panel
-                            if (this.sidebar && this.rail === 'assistant') this.closePanel();
-                        } else {
-                            this.setChatOpen(false);
+                    /* Leaving the side column for the composer is two beats:
+                       the column slides out to the right while the site
+                       widens back (chatSideOut holds it in place for that),
+                       and only then does the composer card appear below. */
+                    chatSideOut: false,
+                    chatSideTimer: null,
+                    setChatPlace(place) {
+                        if (!this.chatAvailable || !['panel', 'float', 'side'].includes(place)) return;
+                        if (place === this.chatPlace && !this.chatSideOut) return;
+                        clearTimeout(this.chatSideTimer);
+                        const apply = () => {
+                            const from = this.chatPlace;
+                            this.chatPlace = place;
+                            this.chatSideOut = false;
+                            localStorage.setItem('studio.chat-place', place);
+                            if (place === 'panel') {
+                                this.setChatOpen(false);
+                            } else {
+                                // The float or the column takes over from the panel
+                                if (this.sidebar && this.rail === 'assistant') this.closePanel();
+                            }
+                            // Back from the column the card lands folded, just the composer
+                            if (place === 'float' && from === 'side') this.setChatOpen(false);
+                            window.dispatchEvent(new CustomEvent('studio:chat', { detail: { floating: this.chatFloating, place } }));
+                            window.dispatchEvent(new CustomEvent('studio:reflow'));
+                        };
+                        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                        if (this.chatPlace === 'side' && place === 'float' && !reduced) {
+                            this.chatSideOut = true;
+                            this.chatSideTimer = setTimeout(apply, 340);
+                            return;
                         }
-                        window.dispatchEvent(new CustomEvent('studio:chat', { detail: { floating: on } }));
+                        apply();
+                    },
+                    setChatFloating(on) { this.setChatPlace(on ? 'float' : 'panel') },
+                    // The composer's sidebar button and the column's close
+                    toggleChatSide() { this.setChatPlace(this.chatSide ? 'float' : 'side') },
+                    // The column's width, set by the seam on its inner edge
+                    chatSideWidth: (n => (n >= 320 && n <= 640) ? n : 400)(parseInt(localStorage.getItem('studio.chat-side-width'), 10)),
+                    setChatSideWidth(px) {
+                        this.chatSideWidth = Math.round(Math.min(640, Math.max(320, px)));
+                        localStorage.setItem('studio.chat-side-width', String(this.chatSideWidth));
+                    },
+                    // A floating toolbar on the right edge would sit on the
+                    // column: the column stands in from it (12 + 46 + 12,
+                    // less the gutter the row already keeps)
+                    get chatSideClear() {
+                        return this.dock.edge === 'right' && !this.dock.pinned && !this.dockHidden ? 65 : 0;
+                    },
+                    // What the app row reserves on its right for the column
+                    get chatSideSpace() {
+                        return this.chatSide && !this.chatSideOut ? this.chatSideWidth + this.chatSideClear : 0;
                     },
                     setChatOpen(on) {
                         this.chatOpen = !!on;
@@ -141,7 +198,8 @@
                     // Bring the chat forward wherever it lives, caret in it (⌘J)
                     focusChat() {
                         if (!this.chatAvailable) return;
-                        if (this.chatFloating) this.setChatOpen(true); else this.setRail('assistant', true);
+                        if (this.chatFloating) this.setChatOpen(true);
+                        else if (!this.chatSide) this.setRail('assistant', true);
                         window.dispatchEvent(new CustomEvent('studio:focus-chat'));
                     },
                     // The floating card's distance from the bottom edge: it
@@ -270,6 +328,7 @@
                     // panel is not part of the match.
                     get workspace() {
                         const { edge, pinned } = this.dock;
+                        if (this.chatSide) return null;
                         if (this.chatFloating) {
                             if (this.joined) return 'composer';
                             return pinned && edge === 'top' ? 'chat' : null;
@@ -1165,6 +1224,7 @@
                     },
 
                     place() {
+                        if ($store.studio.chatSide) return this.placeSide();
                         if (!$store.studio.chatFloating) { this.style = {}; return this.joinedReset() }
                         const { w, left } = this.frame();
                         if (!$store.studio.joined) {
@@ -1173,6 +1233,24 @@
                             return;
                         }
                         this.placeJoined(w, left);
+                    },
+
+                    // Pinned to the right: a column as tall as the app row,
+                    // flush with its right edge (the row's padding is what
+                    // keeps the site a gutter away from it). Its own frame
+                    // is fixed, so the site slides under it, not with it.
+                    placeSide() {
+                        this.joinedReset();
+                        const row = document.querySelector('.s-app-row');
+                        if (!row) return;
+                        const r = row.getBoundingClientRect();
+                        this.style = {
+                            left: 'auto',
+                            top: Math.round(r.top) + 'px',
+                            bottom: Math.round(window.innerHeight - r.bottom) + 'px',
+                            right: Math.round(window.innerWidth - r.right + $store.studio.chatSideClear) + 'px',
+                            width: $store.studio.chatSideWidth + 'px',
+                        };
                     },
 
                     /* Joined, this card is the whole unit's placer: it is the
@@ -1246,9 +1324,9 @@
                     },
                 }"
                 class="flex h-full min-h-0 flex-col"
-                :class="$store.studio.chatFloating && 's-chat-host'"
+                :class="{ 's-chat-host': $store.studio.chatOut, 'is-side': $store.studio.chatSide, 'is-leaving': $store.studio.chatSideOut }"
                 :style="style"
-                x-effect="$store.studio.chatFloating; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
+                x-effect="$store.studio.chatFloating; $store.studio.chatSide; $store.studio.chatSideWidth; $store.studio.chatSideOut; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
                 @resize.window.debounce.50ms="place()"
                 @studio:reflow.window="place()"
                 {{-- Every frame while a docked panel slides the site over --}}
@@ -1259,10 +1337,42 @@
                 {{-- Floating, the card steps aside while a sheet is up: the
                      sheet is centred with a transform, which would capture a
                      fixed child, and the scrim covers the card anyway --}}
-                x-show="$store.studio.chatFloating ? !($store.studio.sidebar && $store.studio.frame === 'sheet') : $store.studio.rail === 'assistant'"
+                x-show="$store.studio.chatOut ? !($store.studio.sidebar && $store.studio.frame === 'sheet') : $store.studio.rail === 'assistant'"
                 x-cloak
             >
                 <livewire:studio::assistant-panel :page-slug="$page->slug" />
+
+                {{-- Pinned to the right: a drag seam on the column's inner
+                     edge sets its width, the site following live. The shield
+                     keeps the canvas iframe from swallowing the pointer. --}}
+                <div
+                    x-show="$store.studio.chatSide"
+                    x-cloak
+                    class="s-chat-side-seam"
+                    role="separator"
+                    aria-label="Resize the chat"
+                    @mousedown.prevent="
+                        const host = $el.parentElement;
+                        const shield = document.createElement('div');
+                        shield.className = 's-drag-shield is-col-resize';
+                        document.body.appendChild(shield);
+                        const move = (event) => {
+                            $store.studio.setChatSideWidth(host.getBoundingClientRect().right - event.clientX);
+                        };
+                        const stop = () => {
+                            shield.remove();
+                            document.removeEventListener('mousemove', move);
+                            document.removeEventListener('mouseup', stop);
+                            window.removeEventListener('blur', stop);
+                            document.body.classList.remove('select-none');
+                            window.dispatchEvent(new CustomEvent('studio:reflow'));
+                        };
+                        document.body.classList.add('select-none');
+                        document.addEventListener('mousemove', move);
+                        document.addEventListener('mouseup', stop);
+                        window.addEventListener('blur', stop);
+                    "
+                ></div>
             </div>
         @endif
         <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'pages'" x-cloak>
@@ -1310,6 +1420,7 @@
                     { label: 'Assistant panel', hint: 'Panel', when: studio.chatAvailable && !studio.chatFloating, run: () => studio.setRail('assistant', true) },
                     { label: 'Focus the chat', hint: 'Chat', when: studio.chatAvailable, run: () => studio.focusChat() },
                     { label: studio.chatFloating ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', when: studio.chatAvailable, run: () => studio.setChatFloating(!studio.chatFloating) },
+                    { label: studio.chatSide ? 'Close the chat column' : 'Pin the chat to the right', hint: 'Chat', when: studio.chatAvailable, run: () => studio.toggleChatSide() },
                     { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Editor', run: () => studio.toggleDevMode() },
                     @endif
                     // One per workspace, minus the one you are in and the

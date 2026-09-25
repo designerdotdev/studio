@@ -142,7 +142,16 @@
                 {{-- One row: the docked panel (when the toolbar is pinned)
                      and the stage. A right rail flips the row so the panel
                      sits beside it. --}}
-                <div class="s-app-row flex min-h-0 min-w-0 flex-1" :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'">
+                {{-- With the chat pinned to the right the row keeps its
+                     width free on that side (a padding, transitioned, so
+                     the site slides over as the column arrives) and the
+                     chat's fixed host sits in the strip. --}}
+                <div
+                    class="s-app-row flex min-h-0 min-w-0 flex-1"
+                    :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'"
+                    :style="{ paddingRight: $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px' }"
+                    @transitionend.self="if ($event.propertyName === 'padding-right') window.dispatchEvent(new CustomEvent('studio:reflow'))"
+                >
 
                 {{-- The floating surface: every panel lives here, one visible
                      at a time. Anchored to its dock button (popover), centred
@@ -156,7 +165,7 @@
                         'is-docked': $store.studio.column,
                         'is-collapsed': $store.studio.column && !$store.studio.sidebar,
                         'at-right': $store.studio.column && $store.studio.panelSide === 'right',
-                        'is-ghost': !$store.studio.sidebar && $store.studio.chatFloating,
+                        'is-ghost': !$store.studio.sidebar && $store.studio.chatOut,
                     }"
                     {{-- An object binding: a string would replace the style
                          attribute and wipe the display:none x-show sets --}}
@@ -213,10 +222,10 @@
                     {{-- With the chat floating the aside stays mounted as an
                          invisible ghost (is-ghost): the chat card is one of
                          its children, fixed over the site --}}
-                    x-show="$store.studio.sidebar || $store.studio.chatFloating || $store.studio.column"
+                    x-show="$store.studio.sidebar || $store.studio.chatOut || $store.studio.column"
                     x-cloak
-                    :aria-hidden="!$store.studio.sidebar && !$store.studio.chatFloating"
-                    :inert="!$store.studio.sidebar && !$store.studio.chatFloating"
+                    :aria-hidden="!$store.studio.sidebar && !$store.studio.chatOut"
+                    :inert="!$store.studio.sidebar && !$store.studio.chatOut"
                     {{-- The row's width changes under the site: whatever is
                          placed against the stage (the floating chat) re-places
                          every frame of the slide, so it glides with the site

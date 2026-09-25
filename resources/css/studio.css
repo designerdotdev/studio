@@ -405,6 +405,18 @@ html.studio-light .s-dock-peek {
         border-radius: var(--studio-radius, 0);
     }
 
+    /* The row keeps a strip free on its right while the chat is pinned
+       there (the store writes the padding). One curve for the site sliding
+       over and the column arriving, so the two read as a single motion. */
+    .s-app-row {
+        transition: padding-right 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* While the column's seam is dragged the site follows the pointer */
+    body.select-none .s-app-row {
+        transition: none;
+    }
+
     /* Behind a sheet: dims the site, click closes */
     .s-scrim {
         @apply fixed inset-0 z-20 bg-black/45;
@@ -1550,6 +1562,20 @@ html.studio-light .s-chat.is-floating.is-joined {
     box-shadow: 0 -1px 0 var(--color-line);
 }
 
+html.studio-light .s-chat.is-side {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+html.studio-light .s-chat.is-side .s-chat-field {
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.06);
+    border-color: transparent;
+}
+
+html.studio-light .s-chat.is-side .s-chat-field:focus-within {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 4px color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
 html.studio-light .s-chat.is-floating.is-joined.is-bar-hidden {
     box-shadow: none;
 }
@@ -1698,6 +1724,119 @@ html.studio-light .s-pop-inverse {
 
     .s-chat.is-floating.is-picking:hover {
         opacity: 1;
+    }
+
+    /* --- pinned to the right: a column beside the site -----------------
+       The same host, now stretched between the row's top and bottom and
+       flush with its right edge (the store writes all four). It arrives
+       from off the right edge on the row's own curve while the site slides
+       over to make room, and leaves the same way before the composer card
+       takes its place below. */
+    .s-chat-host.is-side {
+        left: auto;
+        max-height: none;
+        animation: s-chat-side-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .s-chat-host.is-side.is-leaving {
+        animation: s-chat-side-out 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        pointer-events: none;
+    }
+
+    @keyframes s-chat-side-in {
+        from { opacity: 0; transform: translateX(calc(100% + 24px)); }
+        to { opacity: 1; transform: none; }
+    }
+
+    @keyframes s-chat-side-out {
+        from { opacity: 1; transform: none; }
+        to { opacity: 0; transform: translateX(calc(100% + 24px)); }
+    }
+
+    /* The panel's content settles a beat after the column: a short fade
+       and drift, so it reads as arriving with the column rather than
+       being painted onto it */
+    .s-chat-host.is-side:not(.is-leaving) > .s-chat > * {
+        animation: s-chat-side-content 420ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+    }
+
+    @keyframes s-chat-side-content {
+        from { opacity: 0; transform: translateX(10px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    /* The column: the docked panel's material — a rounded container on
+       the frame's ground, the site's radius, a hairline. Light, it is the
+       white card of the screenshot beside the site. */
+    .s-chat.is-side {
+        border-radius: var(--studio-radius, 12px);
+        background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line);
+        overflow: hidden;
+    }
+
+    .s-chat.is-side .s-chat-head {
+        height: 48px;
+        padding: 0 10px 0 16px;
+    }
+
+    .s-chat.is-side .s-chat-head .s-microlabel {
+        text-transform: none;
+        letter-spacing: -0.006em;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-ink);
+    }
+
+    .s-chat.is-side .s-chat-log {
+        max-height: none;
+    }
+
+    .s-chat.is-side .s-chat-fold {
+        border-top-color: transparent;
+    }
+
+    .s-chat.is-side .s-chat-composer {
+        padding: 6px 12px 12px;
+    }
+
+    .s-chat.is-side .s-chat-field {
+        border-radius: 18px;
+        background: var(--color-raised);
+        border-color: var(--color-line);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .s-chat.is-side .s-chat-field:focus-within {
+        border-color: var(--color-line-strong);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
+    }
+
+    /* Its resize seam: a 6px grab strip on the inner edge, accent while held */
+    .s-chat-side-seam {
+        position: absolute;
+        top: 12px;
+        bottom: 12px;
+        left: 0;
+        width: 6px;
+        z-index: 5;
+        cursor: col-resize;
+    }
+
+    .s-chat-side-seam::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 2px;
+        background: transparent;
+        transition: background-color 150ms ease;
+    }
+
+    .s-chat-side-seam:hover::after,
+    .s-chat-side-seam:active::after {
+        background: var(--color-accent);
     }
 
     /* --- joined: the toolbar and the composer as one object ------------
@@ -1941,7 +2080,7 @@ html.studio-light .s-pop-inverse {
         @apply min-h-0 flex-1 overflow-y-auto p-3;
     }
 
-    .s-chat.is-floating .s-chat-log {
+    .s-chat:is(.is-floating, .is-side) .s-chat-log {
         max-height: 52vh;
         padding: 14px 16px;
     }
@@ -1956,8 +2095,8 @@ html.studio-light .s-pop-inverse {
         color: color-mix(in srgb, var(--color-ink) 90%, transparent);
     }
 
-    .s-chat.is-floating .s-chat-msg-user { margin-left: 15%; }
-    .s-chat.is-floating .s-chat-msg { margin-right: 15%; }
+    .s-chat:is(.is-floating, .is-side) .s-chat-msg-user { margin-left: 15%; }
+    .s-chat:is(.is-floating, .is-side) .s-chat-msg { margin-right: 15%; }
 
     /* --- the folded part: status + composer --------------------------- */
     .s-chat-fold {
@@ -1997,7 +2136,7 @@ html.studio-light .s-pop-inverse {
         padding: 8px;
     }
 
-    .s-chat.is-floating .s-chat-composer {
+    .s-chat:is(.is-floating, .is-side) .s-chat-composer {
         padding: 10px;
     }
 
@@ -2005,7 +2144,7 @@ html.studio-light .s-pop-inverse {
         @apply mb-1.5 flex flex-wrap gap-1;
     }
 
-    .s-chat.is-floating .s-chat-chips {
+    .s-chat:is(.is-floating, .is-side) .s-chat-chips {
         padding: 0 4px;
     }
 
@@ -2037,12 +2176,12 @@ html.studio-light .s-pop-inverse {
         border-color: var(--color-line-strong);
     }
 
-    .s-chat.is-floating .s-chat-field {
+    .s-chat:is(.is-floating, .is-side) .s-chat-field {
         @apply rounded-2xl;
         background: var(--color-wash-faint);
     }
 
-    .s-chat.is-floating .s-chat-field:focus-within {
+    .s-chat:is(.is-floating, .is-side) .s-chat-field:focus-within {
         background: var(--color-wash);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
     }
@@ -2061,7 +2200,7 @@ html.studio-light .s-pop-inverse {
         outline: none;
     }
 
-    .s-chat.is-floating .s-chat-input {
+    .s-chat:is(.is-floating, .is-side) .s-chat-input {
         padding: 12px 14px 4px;
         font-size: 13.5px;
     }
@@ -2070,7 +2209,7 @@ html.studio-light .s-pop-inverse {
         @apply flex items-center gap-1 px-1.5 pb-1.5;
     }
 
-    .s-chat.is-floating .s-chat-tools {
+    .s-chat:is(.is-floating, .is-side) .s-chat-tools {
         padding: 2px 8px 8px;
     }
 
@@ -2094,7 +2233,7 @@ html.studio-light .s-pop-inverse {
     }
 
     /* The composer's pick button keeps its label only where there is room */
-    .s-chat:not(.is-floating) .s-chat-tool-label {
+    .s-chat:not(.is-floating):not(.is-side) .s-chat-tool-label {
         display: none;
     }
 
@@ -2193,6 +2332,10 @@ html.studio-light .s-pop-inverse {
 
     @media (prefers-reduced-motion: reduce) {
         .s-chat-host { animation: none; }
+        .s-chat-host.is-side,
+        .s-chat-host.is-side.is-leaving,
+        .s-chat-host.is-side:not(.is-leaving) > .s-chat > * { animation: none; }
+        .s-app-row { transition: none; }
         .s-chat.is-floating .s-chat-thread { transition: none; }
         .s-chat-status-dot.is-live { animation: none; }
         .s-dock-btn.is-busy::before { animation: none; }

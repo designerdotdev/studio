@@ -242,14 +242,14 @@
             // The Assistant's button follows the floating chat when it is out:
             // lit while the conversation is open, pulsing while a turn runs
             $active = $name === 'assistant'
-                ? "\$store.studio.chatFloating ? \$store.studio.chatOpen : (\$store.studio.rail === 'assistant' && \$store.studio.sidebar)"
+                ? "\$store.studio.chatFloating ? \$store.studio.chatOpen : (\$store.studio.chatSide || (\$store.studio.rail === 'assistant' && \$store.studio.sidebar))"
                 : "\$store.studio.rail === '{$name}' && \$store.studio.sidebar";
         @endphp
         <button
             type="button"
             class="s-dock-btn"
             data-panel="{{ $name }}"
-            :data-tip="{{ $name === 'assistant' ? "\$store.studio.chatFloating ? (\$store.studio.chatOpen ? 'Fold the conversation' : 'Open the conversation') : 'Assistant'" : "'{$label}'" }}"
+            :data-tip="{{ $name === 'assistant' ? "\$store.studio.chatFloating ? (\$store.studio.chatOpen ? 'Fold the conversation' : 'Open the conversation') : (\$store.studio.chatSide ? 'Close the chat column' : 'Assistant')" : "'{$label}'" }}"
             :class="{ 'is-active': {{ $active }}, 'is-busy': {{ $name === 'assistant' ? '$store.studio.chatBusy' : 'false' }} }"
             :aria-pressed="{{ $active }}"
             @click="$store.studio.setRail('{{ $name }}')"
