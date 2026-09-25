@@ -9,9 +9,9 @@
     --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-    /* The frame — the black the whole editor sits in. The site and the
-       panels are rounded containers laid on it; a pinned toolbar is part
-       of it. The same in both chrome themes. */
+    /* The frame — the ground the whole editor sits on. The top bar sits
+       straight on it; the site, the sidebar and the Assistant column are
+       rounded containers laid on it a gutter apart. */
     --color-frame: #0b0b0b;
 
     /* Surfaces (dark chrome: neutral near-blacks, no blue cast) */
@@ -51,11 +51,12 @@
     --color-scroll-hover: rgba(255, 255, 255, 0.24);
 }
 
-/* Light chrome — the default. White panels and a soft grey canvas on the
-   black frame: near-black ink, neutral greys, one blue for what is
-   interactive, black for the primary action. */
+/* Light chrome. A soft grey frame with white containers on it: near-black
+   ink, neutral greys, one blue for what is interactive, black for the
+   primary action. */
 html.studio-light {
-    --color-shell: #f1f1f1;
+    --color-frame: #e9e9eb;
+    --color-shell: #f4f4f5;
     --color-panel: #ffffff;
     --color-raised: #ffffff;
     --color-overlay: #ffffff;
@@ -80,33 +81,6 @@ html.studio-light {
     color-scheme: light;
 }
 
-/* The toolbar belongs to the frame, so it is dark in either theme — the
-   floating pill, a pinned bar, and what opens off them. Joined to the
-   composer it is part of that card instead and keeps the theme's own. */
-html.studio-light .s-dock:not(.is-joined),
-html.studio-light .s-dock-peek {
-    --color-shell: #0b0b0b;
-    --color-panel: #141414;
-    --color-raised: #1f1f1f;
-    --color-overlay: #1c1c1c;
-    --color-line: rgba(255, 255, 255, 0.1);
-    --color-line-strong: rgba(255, 255, 255, 0.16);
-    --color-ink: #f3f3f3;
-    --color-soft: #b5b5b5;
-    --color-faint: #7a7a7a;
-    --color-accent: #4a8cff;
-    --color-accent-hover: #3a7cf2;
-    --color-ok: #36c285;
-    --color-warn: #ffb800;
-    --color-danger: #ff6b5b;
-    --color-wash: rgba(255, 255, 255, 0.07);
-    --color-wash-strong: rgba(255, 255, 255, 0.12);
-    --color-wash-faint: rgba(255, 255, 255, 0.03);
-    --color-scroll: rgba(255, 255, 255, 0.14);
-    --color-scroll-hover: rgba(255, 255, 255, 0.24);
-    color-scheme: dark;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Base                                                               */
 /* ------------------------------------------------------------------ */
@@ -123,14 +97,6 @@ html.studio-light .s-dock-peek {
         background: var(--color-shell);
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
-
-        /* The joined unit — the toolbar and the composer as one object.
-           Three separate fixed boxes have to agree on these to the pixel,
-           and the store carries the same two numbers (joinedBar,
-           joinedPeek) because it writes the boxes. Keep them in step. */
-        --joined-radius: 24px;
-        --joined-bar: 46px;
-        --joined-peek: 14px;
     }
 
     .studio-app ::selection {
@@ -385,295 +351,237 @@ html.studio-light .s-dock-peek {
         @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-line-strong bg-raised px-1 font-mono text-[10px] text-faint;
     }
 
-    /* --- the stage: the site is the screen ---------------------------- */
+    /* --- the frame ---------------------------------------------------- */
 
-    /* The frame: the editor's black ground. Everything on it is a
-       rounded container a gutter apart — the site always, a docked panel
-       beside it. A pinned toolbar's edge swaps the gutter for the bar
-       (appInsets writes that side inline, over this padding). A faint
-       warm glow low on the left keeps the black from reading as a void. */
+    /* The editor's ground: the top bar sits straight on it, and the site,
+       the sidebar (light theme) and the Assistant column are rounded
+       containers laid on it a gutter apart. */
     .s-app {
-        --studio-gutter: 5px;
-        --studio-radius: 12px;
-        padding: var(--studio-gutter);
+        --studio-gutter: 6px;
+        --studio-radius: 10px;
+        --studio-topbar: 48px;
+        padding: 0 var(--studio-gutter) var(--studio-gutter);
         background-color: var(--color-frame);
-        background-image: radial-gradient(ellipse 60% 45% at 0% 100%, rgba(149, 191, 71, 0.10), transparent 70%);
     }
 
+    .s-app-row {
+        gap: var(--studio-gutter);
+    }
+
+    /* The site is the screen: the stage fills what the columns leave */
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
-        border-radius: var(--studio-radius, 0);
+        border-radius: var(--studio-radius);
     }
 
-    /* Behind a sheet: dims the site, click closes */
-    .s-scrim {
-        @apply fixed inset-0 z-20 bg-black/45;
-        backdrop-filter: blur(2px);
-    }
-
-    /* --- the floating surface (holds the Livewire panels) ------------- */
-
-    .s-float {
-        @apply fixed z-30 flex flex-col overflow-hidden bg-panel;
-        border-radius: 14px;
-        box-shadow:
-            0 0 0 1px var(--color-line),
-            0 30px 70px -20px rgba(0, 0, 0, 0.7),
-            0 8px 24px -10px rgba(0, 0, 0, 0.5);
-        animation: s-float-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .s-float.is-sheet {
-        top: 50%;
-        left: 50%;
-        width: min(1100px, 88vw);
-        height: 80vh;
-        transform: translate(-50%, -50%);
-        border-radius: 16px;
-        animation-name: s-sheet-in;
-    }
-
-    /* A floating panel's close control — the last thing in its top row
-       (partials/float-close). A hairline sets it apart from the row's own
-       actions; the × turns a quarter on hover. */
-    .s-close {
-        @apply relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md text-faint;
-        width: 24px;
-        height: 24px;
-        margin-left: 9px;
-        transition: color 150ms ease, background-color 150ms ease, transform 120ms ease;
-    }
-
-    .s-close::before {
-        content: '';
-        position: absolute;
-        left: -5px;
-        top: 50%;
-        width: 1px;
-        height: 14px;
-        transform: translateY(-50%);
-        background: var(--color-line);
-        pointer-events: none;
-    }
-
-    .s-close svg {
-        width: 14px;
-        height: 14px;
-        transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .s-close:hover,
-    .s-close:focus-visible {
-        @apply bg-wash-strong text-ink;
-        outline: none;
-    }
-
-    .s-close:hover svg {
-        transform: rotate(90deg);
-    }
-
-    .s-close:active {
-        transform: scale(0.92);
-    }
-
-    @keyframes s-float-in {
-        from { opacity: 0; transform: translateY(6px) scale(0.985); }
-        to { opacity: 1; transform: none; }
-    }
-
-    @keyframes s-sheet-in {
-        from { opacity: 0; transform: translate(-50%, -50%) scale(0.985); }
-        to { opacity: 1; transform: translate(-50%, -50%); }
-    }
-
-    /* --- the dock ----------------------------------------------------- */
-
-    .s-dock {
-        @apply fixed z-40 flex items-center gap-0.5 text-soft;
-        height: 46px;
-        padding: 5px 6px 5px 4px;
-        border-radius: 999px;
-        /* the panel's surface — as dark as the chat and the popovers it opens */
-        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        box-shadow:
-            0 0 0 1px var(--color-line),
-            inset 0 1px 0 var(--color-wash),
-            0 20px 50px -20px rgba(0, 0, 0, 0.7),
-            0 4px 14px -6px rgba(0, 0, 0, 0.5);
-        transition:
-            left 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            top 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            opacity 200ms ease;
-        user-select: none;
-    }
-
-    .s-dock.is-dragging,
-    .s-dock.is-snapping {
-        transition: none;
-    }
-
-    .s-dock.is-vertical {
-        @apply flex-col;
-        height: auto;
-        width: 46px;
-        padding: 4px 5px 6px;
-    }
-
-    /* Hidden: parked in place, invisible, brought back by the hot strip */
-    .s-dock.is-hidden {
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    .s-dock-peek {
-        @apply fixed z-40;
-    }
-
-    /* Under the dock, over everything else (incl. the canvas iframe) while it is dragged */
+    /* Over everything (incl. the canvas iframe, which would otherwise
+       swallow pointer events) while a seam is dragged */
     .s-drag-shield {
         @apply fixed inset-0;
-        z-index: 39;
-        cursor: grabbing;
+        z-index: 60;
+        cursor: col-resize;
         touch-action: none;
         user-select: none;
     }
 
-    .s-dock-grip {
-        @apply flex shrink-0 cursor-grab items-center justify-center rounded-md text-faint;
-        width: 18px;
-        height: 34px;
-        touch-action: none;
+    /* --- the top bar --------------------------------------------------- */
+
+    .s-topbar {
+        @apply flex shrink-0 items-center text-soft;
+        height: var(--studio-topbar);
+        padding: 0 4px 0 2px;
+        gap: 2px;
+        user-select: none;
     }
 
-    .s-dock-grip:hover {
-        @apply bg-wash text-soft;
+    .s-topbar-group {
+        @apply flex min-w-0 items-center;
+        gap: 2px;
     }
 
-    .s-dock-grip:active {
-        cursor: grabbing;
+    .s-topbar-group.is-start,
+    .s-topbar-group.is-end {
+        flex: 1 1 0;
     }
 
-    .is-vertical .s-dock-grip {
-        width: 34px;
-        height: 18px;
+    .s-topbar-group.is-end {
+        justify-content: flex-end;
     }
 
-    .is-vertical .s-dock-grip svg {
-        transform: rotate(90deg);
+    .s-topbar-group.is-center {
+        flex: none;
     }
 
-    .s-dock-btn {
-        @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-full text-soft;
-        width: 34px;
-        height: 34px;
-        transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+    .s-tb-btn {
+        @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-md text-soft;
+        width: 32px;
+        height: 32px;
+        transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
     }
 
-    .s-dock-btn:hover {
+    .s-tb-btn:hover {
         @apply bg-wash text-ink;
     }
 
-    .s-dock-btn.is-active {
+    .s-tb-btn.is-active {
         @apply bg-wash-strong text-ink;
     }
 
-    .s-dock-btn:active {
+    .s-tb-btn:active {
         transform: scale(0.94);
     }
 
-    .s-dock-btn:focus-visible {
+    .s-tb-btn:focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 1px;
     }
 
-    .s-dock-btn.is-menu {
+    .s-tb-btn.is-busy::before {
+        content: '';
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-accent);
+        box-shadow: 0 0 0 2px var(--color-frame);
+        animation: s-busy 1.2s ease-in-out infinite;
+    }
+
+    @keyframes s-busy {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+    }
+
+    .s-tb-sep {
+        @apply shrink-0 bg-line;
+        width: 1px;
+        height: 18px;
+        margin: 0 6px;
+    }
+
+    /* The brand mark: the menu button */
+    .s-brand {
         @apply text-ink;
     }
 
-    /* Back / Forward / Reload: its buttons sit in the dock's own flex row */
-    .s-dock-nav {
-        display: contents;
+    .s-brand svg {
+        opacity: 0.85;
+        transition: opacity 120ms ease;
     }
 
-    .s-dock-sep {
-        @apply shrink-0 bg-line;
-        width: 1px;
-        height: 20px;
-        margin: 0 4px;
+    .s-brand:hover svg,
+    .s-brand.is-open svg {
+        opacity: 1;
     }
 
-    .is-vertical .s-dock-sep {
-        width: 18px;
-        height: 1px;
-        margin: 3px 0;
+    .s-brand.is-open {
+        @apply bg-wash;
     }
 
-    /* Preview / Edit / Code */
-    .s-dock-seg {
-        @apply flex shrink-0 rounded-full bg-wash p-0.5;
+    /* The page switcher: title, path, the save-status pip */
+    .s-page-btn {
+        @apply flex min-w-0 cursor-pointer items-center gap-2 rounded-md;
+        height: 32px;
+        padding: 0 8px 0 10px;
+        max-width: min(360px, 34vw);
+        font-size: 13px;
+        transition: background-color 120ms ease;
+    }
+
+    .s-page-btn:hover,
+    .s-page-btn.is-open {
+        @apply bg-wash;
+    }
+
+    .s-page-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    /* Edit | Preview | Code */
+    .s-mode {
+        @apply flex shrink-0 rounded-lg bg-wash p-0.5;
         gap: 1px;
     }
 
-    .is-vertical .s-dock-seg {
-        @apply flex-col;
-    }
-
-    .s-dock-seg-btn {
-        @apply flex cursor-pointer items-center justify-center rounded-full text-faint;
-        width: 32px;
-        height: 30px;
+    .s-mode-btn {
+        @apply flex cursor-pointer items-center gap-1.5 rounded-[6px] text-faint;
+        height: 28px;
+        padding: 0 11px;
+        font-size: 12.5px;
+        font-weight: 500;
         transition: background-color 150ms ease, color 150ms ease;
     }
 
-    .s-dock-seg-btn:hover {
+    .s-mode-btn:hover {
         @apply text-ink;
     }
 
-    .s-dock-seg-btn.is-active {
+    .s-mode-btn.is-active {
         background: var(--color-ink);
         color: var(--color-shell);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
-    .s-dock-seg-btn.is-active.is-edit {
-        background: color-mix(in srgb, var(--color-ok) 78%, white);
-        color: #0f2a17;
+    .s-mode-btn.is-active.is-code {
+        background: var(--color-accent);
+        color: #ffffff;
     }
 
-    .s-dock-seg-btn.is-active.is-code {
-        background: color-mix(in srgb, var(--color-accent) 80%, white);
-        color: #0e1140;
+    .s-mode-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
     }
 
-    /* Publish, carrying the save-status dot */
-    .s-dock-publish {
-        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full font-semibold;
+    /* Canvas widths — three small icon radios */
+    .s-widths {
+        @apply flex shrink-0 rounded-lg bg-wash p-0.5;
+        gap: 1px;
+    }
+
+    .s-widths-btn {
+        @apply flex cursor-pointer items-center justify-center rounded-[6px] text-faint;
+        width: 30px;
+        height: 28px;
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .s-widths-btn:hover {
+        @apply text-ink;
+    }
+
+    .s-widths-btn.is-active {
+        @apply bg-wash-strong text-ink;
+    }
+
+    /* Publish, carrying the save-status pip */
+    .s-publish {
+        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md font-semibold;
         height: 32px;
         padding: 0 12px 0 10px;
-        margin-left: 2px;
+        margin-left: 4px;
         font-size: 12.5px;
         background: var(--color-ink);
         color: var(--color-shell);
-        transition: filter 150ms ease;
+        transition: filter 150ms ease, transform 120ms ease;
     }
 
-    .s-dock-publish:hover {
+    .s-publish:hover {
         filter: brightness(1.08);
     }
 
-    .is-vertical .s-dock-publish {
-        width: 34px;
-        padding: 0;
-        justify-content: center;
+    .s-publish:active {
+        transform: scale(0.98);
     }
 
-    .is-vertical .s-dock-publish .s-dock-publish-label {
-        display: none;
+    .s-publish:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
     }
 
-    .s-dock-status {
+    .s-status-pip {
         @apply block shrink-0 rounded-full bg-ok;
         width: 6px;
         height: 6px;
@@ -681,28 +589,72 @@ html.studio-light .s-dock-peek {
         transition: background-color 300ms ease, box-shadow 300ms ease;
     }
 
-    .s-dock-status.is-saving {
+    .s-status-pip.is-saving {
         @apply animate-pulse bg-warn;
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-warn) 25%, transparent);
     }
 
-    .s-dock-status.is-error {
+    .s-status-pip.is-error {
         @apply bg-danger;
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 25%, transparent);
     }
 
-    .s-dock-publish .s-dock-dirty {
-        @apply absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent;
-        box-shadow: 0 0 0 2px var(--color-panel);
+    .s-publish .s-dirty-pip {
+        @apply absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent;
+        box-shadow: 0 0 0 2px var(--color-frame);
     }
 
-    /* Label tooltips, away from the dock's edge */
-    .s-dock-btn[data-tip]::after {
+    /* A small switch, drawn from state (the developer-mode row) */
+    .s-switch {
+        position: relative;
+        display: inline-block;
+        flex: none;
+        width: 26px;
+        height: 16px;
+        border-radius: 999px;
+        background: var(--color-wash-strong);
+        box-shadow: inset 0 0 0 1px var(--color-line);
+        transition: background-color 150ms ease;
+    }
+
+    .s-switch::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--color-ink);
+        opacity: 0.7;
+        transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease;
+    }
+
+    .s-switch.is-on {
+        background: var(--color-accent);
+        box-shadow: none;
+    }
+
+    .s-switch.is-on::after {
+        transform: translateX(10px);
+        background: #ffffff;
+        opacity: 1;
+    }
+
+    /* Tooltips — a label under (or over) any control that carries data-tip */
+    .s-tip {
+        position: relative;
+    }
+
+    .s-tip[data-tip]::after {
         content: attr(data-tip);
         position: absolute;
         z-index: 60;
+        top: calc(100% + 8px);
+        left: 50%;
+        translate: -50% 0;
         padding: 4px 8px;
-        border-radius: 7px;
+        border-radius: 6px;
         background: var(--color-ink);
         color: var(--color-shell);
         font-size: 11.5px;
@@ -714,201 +666,85 @@ html.studio-light .s-dock-peek {
         transition: opacity 120ms ease;
     }
 
-    .s-dock-btn[data-tip]:hover::after {
+    .s-tip[data-tip]:hover::after {
         opacity: 1;
-        transition-delay: 450ms;
+        transition-delay: 500ms;
     }
 
-    /* No tooltips while a dock popover is open (they would sit on top of
-       it), or when View → Tooltips is off */
-    .s-dock:has(.is-open) .s-dock-btn[data-tip]::after,
-    .s-dock.no-tips .s-dock-btn[data-tip]::after {
+    .s-tip.is-open[data-tip]::after,
+    .s-tip[data-tip=""]::after {
         display: none;
     }
 
-    .s-dock.at-bottom .s-dock-btn[data-tip]::after { bottom: calc(100% + 10px); left: 50%; translate: -50% 0; }
-    .s-dock.at-top .s-dock-btn[data-tip]::after { top: calc(100% + 10px); left: 50%; translate: -50% 0; }
-    .s-dock.at-left .s-dock-btn[data-tip]::after { left: calc(100% + 10px); top: 50%; translate: 0 -50%; }
-    .s-dock.at-right .s-dock-btn[data-tip]::after { right: calc(100% + 10px); top: 50%; translate: 0 -50%; }
+    /* --- the sidebar --------------------------------------------------- */
 
-    /* --- pinned: a flush rail on its edge ------------------------------
-       The app root pads by the rail's size (appInsets), so it never covers
-       the site. Top/bottom: a 48px full-width bar. Left/right: a 52px
-       column. The pin button is the switch; dragging keeps the pin. */
-    .s-dock.is-pinned {
-        gap: 2px;
-        border-radius: 0;
-        background: transparent;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        box-shadow: none;
-        transition: none;
-    }
-
-    .s-dock.is-pinned.at-top,
-    .s-dock.is-pinned.at-bottom {
-        left: 0;
-        right: 0;
-        width: auto;
-        height: 48px;
-        padding: 0 10px 0 8px;
-    }
-
-    .s-dock.is-pinned.at-top {
-        top: 0;
-        bottom: auto;
-    }
-
-    .s-dock.is-pinned.at-bottom {
-        top: auto;
-        bottom: 0;
-    }
-
-    .s-dock.is-pinned.at-left,
-    .s-dock.is-pinned.at-right {
-        top: 0;
-        bottom: 0;
-        width: 52px;
-        height: auto;
-        padding: 8px 0;
-    }
-
-    .s-dock.is-pinned.at-left {
-        left: 0;
-        right: auto;
-    }
-
-    .s-dock.is-pinned.at-right {
-        left: auto;
-        right: 0;
-    }
-
-    /* A pinned rail has nowhere to slide, so its grip only starts a drag */
-    .s-dock.is-pinned .s-dock-grip {
-        opacity: 0.6;
-    }
-
-    .s-dock-pin.is-active svg {
-        fill: currentColor;
-    }
-
-    .s-dock-pin.is-active {
-        color: var(--color-ink);
-    }
-
-    /* Pushes the modes and Publish to the far end of a pinned rail */
-    .s-dock-spacer {
-        flex: 1 1 0;
-        min-width: 0;
-        min-height: 0;
-    }
-
-    /* The page switcher, centred in a pinned top/bottom bar. Centred with
-       flex, not a transform: its popover is position:fixed, and a
-       transformed ancestor would become that popover's containing block. */
-    .s-dock-page {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        pointer-events: none;
-    }
-
-    .s-dock-page > * {
-        pointer-events: auto;
-    }
-
-    .s-dock-page-btn {
-        @apply flex cursor-pointer items-center gap-2 rounded-lg bg-wash;
-        height: 32px;
-        padding: 0 10px 0 11px;
-        max-width: min(360px, 32vw);
-        font-size: 12.5px;
-        transition: background-color 150ms ease;
-    }
-
-    .s-dock-page-btn:hover,
-    .s-dock-page-btn.is-open {
-        @apply bg-wash-strong;
-    }
-
-    .s-dock-page-btn:focus-visible {
-        outline: 2px solid var(--color-accent);
-        outline-offset: 1px;
-    }
-
-    /* --- docked panel: a real column beside a pinned rail ------------- */
-    /* The column beside the site. Dark, it is the frame itself — the
-       panel sits straight on the black and only the site is a card. Light,
-       it is a white container like the site: same radius, a gutter apart.
-
-       It stays in the row open or shut (the store's `column`), so opening
-       and closing are one width + margin transition, the old sidebar's
-       curve. The panel inside is held at the full width and pinned to the
-       column's outer edge, so it slides out under that edge rather than
-       reflowing as the column narrows. */
-    .s-float.is-docked {
+    /* A column beside the site. Dark, it sits straight on the frame —
+       only the site is a card; light, it is a white container like the
+       site. It stays in the row open or shut, so collapsing is one width +
+       margin transition with the panel held at full width sliding out
+       under the outer edge. */
+    .s-sidebar,
+    .s-assistant {
         position: relative;
-        inset: auto;
-        z-index: 10;
-        height: auto;
-        min-height: 0;
+        display: flex;
         flex: none;
-        align-items: flex-end;
-        margin-right: var(--studio-gutter, 5px);
-        border-radius: var(--studio-radius, 12px);
-        box-shadow: none;
-        animation: none;
-        transition:
-            width 280ms cubic-bezier(0.22, 1, 0.36, 1),
-            margin 280ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    /* The panels fade as they go. Not the column itself: the floating
-       chat is its child too, and an ancestor's opacity would take it
-       along even though it is fixed over the site. */
-    .s-float.is-docked > div:first-child > :not(.s-chat-host) {
-        transition: opacity 220ms ease;
-    }
-
-    .s-float.is-docked.is-collapsed > div:first-child > :not(.s-chat-host) {
-        opacity: 0;
-    }
-
-    .s-float.is-docked.at-right {
-        align-items: flex-start;
-        margin-right: 0;
-        margin-left: var(--studio-gutter, 5px);
-    }
-
-    .s-float.is-docked.is-collapsed {
-        margin-right: 0;
-        margin-left: 0;
-        pointer-events: none;
-    }
-
-    /* Collapsed while the chat floats, the aside is also the chat's ghost —
-       but the ghost's own rules would blank the panel mid-slide */
-    .s-float.is-docked.is-ghost {
-        visibility: visible;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        border-radius: var(--studio-radius);
         background: var(--color-panel);
+        transition:
+            width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 180ms ease;
     }
 
-    html:not(.studio-light) .s-float.is-docked {
+    html:not(.studio-light) .s-sidebar,
+    html:not(.studio-light) .s-assistant {
         background: transparent;
     }
 
-    /* While the seam is dragged the width follows the pointer, not a curve */
-    body.select-none .s-float.is-docked {
+    .s-sidebar.is-collapsed,
+    .s-assistant.is-collapsed {
+        width: 0 !important;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* The row's gap is the gutter; a collapsed column gives it back */
+    .s-sidebar.is-collapsed {
+        margin-right: calc(-1 * var(--studio-gutter));
+    }
+
+    .s-assistant.is-collapsed {
+        margin-left: calc(-1 * var(--studio-gutter));
+    }
+
+    /* Held at exactly the column's width so the panel slides, never reflows */
+    .s-sidebar-inner {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        margin-left: auto;
+    }
+
+    .s-assistant .s-sidebar-inner {
+        margin-left: 0;
+        margin-right: auto;
+    }
+
+    /* While a seam is dragged the width follows the pointer, not a curve */
+    body.select-none .s-sidebar,
+    body.select-none .s-assistant {
         transition: none;
     }
 
-    /* Its resize seam: a 6px grab strip on the inner edge, accent while held */
+    /* The resize seam: a 6px grab strip on the column's inner edge */
     .s-panel-seam {
         position: absolute;
-        top: 12px;
-        bottom: 12px;
+        top: 10px;
+        bottom: 10px;
         right: 0;
         width: 6px;
         z-index: 5;
@@ -922,6 +758,7 @@ html.studio-light .s-dock-peek {
         bottom: 0;
         right: 0;
         width: 2px;
+        border-radius: 2px;
         background: transparent;
         transition: background-color 150ms ease;
     }
@@ -931,14 +768,107 @@ html.studio-light .s-dock-peek {
         background: var(--color-accent);
     }
 
-    .s-float.is-docked.at-right .s-panel-seam {
+    .s-assistant .s-panel-seam {
         right: auto;
         left: 0;
     }
 
-    .s-float.is-docked.at-right .s-panel-seam::after {
+    .s-assistant .s-panel-seam::after {
         right: auto;
         left: 0;
+    }
+
+    /* The sidebar's tab strip: Sections · Pages · Content · Media */
+    .s-tabs {
+        @apply flex shrink-0 items-center border-b border-line;
+        height: 44px;
+        padding: 0 8px;
+        gap: 2px;
+    }
+
+    .s-tab {
+        @apply flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-faint;
+        height: 30px;
+        min-width: 0;
+        padding: 0 4px;
+        font-size: 12.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-tab:hover {
+        @apply text-ink bg-wash;
+    }
+
+    .s-tab.is-active {
+        @apply bg-wash-strong text-ink;
+    }
+
+    .s-tab:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: -2px;
+    }
+
+    .s-tab svg {
+        width: 15px;
+        height: 15px;
+        flex: none;
+    }
+
+    /* Narrow sidebar: icons only */
+    .s-sidebar.is-narrow .s-tab span {
+        display: none;
+    }
+
+    /* The composer's pick button: an icon in the column, its label lives in the tooltip */
+    .s-chat-tool-label {
+        display: none;
+    }
+
+    /* A panel's top row: a title, actions at the end */
+    .s-panel-head {
+        @apply flex shrink-0 items-center gap-1 border-b border-line;
+        height: 44px;
+        padding: 0 8px 0 12px;
+    }
+
+    /* The Getting-started card on first run */
+    .s-tipcard {
+        @apply relative m-2 rounded-lg border border-line p-3;
+        background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+        border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
+    }
+
+    .s-tipcard ol {
+        @apply mt-2 space-y-1.5 text-[12px] leading-snug text-soft;
+        counter-reset: tip;
+    }
+
+    .s-tipcard li {
+        @apply flex items-start gap-2;
+    }
+
+    .s-tipcard li::before {
+        counter-increment: tip;
+        content: counter(tip);
+        @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold;
+        background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+        color: var(--color-accent);
+        margin-top: 1px;
+    }
+
+    /* Code mode's file tree column, inside the code pane */
+    .s-code-files {
+        @apply flex shrink-0 flex-col border-r border-line bg-panel;
+        width: 260px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-sidebar,
+        .s-assistant {
+            transition: none;
+        }
     }
 
     /* --- the Assistant's pick tool, armed ------------------------------
@@ -1026,18 +956,6 @@ html.studio-light .s-dock-peek {
     @keyframes s-pick-pulse {
         0%, 100% { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.3); }
         50% { box-shadow: 0 0 0 6px rgba(167, 139, 250, 0.12); }
-    }
-
-    /* Code mode's file tree column, inside the code pane */
-    .s-code-files {
-        @apply flex shrink-0 flex-col border-r border-line bg-panel;
-        width: 260px;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .s-dock { transition: none; }
-        .s-float { animation: none; }
-        .s-pick-banner-dot { animation: none; }
     }
 
     /* --- rich text (collections) ------------------------------------- */
@@ -1128,8 +1046,6 @@ html.studio-light .s-dock-peek {
         opacity: 1;
     }
 
-    /* --- menu button ------------------------------------------------ */
-
     /* Assistant suggestion — a wrapping outline button */
     .s-suggestion {
         @apply w-full cursor-pointer rounded-lg border border-line-strong px-3 py-2 text-left text-[11.5px] leading-snug text-soft transition-colors duration-150;
@@ -1138,46 +1054,6 @@ html.studio-light .s-dock-peek {
 
     .s-suggestion:hover {
         @apply text-ink bg-wash;
-    }
-
-    /* Menu button: brand mark at rest, cross-fades to the hamburger on
-       hover (and stays a hamburger while the menu is open) */
-    .s-logo-btn {
-        position: relative;
-    }
-
-    .s-logo-btn > svg {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        translate: -50% -50%;
-        transition: opacity 180ms ease, scale 180ms ease;
-    }
-
-    .s-logo-btn .s-logo-btn-logo {
-        opacity: 0.7;
-    }
-
-    .s-logo-btn .s-logo-btn-menu {
-        opacity: 0;
-        scale: 0.72;
-    }
-
-    /* Menu open (no hover needed): keep the hover state */
-    .s-logo-btn.is-open {
-        @apply text-ink bg-wash;
-    }
-
-    .s-logo-btn:hover .s-logo-btn-logo,
-    .s-logo-btn.is-open .s-logo-btn-logo {
-        opacity: 0;
-        scale: 0.72;
-    }
-
-    .s-logo-btn:hover .s-logo-btn-menu,
-    .s-logo-btn.is-open .s-logo-btn-menu {
-        opacity: 1;
-        scale: 1;
     }
 
     .s-seg {
@@ -1501,11 +1377,6 @@ html.studio-light .s-dock-peek {
         background: var(--color-accent);
     }
 
-    /* The dock's drag shield, reused while the seam is dragged */
-    .s-drag-shield.is-col-resize {
-        cursor: col-resize;
-    }
-
     /* Empty-state dashed tile */
     .s-empty-tile {
         @apply flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong px-4 py-8 text-center transition-colors duration-150;
@@ -1517,7 +1388,6 @@ html.studio-light .s-dock-peek {
     }
 }
 
-
 /* ------------------------------------------------------------------ */
 /*  Light chrome adjustments                                           */
 /* ------------------------------------------------------------------ */
@@ -1527,31 +1397,6 @@ html.studio-light .s-dock-peek {
 html.studio-light .s-pop {
     border-color: transparent;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 12px 32px -8px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-/* Off the dark toolbar a popover is dark too, so it keeps the dark lift */
-html.studio-light .s-dock:not(.is-joined) .s-pop {
-    border-color: var(--color-line-strong);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
-}
-
-/* Floating surfaces over the site — a white card lifts with a soft,
-   neutral shadow rather than the dark theme's deep one */
-html.studio-light .s-float:not(.is-docked):not(.is-ghost),
-html.studio-light .s-chat.is-floating,
-html.studio-light .s-joined {
-    box-shadow:
-        0 0 0 1px rgba(0, 0, 0, 0.08),
-        0 24px 56px -20px rgba(0, 0, 0, 0.28),
-        0 6px 16px -8px rgba(0, 0, 0, 0.12);
-}
-
-html.studio-light .s-chat.is-floating.is-joined {
-    box-shadow: 0 -1px 0 var(--color-line);
-}
-
-html.studio-light .s-chat.is-floating.is-joined.is-bar-hidden {
-    box-shadow: none;
 }
 
 /* Buttons with a little depth: the primary is a black key with a lit top
@@ -1598,31 +1443,6 @@ html.studio-light .s-section-row.is-active {
 
 }
 
-
-/* ------------------------------------------------------------------ */
-/*  Inverse popover — the main menu is black in either chrome theme,   */
-/*  borderless, like the Sites menu                                    */
-/* ------------------------------------------------------------------ */
-
-.s-pop-inverse {
-    --color-overlay: #141417;
-    --color-ink: #f4f4f6;
-    --color-soft: #b9b9c2;
-    --color-faint: #7c7c86;
-    --color-line: rgba(255, 255, 255, 0.1);
-    --color-line-strong: rgba(255, 255, 255, 0.16);
-    --color-wash: rgba(255, 255, 255, 0.08);
-    --color-wash-strong: rgba(255, 255, 255, 0.14);
-    border: 0;
-    /* a hairline keeps black-on-dark from melting into the dark chrome */
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px -8px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-
-html.studio-light .s-pop-inverse {
-    box-shadow: 0 16px 40px -8px rgba(17, 17, 20, 0.35), 0 2px 6px rgba(17, 17, 20, 0.12);
-}
-
-
 /* An inspector field the canvas just selected — a brief, quiet flash so the
    eye finds it without the panel jumping around. */
 @keyframes s-field-flash {
@@ -1635,274 +1455,13 @@ html.studio-light .s-pop-inverse {
     border-radius: 6px;
 }
 
-
 /* ------------------------------------------------------------------ */
-/*  The chat — the Assistant in the rail, or floating over the site     */
+/*  The Assistant column                                               */
 /* ------------------------------------------------------------------ */
 
 @layer components {
 
-    /* With the chat floating, the aside stays mounted as a ghost: nothing
-       of it shows or takes the pointer, but the chat card inside it can be
-       fixed over the site while every other panel stays where it was. */
-    .s-float.is-ghost {
-        visibility: hidden;
-        pointer-events: none;
-        background: transparent;
-        box-shadow: none;
-        animation: none;
-        /* a transformed ancestor would become the fixed card's containing block */
-        transform: none;
-    }
-
-    /* The wrapper around the Assistant, floating: a card over the bottom
-       of the site, centred, never wider than the composer needs. The
-       store sets `bottom` so it clears the dock. */
-    .s-chat-host {
-        position: fixed;
-        left: max(16px, calc(50% - 265px));
-        width: min(530px, calc(100vw - 32px));
-        height: auto !important;
-        max-height: calc(100vh - 32px);
-        z-index: 8;
-        visibility: visible;
-        pointer-events: auto;
-        animation: s-chat-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    @keyframes s-chat-in {
-        from { opacity: 0; transform: translateY(12px) scale(0.985); }
-        to { opacity: 1; transform: none; }
-    }
-
-    /* The card itself: the dock's material, so the two read as one family */
-    .s-chat.is-floating {
-        border-radius: 22px;
-        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        box-shadow:
-            0 0 0 1px var(--color-line),
-            inset 0 1px 0 var(--color-wash),
-            0 24px 60px -24px rgba(0, 0, 0, 0.7),
-            0 6px 18px -8px rgba(0, 0, 0, 0.5);
-        overflow: hidden;
-        transition: opacity 180ms ease;
-    }
-
-    /* While the pick tool is armed the card steps back so the canvas and
-       its banner are unmistakably where the action is */
-    .s-chat.is-floating.is-picking {
-        opacity: 0.55;
-    }
-
-    .s-chat.is-floating.is-picking:hover {
-        opacity: 1;
-    }
-
-    /* --- joined: the toolbar and the composer as one object ------------
-       One shell carries the material and the radius for both, so the outer
-       corner is a single continuous curve instead of two that have to be
-       kept in step. The row and the composer go transparent and sit over
-       it. At rest the row is tucked behind the composer with only
-       --joined-peek of it clearing; pointing at either surface brings it
-       out. Nothing is ever clipped: while the row is down, the composer —
-       which is opaque and above it — is simply in front of it.
-
-       The three boxes are placed from one pass in the chat card's
-       place(), which is the only thing that knows the composer's height. */
-
-    .s-joined {
-        position: fixed;
-        /* The row has to sit between them: over the shell, which would
-           otherwise paint across it, and under the composer, which is what
-           it tucks behind. The chat host is z-8. */
-        z-index: 6;
-        /* It paints and nothing else — the row and the composer over it
-           are what you point at */
-        pointer-events: none;
-        border-radius: var(--joined-radius);
-        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        box-shadow:
-            0 0 0 1px var(--color-line),
-            inset 0 1px 0 var(--color-wash),
-            0 24px 60px -24px rgba(0, 0, 0, 0.7),
-            0 6px 18px -8px rgba(0, 0, 0, 0.5);
-        /* No transition by default. This box tracks the composer, and the
-           composer's height changes on every keystroke that grows the
-           textarea, on a context chip, on the thread folding — animating
-           those would leave the shell visibly lagging behind the thing it
-           is wrapping. A reveal arms the transition for its own 260ms
-           (is-sliding) and nothing else ever animates this box. */
-        transition: none;
-    }
-
-    .s-joined.is-sliding {
-        transition:
-            top 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            box-shadow 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    /* The row out: the unit lifts off the site a little further */
-    .s-joined:has(~ .s-dock.is-joined.is-out) {
-        box-shadow:
-            0 0 0 1px var(--color-line-strong),
-            inset 0 1px 0 var(--color-wash),
-            0 34px 80px -28px rgba(0, 0, 0, 0.78),
-            0 10px 26px -10px rgba(0, 0, 0, 0.55);
-    }
-
-    /* The row, joined: an invisible frame. It paints nothing at all — no
-       surface, no ring, no radius — because the shell paints for it, and
-       anything it drew would show above the shell's top edge while the row
-       is tucked away. Its box is fixed; only its contents ride. */
-    .s-dock.is-joined {
-        z-index: 7;
-        height: var(--joined-bar);
-        padding: 5px 6px 5px 4px;
-        background: none;
-        border-radius: 0;
-        box-shadow: none;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        /* Its box is written, not slid — but ⌘. still fades it */
-        transition: opacity 200ms ease;
-    }
-
-    /* A menu, its flyouts and Publish are children of the row, so they
-       stack wherever it does — and z-7 is under the composer and under an
-       open panel (both live in the z-30 float). While one of them is up the
-       row is out, clear of the composer, so it takes the dock's usual place
-       above everything and what it opened comes with it. */
-    .s-dock.is-joined.is-raised {
-        z-index: 40;
-    }
-
-    /* The reveal. The contents ride up the same 32px the shell's top edge
-       rises, in the same curve, so the row grows upward out from behind
-       the composer rather than appearing in place. Down, they are behind
-       the composer AND transparent: transparent because the tallest of
-       them — Publish, the mode pill — would otherwise poke out above the
-       composer's top edge by the few pixels they sit higher in the row. */
-    .s-dock.is-joined > * {
-        transform: translateY(calc(var(--joined-bar) - var(--joined-peek)));
-        opacity: 0;
-        pointer-events: none;
-        /* Leaving: the contents go before the edge closes over them */
-        transition:
-            transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            opacity 110ms ease;
-    }
-
-    .s-dock.is-joined.is-out > * {
-        transform: none;
-        opacity: 1;
-        pointer-events: auto;
-        /* Arriving: the edge leads, the contents follow it up */
-        transition:
-            transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            opacity 170ms ease 70ms;
-    }
-
-    /* Tucked away, the strip would be bare, which reads as a gap rather
-       than an affordance. A grabber says there is a row behind the
-       composer and that pointing at it brings it out. It rides the row's
-       bottom --joined-peek, which is the part that clears, and widens as
-       it fades so the two never overlap. */
-    .s-dock.is-joined::before {
-        content: '';
-        position: absolute;
-        bottom: 5px;
-        left: 50%;
-        width: 30px;
-        height: 3.5px;
-        translate: -50% 0;
-        border-radius: 999px;
-        background: var(--color-line-strong);
-        transition: opacity 140ms ease, width 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .s-dock.is-joined.is-out::before {
-        opacity: 0;
-        width: 44px;
-    }
-
-    /* Tooltips. Joined at the bottom edge the space above the row is open
-       canvas, so they go there. At the top edge they have nowhere to go —
-       the window's edge is 12px above, and below the row is the composer,
-       which is opaque and stacked over the row — so the row does without
-       them, the way it already does while a popover is open off it. The
-       buttons keep their aria-labels either way. */
-    .s-dock.is-joined.at-bottom .s-dock-btn[data-tip]::after {
-        top: auto;
-        bottom: calc(100% + 10px);
-        left: 50%;
-        translate: -50% 0;
-    }
-
-    .s-dock.is-joined.at-top .s-dock-btn[data-tip]::after {
-        display: none;
-    }
-
-    /* The composer, joined: opaque, so it is what the row tucks behind,
-       and square where it meets the row. The seam is the same hairline
-       the conversation's header uses.
-
-       Square is only right while the whole row is out. Tucked, the seam
-       sits --joined-peek under the shell's top edge, which is inside the
-       shell's --joined-radius corner: the arc is still turning there, and
-       a square composer corner pokes out past it (2px at 14 under 24 —
-       enough to read as a notch). So the composer is clipped to the
-       shell's own outline — its box carried up by however much of the row
-       is showing, same radius — and the unit's silhouette is one curve
-       whatever the two numbers are. The seam's hairline lies inside that
-       outline and ends on the arc with it. The inset moves in the shell's
-       curve and time, so the two edges travel together on a reveal. */
-    .s-chat.is-floating.is-joined {
-        background: var(--color-panel);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        border-radius: 0 0 var(--joined-radius) var(--joined-radius);
-        box-shadow: 0 -1px 0 var(--color-line);
-        clip-path: inset(calc(-1 * var(--joined-peek)) 0 0 0 round var(--joined-radius));
-        transition:
-            opacity 180ms ease,
-            clip-path 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .s-chat.is-floating.is-joined.is-row-out {
-        clip-path: inset(calc(-1 * var(--joined-bar)) 0 0 0 round var(--joined-radius));
-    }
-
-    .s-chat.is-floating.is-joined.is-bar-hidden {
-        border-radius: var(--joined-radius);
-        box-shadow: none;
-        clip-path: none;
-    }
-
-    /* The host is only a frame now — the shell behind it does the drawing,
-       and the card's own entrance would fight the shell's placement */
-    .s-chat-host:has(> .s-chat.is-joined) {
-        animation: none;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .s-joined.is-sliding,
-        .s-dock.is-joined > *,
-        .s-dock.is-joined.is-out > *,
-        .s-dock.is-joined::before,
-        .s-chat.is-floating.is-joined {
-            transition: none;
-        }
-    }
-
-    /* --- the conversation ---------------------------------------------
-       In the rail it fills the panel. Floating, it folds out of the
-       composer: a grid row that grows from nothing, so the card's height
-       animates without measuring anything. */
+    /* --- the conversation --------------------------------------------- */
     .s-chat-thread {
         display: flex;
         min-height: 0;
@@ -1917,21 +1476,6 @@ html.studio-light .s-pop-inverse {
         flex-direction: column;
     }
 
-    .s-chat.is-floating .s-chat-thread {
-        display: grid;
-        flex: none;
-        grid-template-rows: 0fr;
-        transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .s-chat.is-floating.is-open .s-chat-thread {
-        grid-template-rows: 1fr;
-    }
-
-    .s-chat.is-floating .s-chat-thread-inner {
-        overflow: hidden;
-    }
-
     .s-chat-head {
         @apply flex shrink-0 items-center gap-1 border-b border-line px-3;
         height: 44px;
@@ -1939,11 +1483,6 @@ html.studio-light .s-pop-inverse {
 
     .s-chat-log {
         @apply min-h-0 flex-1 overflow-y-auto p-3;
-    }
-
-    .s-chat.is-floating .s-chat-log {
-        max-height: 52vh;
-        padding: 14px 16px;
     }
 
     /* Messages */
@@ -1956,17 +1495,9 @@ html.studio-light .s-pop-inverse {
         color: color-mix(in srgb, var(--color-ink) 90%, transparent);
     }
 
-    .s-chat.is-floating .s-chat-msg-user { margin-left: 15%; }
-    .s-chat.is-floating .s-chat-msg { margin-right: 15%; }
-
     /* --- the folded part: status + composer --------------------------- */
     .s-chat-fold {
         @apply shrink-0 border-t border-line;
-    }
-
-    /* Floating and folded there is nothing above the composer to divide from */
-    .s-chat.is-floating:not(.is-open) .s-chat-fold {
-        border-top-color: transparent;
     }
 
     /* One line of what is happening, or what was last said */
@@ -1997,16 +1528,8 @@ html.studio-light .s-pop-inverse {
         padding: 8px;
     }
 
-    .s-chat.is-floating .s-chat-composer {
-        padding: 10px;
-    }
-
     .s-chat-chips {
         @apply mb-1.5 flex flex-wrap gap-1;
-    }
-
-    .s-chat.is-floating .s-chat-chips {
-        padding: 0 4px;
     }
 
     .s-chat-chip {
@@ -2037,16 +1560,6 @@ html.studio-light .s-pop-inverse {
         border-color: var(--color-line-strong);
     }
 
-    .s-chat.is-floating .s-chat-field {
-        @apply rounded-2xl;
-        background: var(--color-wash-faint);
-    }
-
-    .s-chat.is-floating .s-chat-field:focus-within {
-        background: var(--color-wash);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
-    }
-
     .s-chat-input {
         @apply block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-ink;
         max-height: 168px;
@@ -2061,17 +1574,8 @@ html.studio-light .s-pop-inverse {
         outline: none;
     }
 
-    .s-chat.is-floating .s-chat-input {
-        padding: 12px 14px 4px;
-        font-size: 13.5px;
-    }
-
     .s-chat-tools {
         @apply flex items-center gap-1 px-1.5 pb-1.5;
-    }
-
-    .s-chat.is-floating .s-chat-tools {
-        padding: 2px 8px 8px;
     }
 
     .s-chat-tool {
@@ -2091,11 +1595,6 @@ html.studio-light .s-pop-inverse {
     .s-chat-tool:disabled {
         opacity: 0.4;
         pointer-events: none;
-    }
-
-    /* The composer's pick button keeps its label only where there is room */
-    .s-chat:not(.is-floating) .s-chat-tool-label {
-        display: none;
     }
 
     @media (max-width: 820px) {
@@ -2157,44 +1656,7 @@ html.studio-light .s-pop-inverse {
         text-align: center;
     }
 
-    /* The dock's Assistant button carries a dot while a turn runs */
-    .s-dock-btn.is-busy::before {
-        content: '';
-        position: absolute;
-        top: 6px;
-        right: 6px;
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: var(--color-accent);
-        box-shadow: 0 0 0 2px var(--color-panel);
-        animation: s-chat-busy 1.2s ease-in-out infinite;
-    }
-
-    @keyframes s-chat-busy {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.35; }
-    }
-
-    /* Workspace rows in the main menu: a glyph, a name and a hint */
-    .s-workspace-item {
-        align-items: flex-start;
-        padding-top: 6px;
-        padding-bottom: 6px;
-    }
-
-    .s-workspace-item > svg:first-child {
-        margin-top: 2px;
-    }
-
-    .s-workspace-item.is-active {
-        color: var(--color-ink);
-    }
-
     @media (prefers-reduced-motion: reduce) {
-        .s-chat-host { animation: none; }
-        .s-chat.is-floating .s-chat-thread { transition: none; }
         .s-chat-status-dot.is-live { animation: none; }
-        .s-dock-btn.is-busy::before { animation: none; }
     }
 }

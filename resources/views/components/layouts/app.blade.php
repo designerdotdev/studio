@@ -19,19 +19,15 @@
             if (localStorage.getItem('studio.theme') === 'light') document.documentElement.classList.add('studio-light');
         </script>
         @isset($sidebar)
-            {{-- The editor boots hidden. The dock is placed by script, the
-                 open panel anchors to the dock, and the canvas paints blank
-                 until its document loads — shown as they arrive, they jump.
-                 So until all of it has settled (Alpine up, fonts in, the
-                 canvas loaded, the dock placed against the real font) they
-                 stay invisible, still laid out so they can be measured, and
-                 then fade in together. Inline, so it holds from first paint;
-                 a timeout reveals regardless, so nothing can stay hidden. --}}
+            {{-- The editor boots hidden: the columns are laid out at once
+                 but stay invisible until Alpine is up, the fonts are in and
+                 the canvas document has loaded, then fade in together.
+                 Inline, so it holds from first paint; a timeout reveals
+                 regardless, so nothing can stay hidden. --}}
             <style>
-                html.studio-booting .s-dock,
-                html.studio-booting .s-joined,
-                html.studio-booting .s-float,
-                html.studio-booting .s-scrim,
+                html.studio-booting .s-topbar,
+                html.studio-booting .s-sidebar,
+                html.studio-booting .s-assistant,
                 html.studio-booting .s-stage {
                     visibility: hidden;
                     opacity: 0;
@@ -40,11 +36,10 @@
                     pointer-events: none;
                 }
 
-                html.studio-revealing .s-dock,
-                html.studio-revealing .s-joined,
-                html.studio-revealing .s-stage,
-                html.studio-revealing .s-float,
-                html.studio-revealing .s-scrim {
+                html.studio-revealing .s-topbar,
+                html.studio-revealing .s-sidebar,
+                html.studio-revealing .s-assistant,
+                html.studio-revealing .s-stage {
                     transition: opacity 180ms ease;
                 }
             </style>
@@ -58,7 +53,6 @@
                         step();
                     });
 
-                    // Alpine has rendered the stores and run the dock's first place()
                     const alpine = new Promise((resolve) => {
                         if (window.Alpine?.version) return resolve();
                         document.addEventListener('alpine:initialized', resolve, { once: true });
@@ -90,8 +84,6 @@
                     const reveal = async () => {
                         if (revealed) return;
                         revealed = true;
-                        // Re-place the dock and panel against the loaded font, then
-                        // show them only once that position has been painted
                         window.dispatchEvent(new CustomEvent('studio:reflow'));
                         await frames(2);
                         root.classList.add('studio-revealing');
@@ -132,182 +124,105 @@
             </button>
         </div>
 
-        {{-- The app root. In the editor it is the black frame: the site and
-             a docked panel are rounded containers laid on it, a gutter apart
-             (s-app). A pinned toolbar is part of the frame and takes its
-             edge's gutter as its own size (appInsets), so the rail below is
-             flush and the site is pushed over rather than covered. --}}
-        <div class="flex h-dvh flex-col @isset($sidebar) s-app @endisset" x-data :style="$store.studio?.appInsets || {}">
+        {{-- The app root. In the editor it is the frame: the top bar sits on
+             it, and the sidebar, the site and the Assistant column are laid
+             on it a gutter apart. --}}
+        <div class="flex h-dvh flex-col @isset($sidebar) s-app @endisset" x-data>
             @isset($sidebar)
-                {{-- One row: the docked panel (when the toolbar is pinned)
-                     and the stage. A right rail flips the row so the panel
-                     sits beside it. --}}
-                <div class="s-app-row flex min-h-0 min-w-0 flex-1" :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'">
+                @include('studio::partials.topbar')
 
-                {{-- The floating surface: every panel lives here, one visible
-                     at a time. Anchored to its dock button (popover), centred
-                     (sheet), or — with the toolbar pinned — a real column
-                     beside the site (docked). The popover height is fixed to
-                     what fits so the panels' own scroll regions keep working. --}}
-                <aside
-                    class="s-float"
-                    :class="{
-                        'is-sheet': $store.studio.sidebar && $store.studio.frame === 'sheet',
-                        'is-docked': $store.studio.column,
-                        'is-collapsed': $store.studio.column && !$store.studio.sidebar,
-                        'at-right': $store.studio.column && $store.studio.panelSide === 'right',
-                        'is-ghost': !$store.studio.sidebar && $store.studio.chatFloating,
-                    }"
-                    {{-- An object binding: a string would replace the style
-                         attribute and wipe the display:none x-show sets --}}
-                    :style="$store.studio.column ? { width: ($store.studio.sidebar ? $store.studio.panelWidth : 0) + 'px' } : ($store.studio.frame === 'popover' ? style : {})"
-                    x-data="{
-                        style: {},
-                        place() {
-                            if ($store.studio.frame !== 'popover' || $store.studio.docked) return;
-                            const button = document.querySelector(`#studio-dock [data-panel='${$store.studio.rail}']`);
-                            {{-- Joined, the row is only the top of a taller
-                                 object: anchoring to it would open the
-                                 popover straight onto the composer. The
-                                 shell is what has to be cleared. --}}
-                            const anchor = $store.studio.joined
-                                ? document.getElementById('studio-joined')
-                                : document.getElementById('studio-dock');
-                            if (!button || !anchor) return;
-                            // A floating dock carries its own left/top. Until it
-                            // has them — the frame it is in has just changed, and
-                            // its effect runs after this one — its rect says
-                            // nothing, so stay out of sight rather than anchor to
-                            // the position it is leaving. It re-fires
-                            // studio:dock-moved the moment it lands.
-                            if (!anchor.style.left) { this.style = { visibility: 'hidden' }; return; }
-                            const gap = 12, edgePad = 12;
-                            const W = window.innerWidth, H = window.innerHeight;
-                            const b = button.getBoundingClientRect();
-                            const d = anchor.getBoundingClientRect();
-                            const edge = $store.studio.dock.edge;
-                            let w = $store.studio.floatWidth;
-                            let left, top, maxH;
-                            if (edge === 'bottom' || edge === 'top') {
-                                // Along a horizontal edge the popover takes the
-                                // dock's own width and shares its edges, so the
-                                // two read as one object
-                                w = Math.max(w, Math.round(d.width));
-                                left = d.left + d.width / 2 - w / 2;
-                                maxH = Math.min(H * 0.7, H - d.height - gap - edgePad * 2);
-                                top = edge === 'bottom' ? d.top - gap - maxH : d.bottom + gap;
-                            } else {
-                                maxH = Math.min(H * 0.7, H - edgePad * 2);
-                                top = b.top + b.height / 2 - maxH / 2;
-                                left = edge === 'left' ? d.right + gap : d.left - gap - w;
-                            }
-                            left = Math.round(Math.max(edgePad, Math.min(left, W - w - edgePad)));
-                            top = Math.round(Math.max(edgePad, Math.min(top, H - maxH - edgePad)));
-                            this.style = { left: `${left}px`, top: `${top}px`, width: `${w}px`, height: `${Math.round(maxH)}px` };
-                        },
-                    }"
-                    x-effect="$store.studio.rail; $store.studio.sidebar; $store.studio.dock; $store.studio.mode; $nextTick(() => place())"
-                    @resize.window.debounce.50ms="place()"
-                    @studio:dock-moved.window="place()"
-                    @studio:reflow.window="place()"
-                    {{-- With the chat floating the aside stays mounted as an
-                         invisible ghost (is-ghost): the chat card is one of
-                         its children, fixed over the site --}}
-                    x-show="$store.studio.sidebar || $store.studio.chatFloating || $store.studio.column"
-                    x-cloak
-                    :aria-hidden="!$store.studio.sidebar && !$store.studio.chatFloating"
-                    :inert="!$store.studio.sidebar && !$store.studio.chatFloating"
-                    {{-- The row's width changes under the site: whatever is
-                         placed against the stage (the floating chat) re-places
-                         every frame of the slide, so it glides with the site
-                         instead of jumping when the slide ends --}}
-                    @transitionrun.self="
-                        if ($event.propertyName !== 'width') return;
-                        cancelAnimationFrame($el._slide);
-                        const tick = () => { window.dispatchEvent(new CustomEvent('studio:stage-resized')); $el._slide = requestAnimationFrame(tick); };
-                        tick();
-                    "
-                    @transitionend.self="if ($event.propertyName === 'width') { cancelAnimationFrame($el._slide); window.dispatchEvent(new CustomEvent('studio:reflow')); }"
-                    @transitioncancel.self="if ($event.propertyName === 'width') cancelAnimationFrame($el._slide)"
-                >
-                    {{-- Held at exactly the column's width while it collapses,
-                         so the panel slides out of view rather than reflowing.
-                         Exactly, not at least: a panel with wide content (a
-                         long pick path in the chat) would otherwise grow past
-                         the column and be clipped on its far side --}}
-                    <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden" :style="$store.studio.column ? { width: $store.studio.panelWidth + 'px', minWidth: $store.studio.panelWidth + 'px', maxWidth: $store.studio.panelWidth + 'px' } : {}">
-                        {{ $sidebar }}
-                    </div>
+                <div class="s-app-row flex min-h-0 min-w-0 flex-1">
 
-                    {{-- Docked: a drag seam on the panel's inner edge sets
-                         its width. A shield covers the window while it is
-                         held so the canvas iframe can't swallow the pointer. --}}
-                    <div
-                        x-show="$store.studio.docked"
-                        x-cloak
-                        class="s-panel-seam"
-                        role="separator"
-                        aria-label="Resize the panel"
-                        @mousedown.prevent="
-                            const aside = $el.closest('aside');
-                            const right = $store.studio.panelSide === 'right';
-                            const shield = document.createElement('div');
-                            shield.className = 's-drag-shield is-col-resize';
-                            document.body.appendChild(shield);
-                            const move = (event) => {
-                                const box = aside.getBoundingClientRect();
-                                $store.studio.setPanelWidth(right ? box.right - event.clientX : event.clientX - box.left);
-                            };
-                            const stop = () => {
-                                shield.remove();
-                                document.removeEventListener('mousemove', move);
-                                document.removeEventListener('mouseup', stop);
-                                window.removeEventListener('blur', stop);
-                                document.body.classList.remove('select-none');
-                            };
-                            document.body.classList.add('select-none');
-                            document.addEventListener('mousemove', move);
-                            document.addEventListener('mouseup', stop);
-                            window.addEventListener('blur', stop);
-                        "
-                    ></div>
-                </aside>
+                    {{-- The sidebar: one panel at a time, chosen by the tab
+                         strip. It stays in the row open or shut so collapsing
+                         is one width transition. --}}
+                    <aside
+                        class="s-sidebar"
+                        :class="{ 'is-collapsed': !$store.studio.sidebar, 'is-narrow': $store.studio.panelWidth < 316 }"
+                        :style="{ width: ($store.studio.sidebar ? $store.studio.panelWidth : 0) + 'px' }"
+                        :aria-hidden="!$store.studio.sidebar"
+                        :inert="!$store.studio.sidebar"
+                        @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
+                    >
+                        <div class="s-sidebar-inner" :style="{ width: $store.studio.panelWidth + 'px', minWidth: $store.studio.panelWidth + 'px' }">
+                            {{ $sidebar }}
+                        </div>
 
-                {{-- The site is the screen: the stage fills what is left. --}}
-                <main class="s-stage">
-                    {{ $slot }}
-                </main>
+                        {{-- A drag seam on the inner edge sets the width. A
+                             shield covers the window while it is held so the
+                             canvas iframe can't swallow the pointer. --}}
+                        <div
+                            class="s-panel-seam"
+                            role="separator"
+                            aria-label="Resize the sidebar"
+                            @mousedown.prevent="
+                                const aside = $el.closest('aside');
+                                const shield = document.createElement('div');
+                                shield.className = 's-drag-shield';
+                                document.body.appendChild(shield);
+                                const move = (event) => $store.studio.setPanelWidth(event.clientX - aside.getBoundingClientRect().left);
+                                const stop = () => {
+                                    shield.remove();
+                                    document.removeEventListener('mousemove', move);
+                                    document.removeEventListener('mouseup', stop);
+                                    window.removeEventListener('blur', stop);
+                                    document.body.classList.remove('select-none');
+                                    window.dispatchEvent(new CustomEvent('studio:reflow'));
+                                };
+                                document.body.classList.add('select-none');
+                                document.addEventListener('mousemove', move);
+                                document.addEventListener('mouseup', stop);
+                                window.addEventListener('blur', stop);
+                            "
+                        ></div>
+                    </aside>
 
+                    {{-- The site is the screen: the stage fills what is left --}}
+                    <main class="s-stage">
+                        {{ $slot }}
+                    </main>
+
+                    {{-- The Assistant: a column on the right, developer mode only --}}
+                    @isset($assistant)
+                        <aside
+                            class="s-assistant"
+                            :class="{ 'is-collapsed': !$store.studio.assistantOpen }"
+                            :style="{ width: ($store.studio.assistantOpen ? $store.studio.assistantWidth : 0) + 'px' }"
+                            :aria-hidden="!$store.studio.assistantOpen"
+                            :inert="!$store.studio.assistantOpen"
+                            x-show="$store.studio.chatAvailable || $store.studio.assistantOpen"
+                            @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
+                        >
+                            <div class="s-sidebar-inner" :style="{ width: $store.studio.assistantWidth + 'px', minWidth: $store.studio.assistantWidth + 'px' }">
+                                {{ $assistant }}
+                            </div>
+                            <div
+                                class="s-panel-seam"
+                                role="separator"
+                                aria-label="Resize the Assistant"
+                                @mousedown.prevent="
+                                    const aside = $el.closest('aside');
+                                    const shield = document.createElement('div');
+                                    shield.className = 's-drag-shield';
+                                    document.body.appendChild(shield);
+                                    const move = (event) => $store.studio.setAssistantWidth(aside.getBoundingClientRect().right - event.clientX);
+                                    const stop = () => {
+                                        shield.remove();
+                                        document.removeEventListener('mousemove', move);
+                                        document.removeEventListener('mouseup', stop);
+                                        window.removeEventListener('blur', stop);
+                                        document.body.classList.remove('select-none');
+                                        window.dispatchEvent(new CustomEvent('studio:reflow'));
+                                    };
+                                    document.body.classList.add('select-none');
+                                    document.addEventListener('mousemove', move);
+                                    document.addEventListener('mouseup', stop);
+                                    window.addEventListener('blur', stop);
+                                "
+                            ></div>
+                        </aside>
+                    @endisset
                 </div>
-
-                {{-- Behind a sheet only --}}
-                <div
-                    x-data
-                    x-show="$store.studio.sidebar && $store.studio.frame === 'sheet'"
-                    x-cloak
-                    x-transition.opacity.duration.150ms
-                    class="s-scrim"
-                    @click="$store.studio.closePanel()"
-                ></div>
-
-                {{-- The joined unit's shell. It is the only thing that
-                     carries the material and the radius when the toolbar and
-                     the composer are one object, so the outer corner is a
-                     single continuous curve rather than two that have to be
-                     kept in step. It paints and nothing else: the row and the
-                     composer sit over it and go transparent, and it never
-                     takes a pointer event. Placed by the chat card, which is
-                     the only thing that knows the composer's height. --}}
-                <div
-                    id="studio-joined"
-                    x-data
-                    class="s-joined"
-                    x-show="$store.studio.joined"
-                    x-cloak
-                    aria-hidden="true"
-                ></div>
-
-                @include('studio::partials.dock')
             @else
                 <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
                     {{ $slot }}

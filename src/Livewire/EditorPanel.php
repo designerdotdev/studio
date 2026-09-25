@@ -74,8 +74,28 @@ class EditorPanel extends Component
 
     public ?string $selectedId = null;
 
-    /** Active sidebar tab: sections | page | layout */
+    /**
+     * The panel's view: `sections` (the list, or the inspector when a
+     * section is selected) or `page` (page settings: title, URL, layout,
+     * SEO). `layout` is kept as an alias of `page` — the layout controls
+     * render inside page settings.
+     */
     public string $tab = 'sections';
+
+    /** Page settings, from the page switcher, the Pages panel or ⌘, */
+    #[On('studio:open-page-settings')]
+    public function openPageSettings(): void
+    {
+        $this->selectedId = null;
+        $this->tab = 'page';
+        $this->dispatch('studio:selection-changed', id: null);
+    }
+
+    public function closePageSettings(): void
+    {
+        $this->tab = 'sections';
+        $this->showCreateLayout = false;
+    }
 
     /**
      * The collection row open in a bound repeater's inline editor:
@@ -1539,12 +1559,12 @@ class EditorPanel extends Component
         );
     }
 
-    /** Open the Layout tab with the create form ready (menu → New layout…) */
+    /** Open page settings with the create-layout form ready (menu → New layout…) */
     #[On('studio:new-layout')]
     public function promptNewLayout(): void
     {
         $this->selectedId = null;
-        $this->tab = 'layout';
+        $this->tab = 'page';
         $this->showCreateLayout = true;
         $this->dispatch('studio:selection-changed', id: null);
     }

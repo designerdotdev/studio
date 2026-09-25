@@ -4,15 +4,19 @@
     // Where publishing writes this page (index.blade.php for the home page)
     $pageFile = 'resources/designer/views/pages/' . ($page->slug === $homeSlug ? 'index' : $page->slug) . '.blade.php';
     $totalComponents = $library->flatten(1)->count();
-    // The server-side gate. Code mode needs this AND the user's dev-mode toggle.
+    // The server-side gate. Code mode and the Assistant need this AND the
+    // user's developer-mode switch.
     $devModeAvailable = \Designer\Studio\Support\DevMode::enabled();
+    // The top bar's "open in a new tab": the draft preview, or the live page
+    $openUrl = $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl;
+    $openLabel = $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab';
 @endphp
 
-<x-studio::layouts.app>
+<x-studio::layouts.app :open-url="$openUrl" :open-label="$openLabel">
     <x-slot:title>{{ $page->title }} — Designer Studio</x-slot:title>
 
     {{-- ============================================================ --}}
-    {{-- Topbar                                                        --}}
+    {{-- The store, and the top bar's actions (Publish)               --}}
     {{-- ============================================================ --}}
     <x-slot:actions>
         <script>
@@ -28,7 +32,7 @@
                 'slug' => $p->slug,
                 'path' => $p->slug === $homeSlug ? '' : $p->slug,
             ])->values());
-            // The pinned toolbar's page switcher reads this list
+            // The top bar's page switcher and the palette read this list
             window.__studioPageList = @js($pages->map(fn ($p) => [
                 'slug' => $p->slug,
                 'title' => $p->title,
@@ -38,12 +42,20 @@
             ])->values());
 
             document.addEventListener('alpine:init', () => {
+                const devModeAvailable = @js($devModeAvailable);
+                const clamp = (n, lo, hi, fallback) => (Number.isFinite(n) && n >= lo && n <= hi) ? n : fallback;
+
+                /* The editor's chrome state. One arrangement: a top bar, a
+                   sidebar on the left with one panel showing, the site, and
+                   (developer mode) the Assistant on the right. What is
+                   remembered is which panel, the widths, the mode, the
+                   theme and the developer switch — never where the chrome
+                   sits. */
                 Alpine.store('studio', {
                     device: 'desktop',
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
-                    // A panel is open (the floating surface is showing). On
-                    // for the first run: the Sidebar workspace opens with
-                    // its panel docked beside the site.
+
+                    /* --- the sidebar ------------------------------------- */
                     sidebar: localStorage.getItem('studio.sidebar') !== '0',
                     toggleSidebar() {
                         this.sidebar = !this.sidebar;
@@ -54,38 +66,12 @@
                         this.sidebar = false;
                         localStorage.setItem('studio.sidebar', '0');
                     },
-                    // A floating popover behaves like one: pressing the site
-                    // behind it closes it (the canvas iframe reports its own
-                    // presses as studio:canvas-pointerdown). Nothing covers
-                    // the site to catch the press, so it keeps scrolling.
-                    // Armed, the Assistant's pick tool owns that press — the
-                    // panel stays. A docked column is part of the layout, and
-                    // a sheet already has its scrim. The Sections panel stays
-                    // too: clicking the site is how you pick what it shows.
-                    dismissFloating() {
-                        if (window.Studio?.picking) return;
-                        // The floating chat's conversation folds like a popover
-                        if (this.chatFloating && this.chatOpen) this.setChatOpen(false);
-                        if (!this.sidebar || this.docked || this.frame !== 'popover') return;
-                        if (this.rail === 'sections') return;
-                        this.closePanel();
-                    },
-                    // The rail: which panel the floating surface shows.
-                    rail: (s => ['sections', 'pages', 'content', 'media', 'assistant'].includes(s) && !(s === 'assistant' && !(@js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0')) ? s : (@js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0' ? 'assistant' : 'sections'))(localStorage.getItem('studio.rail')),
+                    // Which panel the sidebar shows
+                    rail: (s => ['sections', 'pages', 'content', 'media'].includes(s) ? s : 'sections')(localStorage.getItem('studio.rail')),
                     setRail(name, force = false) {
-                        // Floating, the chat is not a rail panel: its button
-                        // opens the conversation over the site instead
-                        if (name === 'assistant' && !this.chatAvailable) return;
-                        if (name === 'assistant' && this.chatFloating) {
-                            force ? this.setChatOpen(true) : this.toggleChat();
-                            return;
-                        }
-                        // Every dock button toggles its own panel; a forced
-                        // call (picker, palette, inspector) always opens it.
-                        if (!force && this.rail === name && this.sidebar) {
-                            this.closePanel();
-                            return;
-                        }
+                        if (!['sections', 'pages', 'content', 'media'].includes(name)) return;
+                        // A tab press on the open panel does nothing; a forced
+                        // call (picker, palette, inspector) always opens it
                         this.rail = name;
                         localStorage.setItem('studio.rail', name);
                         if (!this.sidebar) this.toggleSidebar();
@@ -96,347 +82,109 @@
                     openInspector() {
                         this.setRail('sections', true);
                     },
-
-                    /* --- the chat ------------------------------------------
-                       Where the Assistant lives: in the panel, like every
-                       other rail item, or floating — a composer over the
-                       bottom of the site that is always there, with the
-                       conversation opening upward on demand. Floating, it is
-                       independent of the rail, so the inspector and the chat
-                       can be open at the same time. Only where the Assistant
-                       exists at all (the server's dev-mode gate). */
-                    // The Assistant is a developer surface — it runs a coding
-                    // agent against the app — so it exists only in developer
-                    // mode: the server's gate AND the menu's switch. Off, the
-                    // editor is the one a marketing team uses.
-                    get chatAvailable() { return this.developer },
-                    // The preference (on unless turned off: where the
-                    // Assistant exists the first-run arrangement is the
-                    // Composer workspace) and whether it applies right now.
-                    // Leaving developer mode puts the chat away without
-                    // forgetting where it was.
-                    chatFloatPref: localStorage.getItem('studio.chat-float') === '1',
-                    get chatFloating() { return this.chatFloatPref && this.chatAvailable },
-                    chatOpen: localStorage.getItem('studio.chat-open') === '1',
-                    chatBusy: false,   // a turn is streaming
-                    setChatFloating(on) {
-                        if (!this.chatAvailable) return;
-                        on = !!on;
-                        if (on === this.chatFloating) return;
-                        this.chatFloatPref = on;
-                        localStorage.setItem('studio.chat-float', on ? '1' : '0');
-                        if (on) {
-                            // The float takes over from the panel
-                            if (this.sidebar && this.rail === 'assistant') this.closePanel();
+                    // Page settings are a view of the Sections panel (⌘,)
+                    openPageSettings() {
+                        this.setRail('sections', true);
+                        window.Livewire?.dispatch('studio:open-page-settings');
+                    },
+                    // Sections and Pages are lists; Content and Media are
+                    // grids and start wider. Each group remembers its width.
+                    get wide() { return this.rail === 'content' || this.rail === 'media' },
+                    widths_: {
+                        narrow: clamp(parseInt(localStorage.getItem('studio.panel-width'), 10), 240, 520, 320),
+                        wide: clamp(parseInt(localStorage.getItem('studio.panel-width-wide'), 10), 240, 640, 420),
+                    },
+                    get panelWidth() { return this.wide ? this.widths_.wide : this.widths_.narrow },
+                    setPanelWidth(px) {
+                        if (this.wide) {
+                            this.widths_.wide = Math.round(Math.min(640, Math.max(240, px)));
+                            localStorage.setItem('studio.panel-width-wide', String(this.widths_.wide));
                         } else {
-                            this.setChatOpen(false);
+                            this.widths_.narrow = Math.round(Math.min(520, Math.max(240, px)));
+                            localStorage.setItem('studio.panel-width', String(this.widths_.narrow));
                         }
-                        window.dispatchEvent(new CustomEvent('studio:chat', { detail: { floating: on } }));
                     },
-                    setChatOpen(on) {
-                        this.chatOpen = !!on;
-                        localStorage.setItem('studio.chat-open', this.chatOpen ? '1' : '0');
+
+                    /* --- the Assistant ----------------------------------- */
+                    // A developer surface — it runs a coding agent against
+                    // the app — so it exists only in developer mode: the
+                    // server's gate AND the menu's switch.
+                    get chatAvailable() { return this.developer },
+                    assistantPref: localStorage.getItem('studio.assistant') === '1',
+                    get assistantOpen() { return this.assistantPref && this.chatAvailable },
+                    chatBusy: false,   // a turn is streaming
+                    setAssistant(on) {
+                        if (on && !this.chatAvailable) return;
+                        this.assistantPref = !!on;
+                        localStorage.setItem('studio.assistant', on ? '1' : '0');
                     },
-                    toggleChat() { this.setChatOpen(!this.chatOpen) },
-                    // Bring the chat forward wherever it lives, caret in it (⌘J)
+                    toggleAssistant() { this.setAssistant(!this.assistantOpen) },
+                    // Bring the chat forward with the caret in it (⌘J)
                     focusChat() {
                         if (!this.chatAvailable) return;
-                        if (this.chatFloating) this.setChatOpen(true); else this.setRail('assistant', true);
+                        this.setAssistant(true);
                         window.dispatchEvent(new CustomEvent('studio:focus-chat'));
                     },
-                    // The floating card's distance from the bottom edge: it
-                    // never sits on the dock, pinned or floating
-                    get chatBottom() {
-                        if (this.dockHidden) return 16;
-                        if (this.dock.pinned) return this.dock.edge === 'bottom' ? this.barSize + 14 : 16;
-                        return this.dock.edge === 'bottom' ? 46 + 24 : 16;
+                    assistantWidth: clamp(parseInt(localStorage.getItem('studio.assistant-width'), 10), 300, 640, 380),
+                    setAssistantWidth(px) {
+                        this.assistantWidth = Math.round(Math.min(640, Math.max(300, px)));
+                        localStorage.setItem('studio.assistant-width', String(this.assistantWidth));
                     },
 
-                    /* --- joined ---------------------------------------------
-                       The toolbar and the composer as one object: a single
-                       shell with one radius around both, the toolbar tucked
-                       behind the composer with a strip of it showing, rising
-                       out from behind it when you point at either.
-
-                       `chatJoined` is the preference; `joined` is whether it
-                       can apply right now. Everything that would break the
-                       shape — pinning the toolbar, docking the chat, dragging
-                       to a side edge — therefore un-joins on its own and
-                       joins again by itself, and nothing has to clear the
-                       flag. The numbers are the CSS's too (--joined-*). */
-                    chatJoined: @js($devModeAvailable) && localStorage.getItem('studio.chat-joined') !== '0',
-                    joinedBar: 46,    // the row at full height
-                    joinedPeek: 14,   // what clears the composer at rest
-                    // The row's box, computed by the chat card (the only
-                    // thing that knows the composer's height) and consumed
-                    // by the dock's own place(), so one element still has
-                    // exactly one writer. Null whenever it is not joined.
-                    joinedBox: null,
-                    setChatJoined(on) {
-                        if (!this.chatAvailable) return;
-                        this.chatJoined = !!on;
-                        localStorage.setItem('studio.chat-joined', this.chatJoined ? '1' : '0');
-                        window.dispatchEvent(new CustomEvent('studio:reflow'));
-                    },
-                    get joined() {
-                        return this.chatJoined && this.chatAvailable && this.chatFloating
-                            && !this.dock.pinned && this.dockHorizontal;
-                    },
-                    /* Pointer or caret on either surface brings the row
-                       out. The row and the composer butt together, so there
-                       is no dead zone between them: the delay only covers
-                       the instant the pointer spends crossing the seam, and
-                       arriving on the other surface cancels the close
-                       outright. One timer, shared by both. */
-                    joinedPeeked: false,
-                    joinTimer: null,
-                    joinIn() {
-                        clearTimeout(this.joinTimer);
-                        this.joinedPeeked = true;
-                    },
-                    joinOut() {
-                        clearTimeout(this.joinTimer);
-                        this.joinTimer = setTimeout(() => { this.joinedPeeked = false }, 150);
-                    },
-                    menuOpen: false,
-                    publishOpen: false,
-                    /* Joined, the row sits under the composer (it tucks
-                       behind it), which also puts everything it opens — the
-                       menu, its flyouts, Publish — under the composer and
-                       under an open panel. While one of those is up the row
-                       is out, clear of the composer, so it can take the
-                       dock's usual place on top (is-raised). */
-                    get dockPopOpen() { return this.menuOpen || this.publishOpen },
-                    /* The grip can only be grabbed while the row is out, and
-                       the drag then puts a shield over the whole window —
-                       over the row too, which fires its mouseleave. Without
-                       this the row would collapse out from under the very
-                       drag that is carrying it. */
-                    joinedDragging: false,
-                    // Held out while anything is open off the row — a panel
-                    // popover, the menu — or while it is being dragged, any
-                    // of which would otherwise slide away under you.
-                    get joinedOut() {
-                        if (!this.joined || this.dockHidden) return false;
-                        if (this.dockPopOpen || this.joinedDragging) return true;
-                        if (this.sidebar && this.frame === 'popover') return true;
-                        return this.joinedPeeked;
-                    },
-                    // How much of the row clears the composer right now
-                    get joinedShown() {
-                        if (!this.joined) return 0;
-                        if (this.dockHidden) return 0;
-                        return this.joinedOut ? this.joinedBar : this.joinedPeek;
-                    },
-
-                    /* --- workspaces ----------------------------------------
-                       Arrangements of the same chrome, one click each. A
-                       workspace is three answers — where the toolbar is,
-                       where the chat is, whether the panel is docked — and
-                       never the mode or the canvas width. The menu shows
-                       which one you are in (none, when you have moved things
-                       yourself). Listed from the most chat-led to the most
-                       panel-led; the two with `chat` only exist where the
-                       Assistant does.
-
-                       The first-run arrangement is one of these too, and it
-                       comes from the defaults rather than from a call here:
-                       Sidebar — the dock pinned left, the panel open and
-                       docked (the Assistant where it exists, Sections
-                       elsewhere), the chat in the column rather than
-                       floating. */
-                    workspaces: {
-                        composer: { label: 'Composer', hint: 'The toolbar and the chat as one object', edge: 'bottom', pinned: false, chat: true, panel: false },
-                        chat: { label: 'Chat focused', hint: 'Header bar, the chat floating over the site', edge: 'top', pinned: true, chat: true, panel: false },
-                        minimal: { label: 'Minimal', hint: 'A floating toolbar and nothing else', edge: 'bottom', pinned: false, chat: false, panel: false },
-                        classic: { label: 'Classic', hint: 'Header bar with the panel docked beside the site', edge: 'top', pinned: true, chat: false, panel: true },
-                        sidebar: { label: 'Sidebar', hint: 'A rail on the left with the panel beside it', edge: 'left', pinned: true, chat: false, panel: true },
-                    },
-                    applyWorkspace(name) {
-                        const to = this.workspaces[name];
-                        if (!to || (to.chat && !this.chatAvailable)) return;
-                        if (!to.panel && this.sidebar) this.closePanel();
-                        this.setDock(to.edge, 0.5, to.pinned);
-                        this.setChatFloating(to.chat);
-                        // Joining is a preference the other workspaces leave
-                        // alone — pinned or docked it simply cannot apply
-                        if (name === 'composer') this.setChatJoined(true);
-                        if (to.panel) this.setRail('sections', true);
-                        if (this.dockHidden) this.toggleDock();
-                        window.dispatchEvent(new CustomEvent('studio:workspace', { detail: { name } }));
-                    },
-                    // Read back from the real state. An open popover or a
-                    // closed column is a moment, not an arrangement, so the
-                    // panel is not part of the match.
-                    get workspace() {
-                        const { edge, pinned } = this.dock;
-                        if (this.chatFloating) {
-                            if (this.joined) return 'composer';
-                            return pinned && edge === 'top' ? 'chat' : null;
-                        }
-                        if (!pinned) return 'minimal';
-                        return { top: 'classic', left: 'sidebar' }[edge] ?? null;
-                    },
-                    // Which frame the open panel takes: the two data screens
-                    // are sheets, everything else a popover on the dock.
-                    get frame() { return ['content', 'media'].includes(this.rail) ? 'sheet' : 'popover' },
-                    get floatWidth() { return this.rail === 'assistant' ? 380 : 320 },
-
-                    /* --- the dock ----------------------------------------
-                       Where the toolbar sits: which window edge, how far
-                       along it (0..1, the dock's centre — it slides freely),
-                       and whether it is pinned. Floating, it is a pill over
-                       the site; pinned, it is a flush rail on that edge and
-                       the site is pushed over by exactly its size, so nothing
-                       is ever covered. Pinned top or bottom the bar runs the
-                       full width and carries the page switcher and device
-                       widths — that is the "header bar". */
-                    dock: (() => {
-                        try {
-                            const saved = JSON.parse(localStorage.getItem('studio.dock') || 'null');
-                            if (saved && ['bottom', 'left', 'right', 'top'].includes(saved.edge)) {
-                                return {
-                                    edge: saved.edge,
-                                    along: Math.min(1, Math.max(0, Number(saved.along) || 0.5)),
-                                    pinned: saved.pinned === true,
-                                };
-                            }
-                        } catch (e) { /* fall through */ }
-                        // First run: the Sidebar workspace — a rail pinned left
-                        return { edge: 'left', along: 0.5, pinned: true };
-                    })(),
-                    setDock(edge, along = null, pinned = null) {
-                        if (!['bottom', 'left', 'right', 'top'].includes(edge)) return;
-                        this.dock = {
-                            edge,
-                            along: along === null ? 0.5 : Math.min(1, Math.max(0, along)),
-                            pinned: pinned === null ? this.dock.pinned : !!pinned,
-                        };
-                        localStorage.setItem('studio.dock', JSON.stringify(this.dock));
-                        window.dispatchEvent(new CustomEvent('studio:dock', { detail: this.dock }));
-                    },
-                    // Pin to the current edge / let it float again
-                    togglePin() {
-                        this.setDock(this.dock.edge, this.dock.along, !this.dock.pinned);
-                    },
-                    // Pinned bar sizes — the CSS rails are drawn to these
-                    get dockHorizontal() { return this.dock.edge === 'top' || this.dock.edge === 'bottom' },
-                    get barSize() { return this.dockHorizontal ? 48 : 52 },
-                    // The space the pinned rail takes: padding on the app
-                    // root, on the rail's edge only. A hidden dock (⌘.)
-                    // gives the space back.
-                    get appInsets() {
-                        if (!this.dock.pinned || this.dockHidden) return {};
-                        const side = { top: 'paddingTop', bottom: 'paddingBottom', left: 'paddingLeft', right: 'paddingRight' }[this.dock.edge];
-                        return { [side]: this.barSize + 'px' };
-                    },
-                    // A pinned toolbar docks the open panel as a column
-                    // beside it (sheets stay sheets): next to a left or
-                    // right rail, on the left under a top or bottom bar.
-                    // Only while a panel is open: with the chat floating the
-                    // aside stays mounted as a ghost, and a ghost is no column
-                    get docked() { return this.sidebar && this.dock.pinned && this.frame === 'popover' },
-                    // The column's slot: while the toolbar is pinned it stays
-                    // in the row open or shut, so closing the panel collapses
-                    // it to nothing (width, then gone) instead of cutting it
-                    get column() { return this.dock.pinned && this.frame === 'popover' },
-                    get panelSide() { return this.dock.edge === 'right' ? 'right' : 'left' },
-                    panelWidth: (n => (n >= 260 && n <= 560) ? n : 320)(parseInt(localStorage.getItem('studio.panel-width'), 10)),
-                    setPanelWidth(px) {
-                        this.panelWidth = Math.round(Math.min(560, Math.max(260, px)));
-                        localStorage.setItem('studio.panel-width', String(this.panelWidth));
-                    },
-                    dockHidden: localStorage.getItem('studio.dock-hidden') === '1',
-                    toggleDock() {
-                        this.dockHidden = !this.dockHidden;
-                        localStorage.setItem('studio.dock-hidden', this.dockHidden ? '1' : '0');
-                    },
-
-                    /* --- View ------------------------------------------------
-                       Which optional parts of the toolbar are drawn, from the
-                       menu's View submenu. Only these switches live here — the
-                       canvas width, dock position and theme keep their own
-                       state and the submenu just edits it. A key missing from
-                       the saved object takes its default, so a new switch
-                       never needs a migration. */
-                    viewDefaults: { grip: true, pin: true, pages: true, devices: true, nav: false, live: true, tips: true },
-                    view: (() => {
-                        const defaults = { grip: true, pin: true, pages: true, devices: true, nav: false, live: true, tips: true };
-                        try {
-                            const saved = JSON.parse(localStorage.getItem('studio.view') || 'null');
-                            if (saved && typeof saved === 'object') {
-                                return Object.fromEntries(Object.keys(defaults).map((key) => [key, typeof saved[key] === 'boolean' ? saved[key] : defaults[key]]));
-                            }
-                        } catch (e) { /* fall through */ }
-                        return defaults;
-                    })(),
-                    toggleView(key) {
-                        if (!(key in this.viewDefaults)) return;
-                        this.view = { ...this.view, [key]: !this.view[key] };
-                        localStorage.setItem('studio.view', JSON.stringify(this.view));
-                    },
-                    resetView() {
-                        this.view = { ...this.viewDefaults };
-                        localStorage.removeItem('studio.view');
-                    },
-                    get viewCustomized() {
-                        return Object.keys(this.viewDefaults).some((key) => this.view[key] !== this.viewDefaults[key]);
-                    },
                     // Code mode's file tree column (inside the code pane)
                     filesOpen: localStorage.getItem('studio.files') !== '0',
                     toggleFiles() {
                         this.filesOpen = !this.filesOpen;
                         localStorage.setItem('studio.files', this.filesOpen ? '1' : '0');
                     },
-                    // Editor chrome theme: dark by default, 'light' mirrors the Sites builder
+
+                    /* --- appearance -------------------------------------- */
                     theme: document.documentElement.classList.contains('studio-light') ? 'light' : 'dark',
-                    toggleTheme() {
-                        this.theme = this.theme === 'light' ? 'dark' : 'light';
+                    setTheme(name) {
+                        this.theme = name === 'light' ? 'light' : 'dark';
                         localStorage.setItem('studio.theme', this.theme);
                         document.documentElement.classList.toggle('studio-light', this.theme === 'light');
                         // Monaco themes are global and set in JS, not CSS
                         window.StudioMonaco?.syncTheme();
                     },
-                    /* --- developer mode -------------------------------------
-                       One switch, two editors. On: Code mode, the Assistant,
+                    toggleTheme() { this.setTheme(this.theme === 'light' ? 'dark' : 'light') },
+
+                    /* --- developer mode ---------------------------------- */
+                    /* One switch, two editors. On: Code mode, the Assistant,
                        edit-code buttons, source lines on the canvas, field
-                       bindings, collection schemas, a page's raw head HTML.
-                       Off: the editor a marketing team uses — the page, its
-                       fields, pages, content rows, media, Publish — with
-                       nothing that reads as code. `developer` is THE gate for
-                       chrome (the switch, where the server allows one at
-                       all); the canvas mirrors it as html.studio-devmode. */
+                       bindings, collection schemas, layouts, a page's raw
+                       head HTML. Off: the editor a marketing team uses — the
+                       page, its fields, pages, content rows, media, Publish —
+                       with nothing that reads as code. `developer` is THE
+                       gate for chrome (the switch, where the server allows
+                       one at all); the canvas mirrors it as html.studio-devmode. */
+                    devModeAvailable,
                     devMode: localStorage.getItem('studio.devmode') !== '0',
                     get developer() { return this.devModeAvailable && this.devMode },
                     toggleDevMode() {
                         this.devMode = !this.devMode;
                         localStorage.setItem('studio.devmode', this.devMode ? '1' : '0');
-                        // The Assistant goes with it: a panel showing it has
-                        // nothing left to show
-                        if (!this.devMode && this.sidebar && this.rail === 'assistant') this.closePanel();
-                        if (!this.devMode && this.rail === 'assistant') this.rail = 'sections';
                         window.dispatchEvent(new CustomEvent('studio:reflow'));
                         window.dispatchEvent(new CustomEvent('studio:to-iframe', {
                             detail: { type: 'studio:devmode', on: this.devMode },
                         }));
-                        // Code mode is a developer surface — turning dev mode
-                        // off can't leave the canvas hidden behind an editor.
+                        // Code mode is a developer surface — turning the
+                        // switch off can't leave the canvas hidden behind it
                         if (!this.devMode && this.mode === 'code') this.setMode('edit');
                     },
 
-                    /* --- Preview / Edit / Code ------------------------------
-                       Preview is the canvas as the visitor sees it (links
-                       navigate, no overlay); Edit is the selectable canvas;
-                       Code is the file tree + editor, and only exists when the
-                       server gate AND the dev-mode toggle are both on. */
-                    devModeAvailable: @js($devModeAvailable),
+                    /* --- Edit / Preview / Code --------------------------- */
+                    /* Edit is the selectable canvas (the default); Preview is
+                       the canvas as the visitor sees it (links navigate, no
+                       overlay); Code is the file tree + editor, and only
+                       exists when the server gate AND the switch are on. */
                     get codeAvailable() { return this.developer },
                     mode: (() => {
                         const saved = localStorage.getItem('studio.mode');
-                        const codeOk = @js($devModeAvailable) && localStorage.getItem('studio.devmode') !== '0';
+                        const codeOk = devModeAvailable && localStorage.getItem('studio.devmode') !== '0';
                         if (saved === 'edit' || saved === 'preview') return saved;
                         if (saved === 'code' && codeOk) return 'code';
-                        return 'preview';
+                        return 'edit';
                     })(),
                     setMode(name) {
                         if (name === 'code' && !this.codeAvailable) return;
@@ -447,8 +195,8 @@
                         }));
                         window.dispatchEvent(new CustomEvent('studio:mode', { detail: { mode: name } }));
                     },
-                    // Whether the canvas is on screen at all: Code mode hides it
-                    // unless the split is open.
+                    // Whether the canvas is on screen at all: Code mode hides
+                    // it unless the split is open.
                     get canvasVisible() { return this.mode !== 'code' || this.codeSplit },
 
                     // Code mode is full-width by default; the split brings the
@@ -458,33 +206,13 @@
                         this.codeSplit = !this.codeSplit;
                         localStorage.setItem('studio.code-split', this.codeSplit ? '1' : '0');
                     },
-                    codeSize: (n => (n >= 20 && n <= 80) ? n : 50)(parseFloat(localStorage.getItem('studio.code-size'))),
+                    codeSize: clamp(parseFloat(localStorage.getItem('studio.code-size')), 20, 80, 50),
                     setCodeSize(percent) {
                         this.codeSize = Math.min(80, Math.max(20, percent));
                         localStorage.setItem('studio.code-size', String(this.codeSize));
                     },
                 });
             });
-
-            // Position a popover (menu, publish) beside its dock button,
-            // opening away from the dock's edge and clamped to the window.
-            window.StudioDock = {
-                anchor(pop, button, width) {
-                    const edge = Alpine.store('studio').dock.edge;
-                    const b = button.getBoundingClientRect();
-                    const gap = 10, pad = 12;
-                    const W = window.innerWidth, H = window.innerHeight;
-                    const h = pop.offsetHeight || 320;
-                    let left, top;
-                    if (edge === 'bottom') { left = b.left; top = b.top - gap - h; }
-                    else if (edge === 'top') { left = b.left; top = b.bottom + gap; }
-                    else if (edge === 'left') { left = b.right + gap; top = b.top; }
-                    else { left = b.left - gap - width; top = b.top; }
-                    left = Math.max(pad, Math.min(left, W - width - pad));
-                    top = Math.max(pad, Math.min(top, H - h - pad));
-                    return `left:${Math.round(left)}px; top:${Math.round(top)}px; width:${width}px`;
-                },
-            };
 
             window.addEventListener('studio:toast', (event) => {
                 const { message, type, action } = event.detail;
@@ -501,22 +229,6 @@
             });
         </script>
 
-        {{-- This page on the live site, in a new tab --}}
-        <a
-            href="{{ $liveUrl }}"
-            target="_blank"
-            rel="noopener"
-            class="s-dock-btn"
-            x-show="$store.studio.view.live"
-            data-tip="Open the live page"
-            aria-label="Open the live page in a new tab"
-        >
-            <svg class="h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 13.5v5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h5"/>
-                <path d="M14 4h6v6M20 4l-8.5 8.5"/>
-            </svg>
-        </a>
-
         {{-- Publish --}}
         <div class="relative" x-data="{
             open: false,
@@ -524,7 +236,6 @@
             draftMode: @js($draftMode),
             status: @js($publishStatus),
             busy: false,
-            popStyle: '',
 
             copyUrl() {
                 // navigator.clipboard only exists in secure contexts (https/localhost);
@@ -611,23 +322,19 @@
         }"
         @click.outside="open = false"
         @keydown.escape.window="open = false"
-        {{-- Joined, the row stays out — and on top — while this is up --}}
-        x-effect="$store.studio.publishOpen = open"
         @studio:status.window="if ($event.detail.state === 'saved' && status) status.dirty = true"
         @studio:open-publish.window="open = true; refreshStatus()"
         >
             <button
                 @click="open = !open; if (open) refreshStatus()"
-                class="s-dock-publish"
+                class="s-publish"
                 :class="open && 'is-open'"
-                x-data="{ state: 'idle' }"
-                @studio:status.window="state = $event.detail.state"
-                :title="state === 'saving' ? 'Saving…' : state === 'error' ? 'Offline — changes are not being saved' : 'All changes saved'"
                 aria-label="Publish"
+                aria-haspopup="dialog"
+                :aria-expanded="open"
             >
-                <span class="s-dock-status" :class="{ 'is-saving': state === 'saving', 'is-error': state === 'error' }"></span>
-                <span class="s-dock-publish-label">Publish</span>
-                <span x-show="draftMode && status?.dirty" x-cloak x-transition.opacity class="s-dock-dirty"></span>
+                <span class="s-publish-label">Publish</span>
+                <span x-show="draftMode && status?.dirty" x-cloak x-transition.opacity class="s-dirty-pip"></span>
             </button>
 
             <div
@@ -639,9 +346,7 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop fixed z-50 w-80 p-3"
-                :style="popStyle"
-                x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 320) })"
+                class="s-pop absolute right-0 top-full z-50 mt-1.5 w-80 p-3"
             >
                 @if($draftMode)
                     {{-- Unpublished changes --}}
@@ -724,51 +429,16 @@
                 </p>
             </div>
         </div>
-
     </x-slot:actions>
 
     {{-- ============================================================ --}}
-    {{-- Menu — the layout renders it first in the topbar             --}}
+    {{-- Menu — the brand mark in the top bar                          --}}
     {{-- ============================================================ --}}
     <x-slot:menu>
         <div
             class="relative"
             x-data="{
                 open: false,
-                popStyle: '',
-                // The open flyout — 'view' or 'workspace'. One position string
-                // per flyout: a string :style rewrites the attribute, so a
-                // shared one would wipe the display:none x-show wrote on the
-                // other flyout every time this one was placed.
-                sub: null,
-                subStyles: { view: '', workspace: '' },
-                subTimer: null,
-
-                // A submenu flies out beside the menu, on whichever side has
-                // room, its first row level with the row that opened it.
-                placeSub() {
-                    if (!this.sub) return;
-                    const menu = this.$refs.menu.getBoundingClientRect();
-                    const row = this.$refs[this.sub + 'Row'].getBoundingClientRect();
-                    const width = 300, gap = 2, pad = 12;
-                    const h = this.$refs[this.sub].offsetHeight || 420;
-                    let left = menu.right + gap;
-                    if (left + width > window.innerWidth - pad) left = menu.left - gap - width;
-                    left = Math.max(pad, left);
-                    const top = Math.max(pad, Math.min(row.top - 5, window.innerHeight - h - pad));
-                    this.subStyles[this.sub] = `left:${Math.round(left)}px; top:${Math.round(top)}px; width:${width}px`;
-                },
-                showSub(name, delay = 0) {
-                    clearTimeout(this.subTimer);
-                    this.subTimer = setTimeout(() => {
-                        this.sub = name;
-                        this.$nextTick(() => this.placeSub());
-                    }, delay);
-                },
-                hideSub(delay = 0) {
-                    clearTimeout(this.subTimer);
-                    this.subTimer = setTimeout(() => { this.sub = null }, delay);
-                },
 
                 async duplicatePage() {
                     this.open = false;
@@ -791,19 +461,13 @@
                     }
                 },
             }"
-            @click.outside="open = false; sub = null"
-            @keydown.escape.window="if (sub) sub = null; else open = false"
-            {{-- Joined, the row must stay out while the menu is up: the
-                 pointer leaves the row for the flyout, which is a fixed
-                 sibling, and the row would otherwise slide away under it --}}
-            x-effect="if (!open) sub = null; $store.studio.menuOpen = open"
-            @studio:dock-moved.window="if (open) { popStyle = window.StudioDock.anchor($refs.menu, $refs.menu.previousElementSibling, 272); if (sub) $nextTick(() => placeSub()) }"
+            @click.outside="open = false"
+            @keydown.escape.window="open = false"
         >
-            <button @click="open = !open" class="s-dock-btn is-menu s-logo-btn" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu">
-                <svg class="s-logo-btn-logo h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
-                <svg class="s-logo-btn-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+            <button @click="open = !open" class="s-tb-btn s-brand s-tip" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu" aria-haspopup="menu" :aria-expanded="open">
+                <svg class="h-[16px] w-auto" viewBox="0 0 72 75" fill="none" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
             </button>
-        
+
             <div
                 x-show="open"
                 x-cloak
@@ -813,468 +477,142 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop s-pop-inverse fixed z-50 w-[272px]"
-                :style="popStyle"
-                x-ref="menu"
-                x-effect="open; $nextTick(() => { if (open) popStyle = window.StudioDock.anchor($el, $el.previousElementSibling, 272) })"
-                {{-- Pointing at any other row closes an open flyout --}}
-                @mouseover="if ($event.target.closest('.s-menu-item:not([data-sub-row])')) hideSub(120)"
+                class="s-pop absolute left-0 top-full z-50 mt-1.5 w-[268px]"
+                role="menu"
             >
-                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5 -translate-y-0.5">
-                    <svg class="h-[17px] w-auto -translate-y-0.5 text-ink" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 75" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
+                <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2">
+                    <svg class="h-[15px] w-auto text-ink" viewBox="0 0 72 75" fill="none" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"></path></svg>
                     <span class="text-[13px] font-semibold text-ink">Designer Studio</span>
                 </div>
-        
+
                 <div class="s-divider mb-1"></div>
-        
-                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item">
+
+                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-create-page'))" class="s-menu-item" role="menuitem">
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                     New page…
                 </button>
-                <button x-show="$store.studio.developer" @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item">
-                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
-                    New layout…
-                </button>
-                <button @click="duplicatePage()" class="s-menu-item">
+                <button @click="duplicatePage()" class="s-menu-item" role="menuitem">
                     <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
                     Duplicate this page
                 </button>
-        
+                <button @click="open = false; $store.studio.openPageSettings()" class="s-menu-item" role="menuitem">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg>
+                    <span class="flex-1">Page settings…</span>
+                    <span class="s-kbd">⌘,</span>
+                </button>
+                <button x-show="$store.studio.developer" x-cloak @click="open = false; window.Livewire?.dispatch('studio:new-layout')" class="s-menu-item" role="menuitem">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
+                    New layout…
+                </button>
+
                 <div class="s-divider my-1"></div>
-                @if(\Designer\Studio\Support\DevMode::enabled())
-                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item justify-between" role="switch" :aria-checked="$store.studio.devMode" title="On: Code mode, the Assistant, source lines and field bindings. Off: the editor your marketing team uses — content only, nothing that reads as code.">
-                        <span class="flex items-center gap-2.5">
-                            <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
-                            Developer mode
+
+                @if($devModeAvailable)
+                    {{-- One switch, two editors --}}
+                    <button @click="$store.studio.toggleDevMode()" class="s-menu-item !items-start !py-2" role="menuitemcheckbox" :aria-checked="$store.studio.devMode">
+                        <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+                        <span class="flex min-w-0 flex-1 flex-col">
+                            <span class="text-ink">Developer mode</span>
+                            <span class="mt-px text-[11px] leading-snug text-faint" x-text="$store.studio.devMode ? 'Code mode, the Assistant, source lines and bindings are on' : 'Content editing only — nothing that reads as code'"></span>
                         </span>
-                        <span class="s-chip" :class="$store.studio.devMode && '!border-accent/50 !text-accent'" x-text="$store.studio.devMode ? 'On' : 'Off'"></span>
+                        <span class="s-switch mt-0.5" :class="$store.studio.devMode && 'is-on'" aria-hidden="true"></span>
                     </button>
+                    <div class="s-divider my-1"></div>
                 @endif
-                <button @click="$store.studio.toggleTheme()" class="s-menu-item justify-between" title="Switch between the dark and light editor chrome">
+
+                {{-- Appearance --}}
+                <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
                     <span class="flex items-center gap-2.5">
                         <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 2ZM10 15a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 15ZM10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM15.657 5.404a.75.75 0 1 0-1.06-1.06l-1.061 1.06a.75.75 0 0 0 1.06 1.06l1.06-1.06ZM6.464 14.596a.75.75 0 1 0-1.06-1.06l-1.06 1.06a.75.75 0 0 0 1.06 1.06l1.06-1.06ZM18 10a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 18 10ZM5 10a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 5 10ZM14.596 15.657a.75.75 0 0 0 1.06-1.06l-1.06-1.061a.75.75 0 1 0-1.06 1.06l1.06 1.06ZM5.404 6.464a.75.75 0 0 0 1.06-1.06l-1.06-1.06a.75.75 0 1 0-1.061 1.06l1.06 1.06Z"/></svg>
-                        Light mode
+                        Appearance
                     </span>
-                    <span class="s-chip" :class="$store.studio.theme === 'light' && '!border-accent/50 !text-accent'" x-text="$store.studio.theme === 'light' ? 'On' : 'Off'"></span>
-                </button>
-                {{-- View: canvas width, toolbar position and which toolbar
-                     parts are drawn, in a submenu beside this one --}}
-                <button
-                    type="button"
-                    class="s-menu-item justify-between"
-                    :class="sub === 'view' && 'bg-wash !text-ink'"
-                    data-sub-row
-                    x-ref="viewRow"
-                    @mouseenter="showSub('view', 80)"
-                    @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-menu]')) hideSub(250)"
-                    @click="sub === 'view' ? hideSub() : showSub('view')"
-                    @keydown.arrow-right.prevent="showSub('view'); $nextTick(() => $refs.view.querySelector('button')?.focus())"
-                    aria-haspopup="menu"
-                    :aria-expanded="sub === 'view'"
-                >
-                    <span class="flex items-center gap-2.5">
-                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
-                        View
+                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Theme">
+                        @foreach(['dark' => 'Dark', 'light' => 'Light'] as $value => $label)
+                            <button
+                                type="button"
+                                class="flex h-6 cursor-pointer items-center justify-center rounded-md px-2 text-[11.5px] transition-colors duration-150"
+                                :class="$store.studio.theme === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
+                                @click="$store.studio.setTheme('{{ $value }}')"
+                                role="radio"
+                                :aria-checked="$store.studio.theme === '{{ $value }}'"
+                            >{{ $label }}</button>
+                        @endforeach
                     </span>
-                    <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
-                </button>
-                {{-- Workspace: arrangements of the chrome, in a flyout like View --}}
-                <button
-                    type="button"
-                    class="s-menu-item justify-between"
-                    :class="sub === 'workspace' && 'bg-wash !text-ink'"
-                    data-sub-row
-                    x-ref="workspaceRow"
-                    @mouseenter="showSub('workspace', 80)"
-                    @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-menu]')) hideSub(250)"
-                    @click="sub === 'workspace' ? hideSub() : showSub('workspace')"
-                    @keydown.arrow-right.prevent="showSub('workspace'); $nextTick(() => $refs.workspace.querySelector('button')?.focus())"
-                    aria-haspopup="menu"
-                    :aria-expanded="sub === 'workspace'"
-                >
-                    <span class="flex items-center gap-2.5">
-                        @include('studio::partials.activity-bar-glyph', ['position' => 'chat'])
-                        Workspace
-                    </span>
-                    <span class="flex items-center gap-2">
-                        <span class="text-[11px] text-faint" x-text="$store.studio.workspace ? $store.studio.workspaces[$store.studio.workspace].label : 'Custom'"></span>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
-                    </span>
+                </div>
+
+                <div class="s-divider my-1"></div>
+
+                <button @click="open = false; window.dispatchEvent(new CustomEvent('studio:open-shortcuts'))" class="s-menu-item" role="menuitem">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5.25A2.25 2.25 0 0 1 4.25 3h11.5A2.25 2.25 0 0 1 18 5.25v9.5A2.25 2.25 0 0 1 15.75 17H4.25A2.25 2.25 0 0 1 2 14.75v-9.5Zm2.5 1a.75.75 0 0 0 0 1.5h1a.75.75 0 0 0 0-1.5h-1Zm3.5 0a.75.75 0 0 0 0 1.5h1a.75.75 0 0 0 0-1.5H8Zm3.5 0a.75.75 0 0 0 0 1.5h1a.75.75 0 0 0 0-1.5h-1Zm3.5 0a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5H15Zm-9 3.5a.75.75 0 0 0 0 1.5h1a.75.75 0 0 0 0-1.5H6Zm3.5 0a.75.75 0 0 0 0 1.5h1a.75.75 0 0 0 0-1.5h-1Zm3.5 0a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H13Zm-6.5 3.5a.75.75 0 0 0 0 1.5h7a.75.75 0 0 0 0-1.5h-7Z" clip-rule="evenodd"/></svg>
+                    <span class="flex-1">Keyboard shortcuts</span>
+                    <span class="s-kbd">?</span>
                 </button>
                 @if($liveUrl)
-                    <div class="s-divider my-1"></div>
-                    <a href="{{ $liveUrl }}" target="_blank" class="s-menu-item">
+                    <a href="{{ $liveUrl }}" target="_blank" rel="noopener" class="s-menu-item" role="menuitem">
                         <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd"/></svg>
                         View live site
                     </a>
                 @endif
-            </div>
-
-            {{-- The View submenu. A sibling of the menu, not inside it: the
-                 menu's enter transition transforms it, and a transformed
-                 ancestor would anchor this fixed panel to itself. --}}
-            @php
-                $viewSwitches = [
-                    'grip' => ['Drag handle', 'Drag the toolbar to any edge'],
-                    'pin' => ['Pin button', 'Pin the toolbar flush to its edge'],
-                    'nav' => ['Back, Forward & Reload', 'Browser-style buttons in the toolbar'],
-                    'live' => ['Open live page', 'A button that opens this page in a new tab'],
-                    'pages' => ['Page switcher', 'In the pinned top or bottom bar'],
-                    'devices' => ['Canvas width buttons', 'In the pinned top or bottom bar'],
-                    'tips' => ['Tooltips', 'Button labels on hover'],
-                ];
-            @endphp
-            <div
-                x-show="open && sub === 'view'"
-                x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-75"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                class="s-pop s-pop-inverse fixed z-50"
-                :style="subStyles.view"
-                x-ref="view"
-                data-sub-menu
-                role="menu"
-                aria-label="View"
-                @mouseenter="clearTimeout(subTimer)"
-                @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-row]')) hideSub(250)"
-                @keydown.arrow-left.prevent="sub = null; $refs.viewRow.focus()"
-            >
-                <p class="s-microlabel px-2.5 pb-1 pt-2">Canvas</p>
-                <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
-                    <span class="flex items-center gap-2.5">
-                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="1.75" y="2.25" width="12.5" height="11.5" rx="2.25"/><path d="M5.5 13.75v-2.5m5 2.5v-2.5"/></svg>
-                        Width
-                    </span>
-                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Canvas width">
-                        @foreach(['desktop' => 'Desktop (⌥1)', 'tablet' => 'Tablet — 768px (⌥2)', 'mobile' => 'Mobile — 390px (⌥3)'] as $value => $label)
-                            <button
-                                type="button"
-                                class="flex h-6 cursor-pointer items-center justify-center rounded-md px-2 text-[11.5px] transition-colors duration-150"
-                                :class="$store.studio.device === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
-                                @click="$store.studio.device = '{{ $value }}'"
-                                role="radio"
-                                :aria-checked="$store.studio.device === '{{ $value }}'"
-                                title="{{ $label }}"
-                            >{{ ucfirst($value) }}</button>
-                        @endforeach
-                    </span>
-                </div>
-
-                <div class="s-divider my-1"></div>
-
-                <p class="s-microlabel px-2.5 pb-1 pt-1.5">Toolbar</p>
-                {{-- Floating, or pinned to an edge as a rail. Pinned top is the header bar. --}}
-                <div class="flex items-center justify-between gap-2 py-1 pl-2.5 pr-1.5 text-[13px] text-soft">
-                    <span class="flex items-center gap-2.5">
-                        @include('studio::partials.activity-bar-glyph', ['position' => 'bottom'])
-                        Position
-                    </span>
-                    <span class="flex items-center gap-0.5 rounded-lg bg-wash p-0.5" role="radiogroup" aria-label="Toolbar placement">
-                        <button
-                            type="button"
-                            class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
-                            :class="!$store.studio.dock.pinned ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
-                            @click="$store.studio.setDock($store.studio.dock.edge, $store.studio.dock.along, false)"
-                            role="radio"
-                            :aria-checked="!$store.studio.dock.pinned"
-                            title="Floating — a pill you can drag to any edge"
-                            aria-label="Floating"
-                        >
-                            @include('studio::partials.activity-bar-glyph', ['position' => 'floating'])
-                        </button>
-                        @foreach(['left' => 'Pin left — an icon rail', 'top' => 'Pin top — the header bar', 'right' => 'Pin right — an icon rail', 'bottom' => 'Pin bottom — a full-width bar'] as $value => $label)
-                            <button
-                                type="button"
-                                class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
-                                :class="$store.studio.dock.pinned && $store.studio.dock.edge === '{{ $value }}' ? 'bg-wash-strong text-ink' : 'text-faint hover:text-ink'"
-                                @click="$store.studio.setDock('{{ $value }}', 0.5, true)"
-                                role="radio"
-                                :aria-checked="$store.studio.dock.pinned && $store.studio.dock.edge === '{{ $value }}'"
-                                title="{{ $label }}"
-                                aria-label="{{ $label }}"
-                            >
-                                @include('studio::partials.activity-bar-glyph', ['position' => $value])
-                            </button>
-                        @endforeach
-                    </span>
-                </div>
-
-                @if($devModeAvailable)
-                    {{-- Joined: the toolbar and the composer in one shell,
-                         the toolbar tucked behind the composer until you
-                         point at it. It needs the toolbar floating on a
-                         horizontal edge and the chat floating with it, so
-                         the row says which of those is missing rather than
-                         going quiet — the same way the Page switcher and
-                         Canvas width rows say "pinned bar". --}}
-                    <button
-                        type="button"
-                        class="s-menu-item"
-                        x-show="$store.studio.chatAvailable"
-                        role="menuitemcheckbox"
-                        :aria-checked="$store.studio.joined"
-                        @click="$store.studio.setChatJoined(!$store.studio.chatJoined)"
-                        title="Draw the toolbar and the chat composer as one panel, with the toolbar sliding out from behind it on hover"
-                    >
-                        <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                            <svg x-show="$store.studio.chatJoined" class="h-3.5 w-3.5 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
-                        </span>
-                        <span class="min-w-0 flex-1 truncate" :class="$store.studio.joined && 'text-ink'">Join the chat composer</span>
-                        <span
-                            class="shrink-0 text-[10.5px] text-faint"
-                            x-show="$store.studio.chatJoined && !$store.studio.joined"
-                            x-cloak
-                            x-text="!$store.studio.chatFloating ? 'floating chat' : ($store.studio.dock.pinned ? 'unpinned toolbar' : 'top or bottom')"
-                        ></span>
-                    </button>
-                @endif
-
-                <div class="mt-0.5">
-                    @foreach($viewSwitches as $key => [$label, $hint])
-                        <button
-                            type="button"
-                            class="s-menu-item"
-                            role="menuitemcheckbox"
-                            :aria-checked="$store.studio.view.{{ $key }}"
-                            @click="$store.studio.toggleView('{{ $key }}')"
-                            title="{{ $hint }}"
-                        >
-                            <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                                <svg x-show="$store.studio.view.{{ $key }}" class="h-3.5 w-3.5 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
-                            </span>
-                            <span class="min-w-0 flex-1 truncate" :class="$store.studio.view.{{ $key }} && 'text-ink'">{{ $label }}</span>
-                            @if(in_array($key, ['pages', 'devices'], true))
-                                <span class="shrink-0 text-[10.5px] text-faint" x-show="!($store.studio.dock.pinned && $store.studio.dockHorizontal)">pinned bar</span>
-                            @endif
-                        </button>
-                    @endforeach
-                    <button type="button" class="s-menu-item" role="menuitemcheckbox" :aria-checked="!$store.studio.dockHidden" @click="$store.studio.toggleDock()" title="Hide the toolbar; point at its edge to peek it back">
-                        <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                            <svg x-show="!$store.studio.dockHidden" class="h-3.5 w-3.5 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
-                        </span>
-                        <span class="min-w-0 flex-1 truncate" :class="!$store.studio.dockHidden && 'text-ink'">Show toolbar</span>
-                        <span class="s-kbd">⌘.</span>
-                    </button>
-                </div>
-
-                <div x-show="$store.studio.viewCustomized" x-cloak>
-                    <div class="s-divider my-1"></div>
-                    <button type="button" class="s-menu-item" @click="$store.studio.resetView()">
-                        <span class="h-3.5 w-3.5 shrink-0"></span>
-                        Reset toolbar parts
-                    </button>
-                </div>
-            </div>
-
-            {{-- The Workspace flyout: the presets. The check follows the real
-                 state, so moving the toolbar or the chat by hand leaves none
-                 of them checked. --}}
-            <div
-                x-show="open && sub === 'workspace'"
-                x-cloak
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition ease-in duration-75"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                class="s-pop s-pop-inverse fixed z-50"
-                :style="subStyles.workspace"
-                x-ref="workspace"
-                data-sub-menu
-                role="menu"
-                aria-label="Workspace"
-                @mouseenter="clearTimeout(subTimer)"
-                @mouseleave="if (!$event.relatedTarget?.closest?.('[data-sub-row]')) hideSub(250)"
-                @keydown.arrow-left.prevent="sub = null; $refs.workspaceRow.focus()"
-            >
-                <p class="s-microlabel px-2.5 pb-1 pt-2">Workspace</p>
-                @foreach(['composer', 'chat', 'minimal', 'classic', 'sidebar'] as $workspace)
-                    @if($devModeAvailable || ! in_array($workspace, ['composer', 'chat']))
-                        <button
-                            type="button"
-                            class="s-menu-item s-workspace-item"
-                            @if(in_array($workspace, ['composer', 'chat'])) x-show="$store.studio.chatAvailable" @endif
-                            :class="$store.studio.workspace === '{{ $workspace }}' && 'is-active'"
-                            role="menuitemradio"
-                            :aria-checked="$store.studio.workspace === '{{ $workspace }}'"
-                            @click="open = false; $store.studio.applyWorkspace('{{ $workspace }}')"
-                        >
-                            @include('studio::partials.activity-bar-glyph', ['position' => $workspace])
-                            <span class="flex min-w-0 flex-1 flex-col">
-                                <span class="truncate" x-text="$store.studio.workspaces['{{ $workspace }}'].label"></span>
-                                <span class="truncate text-[11px] text-faint" x-text="$store.studio.workspaces['{{ $workspace }}'].hint"></span>
-                            </span>
-                            <svg x-show="$store.studio.workspace === '{{ $workspace }}'" x-cloak class="h-3.5 w-3.5 shrink-0 text-ink" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
-                        </button>
-                    @endif
-                @endforeach
+                <a href="https://designer.dev/docs" target="_blank" rel="noopener" class="s-menu-item" role="menuitem">
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 16.82A7.462 7.462 0 0 1 15 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0 0 18 15.06v-11a.75.75 0 0 0-.546-.721A9.006 9.006 0 0 0 15 3a8.963 8.963 0 0 0-4.25 1.065V16.82ZM9.25 4.065A8.963 8.963 0 0 0 5 3c-.85 0-1.673.118-2.454.339A.75.75 0 0 0 2 4.06v11a.75.75 0 0 0 .954.721A7.506 7.506 0 0 1 5 15.5c1.579 0 3.042.487 4.25 1.32V4.065Z"/></svg>
+                    Documentation
+                </a>
             </div>
         </div>
     </x-slot:menu>
 
     {{-- ============================================================ --}}
-    {{-- Sidebar — one panel per rail item                             --}}
+    {{-- Sidebar — a tab strip and one panel                           --}}
     {{-- ============================================================ --}}
     <x-slot:sidebar>
-        <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'sections'">
+        @php
+            $tabs = [
+                ['sections', 'Sections', '<path d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/>'],
+                ['pages', 'Pages', '<path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>'],
+                ['content', 'Content', '<path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 3.75v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75"/>'],
+                ['media', 'Media', '<path d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/>'],
+            ];
+        @endphp
+        <nav class="s-tabs" x-data aria-label="Sidebar">
+            @foreach($tabs as [$name, $label, $icon])
+                <button
+                    type="button"
+                    class="s-tab"
+                    :class="$store.studio.rail === '{{ $name }}' && 'is-active'"
+                    @click="$store.studio.setRail('{{ $name }}')"
+                    :aria-pressed="$store.studio.rail === '{{ $name }}'"
+                    title="{{ $label }}"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $icon !!}</svg>
+                    <span>{{ $label }}</span>
+                </button>
+            @endforeach
+        </nav>
+
+        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'sections'">
             <livewire:studio::editor-panel :page-slug="$page->slug" />
         </div>
-        @if(\Designer\Studio\Support\DevMode::enabled())
-            {{-- Floating, this wrapper leaves the panel's column and becomes
-                 the card over the site (s-chat-host): one Livewire instance,
-                 two homes. The aside stays in the DOM as a ghost for it. --}}
-            <div
-                x-data="{
-                    style: {},
-                    observer: null,
-                    slideTimer: null,
-
-                    init() {
-                        // Joined, the shell's box is written from this card's
-                        // height, and that height changes without any store
-                        // key moving: a keystroke grows the textarea, a
-                        // context chip appears, the thread folds open. One
-                        // observer catches all of it — no polling, and the
-                        // shell can never be caught lagging behind what it
-                        // is wrapping.
-                        this.observer = new ResizeObserver(() => this.place());
-                        this.observer.observe(this.$el);
-                        // A reveal is the one change allowed to animate the
-                        // shell's box, so it is the only one that arms the
-                        // transition. The re-place itself comes from the
-                        // effect below, which runs after this watcher.
-                        this.$watch('$store.studio.joinedOut', () => {
-                            if (this.$store.studio.joined) this.slide();
-                        });
-                    },
-                    destroy() { this.observer?.disconnect() },
-
-                    // Centred in the stage — not the window — so a docked
-                    // panel beside the site never sits under the card
-                    frame() {
-                        const stage = document.querySelector('main.s-stage');
-                        const r = stage ? stage.getBoundingClientRect() : { left: 0, width: window.innerWidth };
-                        // 530px: the floating toolbar's width, so the two read as one family
-                        const w = Math.round(Math.min(530, Math.max(320, r.width - 32)));
-                        return { w, left: Math.round(r.left + (r.width - w) / 2) };
-                    },
-
-                    place() {
-                        if (!$store.studio.chatFloating) { this.style = {}; return this.joinedReset() }
-                        const { w, left } = this.frame();
-                        if (!$store.studio.joined) {
-                            this.joinedReset();
-                            this.style = { left: left + 'px', width: w + 'px', top: 'auto', bottom: $store.studio.chatBottom + 'px' };
-                            return;
-                        }
-                        this.placeJoined(w, left);
-                    },
-
-                    /* Joined, this card is the whole unit's placer: it is the
-                       only thing that knows the composer's height, and
-                       writing all three boxes from one pass in one frame is
-                       what keeps the shell, the row and the composer from
-                       ever drifting apart by a pixel.
-
-                       The composer is the anchor and never moves. A composer
-                       that slid out from under the pointer on a reveal would
-                       un-hover itself, collapse, re-hover and flicker — so
-                       instead its edge is fixed a whole row's height from the
-                       window's, and the reveal only moves the shell's far
-                       edge and the row's contents. */
-                    placeJoined(w, left) {
-                        const shell = document.getElementById('studio-joined');
-                        const top = $store.studio.dock.edge === 'top';
-                        const bar = $store.studio.dockHidden ? 0 : $store.studio.joinedBar;
-                        const shown = $store.studio.joinedShown;
-                        const gap = 12;
-
-                        this.style = top
-                            ? { left: left + 'px', width: w + 'px', top: (gap + bar) + 'px', bottom: 'auto' }
-                            : { left: left + 'px', width: w + 'px', bottom: gap + 'px' };
-
-                        // The card's own box, now that it has been written
-                        const h = this.$el.offsetHeight;
-                        const cardTop = top ? gap + bar : Math.round(window.innerHeight - gap - h);
-
-                        // The row's box goes through the store rather than
-                        // straight onto the element: the dock binds its own
-                        // style attribute, and writing behind that binding
-                        // would leave it unpositioned the moment joining
-                        // ends and Alpine's diff sees no change to re-apply.
-                        $store.studio.joinedBox = { left, width: w, top: cardTop - bar };
-
-                        // The shell has no style binding of its own, so it
-                        // is written directly — but never through cssText,
-                        // which would wipe the display x-show put there
-                        if (shell) {
-                            shell.style.left = left + 'px';
-                            shell.style.width = w + 'px';
-                            shell.style.top = (cardTop - shown) + 'px';
-                            shell.style.height = (h + shown) + 'px';
-                        }
-                        // The open popover anchors to the unit, not the row
-                        this.$dispatch('studio:dock-moved');
-                    },
-
-                    // Leaving joined mode, hand the shell back. Only the
-                    // properties placeJoined set — cssText would take the
-                    // display x-show wrote with it. The row needs nothing:
-                    // clearing the box makes its own place() take over.
-                    joinedReset() {
-                        $store.studio.joinedBox = null;
-                        const shell = document.getElementById('studio-joined');
-                        if (!shell) return;
-                        for (const prop of ['left', 'width', 'top', 'height']) shell.style[prop] = '';
-                    },
-
-                    /* A reveal is the one thing allowed to animate the
-                       shell's box. It is on for its own 260ms and off again,
-                       so the content-driven resizes that come through the
-                       observer stay instant. */
-                    slide() {
-                        const shell = document.getElementById('studio-joined');
-                        if (!shell) return;
-                        shell.classList.add('is-sliding');
-                        clearTimeout(this.slideTimer);
-                        this.slideTimer = setTimeout(() => shell.classList.remove('is-sliding'), 320);
-                    },
-                }"
-                class="flex h-full min-h-0 flex-col"
-                :class="$store.studio.chatFloating && 's-chat-host'"
-                :style="style"
-                x-effect="$store.studio.chatFloating; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
-                @resize.window.debounce.50ms="place()"
-                @studio:reflow.window="place()"
-                {{-- Every frame while a docked panel slides the site over --}}
-                @studio:stage-resized.window="place()"
-                {{-- Joined, this card is the placer and fires that event
-                     itself — listening to it here would be a loop --}}
-                @studio:dock-moved.window="if (!$store.studio.joined) place()"
-                {{-- Floating, the card steps aside while a sheet is up: the
-                     sheet is centred with a transform, which would capture a
-                     fixed child, and the scrim covers the card anyway --}}
-                x-show="$store.studio.chatFloating ? !($store.studio.sidebar && $store.studio.frame === 'sheet') : $store.studio.rail === 'assistant'"
-                x-cloak
-            >
-                <livewire:studio::assistant-panel :page-slug="$page->slug" />
-            </div>
-        @endif
-        <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'pages'" x-cloak>
+        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'pages'" x-cloak>
             <livewire:studio::pages-panel :page-slug="$page->slug" />
         </div>
-        <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'content'" x-cloak>
+        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'content'" x-cloak>
             <livewire:studio::content-panel />
         </div>
-        <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rail === 'media'" x-cloak>
+        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'media'" x-cloak>
             <livewire:studio::media-panel />
         </div>
     </x-slot:sidebar>
+
+    @if($devModeAvailable)
+        {{-- ======================================================== --}}
+        {{-- The Assistant column (developer mode)                     --}}
+        {{-- ======================================================== --}}
+        <x-slot:assistant>
+            <div class="flex h-full min-h-0 flex-col">
+                <livewire:studio::assistant-panel :page-slug="$page->slug" />
+            </div>
+        </x-slot:assistant>
+    @endif
 
     {{-- ============================================================ --}}
     {{-- Command palette (⌘K)                                          --}}
@@ -1293,57 +631,37 @@
                     { label: 'Add section…', hint: 'Insert', run: () => window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} })) },
                     { label: 'New page…', hint: 'Create', run: () => window.dispatchEvent(new CustomEvent('studio:open-create-page')) },
                     { label: 'New layout…', hint: 'Create', when: studio.developer, run: () => window.Livewire?.dispatch('studio:new-layout') },
-                    { label: 'Preview mode', hint: 'Mode', when: studio.mode !== 'preview', run: () => studio.setMode('preview') },
+                    // One per page, minus the open one
+                    ...(window.__studioPageList || []).filter((p) => !p.current).map((p) => ({
+                        label: 'Go to ' + p.title, hint: p.path,
+                        run: () => { window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(p.slug) },
+                    })),
+                    { label: 'Page settings', hint: 'Page', run: () => studio.openPageSettings() },
                     { label: 'Edit mode', hint: 'Mode', when: studio.mode !== 'edit', run: () => studio.setMode('edit') },
+                    { label: 'Preview mode', hint: 'Mode', when: studio.mode !== 'preview', run: () => studio.setMode('preview') },
                     { label: 'Code mode', hint: 'Mode', when: studio.codeAvailable && studio.mode !== 'code', run: () => studio.setMode('code') },
                     { label: studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleCodeSplit() },
+                    { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
                     @if($draftMode)
                     { label: 'Publish…', hint: 'Site', run: () => window.dispatchEvent(new CustomEvent('studio:open-publish')) },
                     @endif
+                    { label: 'Sections', hint: 'Sidebar', run: () => studio.setRail('sections', true) },
+                    { label: 'Pages', hint: 'Sidebar', run: () => studio.setRail('pages', true) },
+                    { label: 'Content', hint: 'Sidebar', run: () => studio.setRail('content', true) },
+                    { label: 'Media', hint: 'Sidebar', run: () => studio.setRail('media', true) },
+                    { label: studio.sidebar ? 'Hide the sidebar' : 'Show the sidebar', hint: '⌘B', run: () => studio.toggleSidebar() },
+                    { label: studio.assistantOpen ? 'Hide the Assistant' : 'Open the Assistant', hint: '⌘J', when: studio.chatAvailable, run: () => studio.toggleAssistant() },
                     { label: 'Refresh the preview', hint: 'Canvas', run: () => window.dispatchEvent(new CustomEvent('studio:refresh-preview')) },
-                    { label: 'Open in a new tab', hint: 'Canvas', run: () => window.open(@js($draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : ($liveUrl ?? url('/'))), '_blank', 'noopener') },
-                    { label: 'Sections panel', hint: 'Panel', run: () => studio.setRail('sections', true) },
-                    { label: 'Pages panel', hint: 'Panel', run: () => studio.setRail('pages', true) },
-                    { label: 'Content panel', hint: 'Panel', run: () => studio.setRail('content', true) },
-                    { label: 'Media panel', hint: 'Panel', run: () => studio.setRail('media', true) },
+                    { label: 'Open in a new tab', hint: 'Canvas', run: () => window.open(@js($openUrl), '_blank', 'noopener') },
+                    { label: 'View live site', hint: 'Site', run: () => window.open(@js($liveUrl ?? url('/')), '_blank', 'noopener') },
+                    { label: 'Desktop width', hint: '⌥1', when: studio.device !== 'desktop', run: () => studio.device = 'desktop' },
+                    { label: 'Tablet width', hint: '⌥2', when: studio.device !== 'tablet', run: () => studio.device = 'tablet' },
+                    { label: 'Mobile width', hint: '⌥3', when: studio.device !== 'mobile', run: () => studio.device = 'mobile' },
+                    { label: studio.theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance', hint: 'Appearance', run: () => studio.toggleTheme() },
                     @if($devModeAvailable)
-                    { label: 'Assistant panel', hint: 'Panel', when: studio.chatAvailable && !studio.chatFloating, run: () => studio.setRail('assistant', true) },
-                    { label: 'Focus the chat', hint: 'Chat', when: studio.chatAvailable, run: () => studio.focusChat() },
-                    { label: studio.chatFloating ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', when: studio.chatAvailable, run: () => studio.setChatFloating(!studio.chatFloating) },
                     { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Editor', run: () => studio.toggleDevMode() },
                     @endif
-                    // One per workspace, minus the one you are in and the
-                    // chat-led ones where there is no Assistant
-                    ...Object.entries(studio.workspaces).map(([name, to]) => ({
-                        label: 'Workspace: ' + to.label, hint: 'Workspace',
-                        when: studio.workspace !== name && (!to.chat || studio.chatAvailable),
-                        run: () => studio.applyWorkspace(name),
-                    })),
-                    @if($devModeAvailable)
-                    { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
-                    @endif
-                    { label: studio.sidebar ? 'Close the panel' : 'Open the panel', hint: 'Layout', run: () => studio.toggleSidebar() },
-                    { label: studio.dock.pinned ? 'Unpin the toolbar — let it float' : 'Pin the toolbar to its edge', hint: 'Layout', run: () => studio.togglePin() },
-                    { label: 'Toolbar: header bar (pin top)', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'top'), run: () => studio.setDock('top', 0.5, true) },
-                    { label: 'Toolbar: pin left', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'left'), run: () => studio.setDock('left', 0.5, true) },
-                    { label: 'Toolbar: pin right', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'right'), run: () => studio.setDock('right', 0.5, true) },
-                    { label: 'Toolbar: pin bottom', hint: 'Layout', when: !(studio.dock.pinned && studio.dock.edge === 'bottom'), run: () => studio.setDock('bottom', 0.5, true) },
-                    { label: 'Toolbar: floating', hint: 'Layout', when: studio.dock.pinned, run: () => studio.setDock(studio.dock.edge, studio.dock.along, false) },
-                    { label: studio.dockHidden ? 'Show the toolbar' : 'Hide the toolbar', hint: 'Layout', run: () => studio.toggleDock() },
-                    { label: studio.view.nav ? 'Hide Back, Forward & Reload' : 'Show Back, Forward & Reload', hint: 'View', run: () => studio.toggleView('nav') },
-                    { label: studio.view.grip ? 'Hide the drag handle' : 'Show the drag handle', hint: 'View', run: () => studio.toggleView('grip') },
-                    { label: studio.view.pin ? 'Hide the pin button' : 'Show the pin button', hint: 'View', run: () => studio.toggleView('pin') },
-                    { label: studio.view.live ? 'Hide the live-page button' : 'Show the live-page button', hint: 'View', run: () => studio.toggleView('live') },
-                    { label: studio.view.tips ? 'Turn toolbar tooltips off' : 'Turn toolbar tooltips on', hint: 'View', run: () => studio.toggleView('tips') },
-                    { label: 'Go back', hint: 'Navigate', run: () => history.back() },
-                    { label: 'Go forward', hint: 'Navigate', run: () => history.forward() },
-                    { label: 'Preview: desktop', hint: 'Device', run: () => studio.device = 'desktop' },
-                    { label: 'Preview: tablet', hint: 'Device', run: () => studio.device = 'tablet' },
-                    { label: 'Preview: mobile', hint: 'Device', run: () => studio.device = 'mobile' },
-                    { label: studio.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', hint: 'Appearance', run: () => studio.toggleTheme() },
-                    @if($devModeAvailable)
-                    { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Developer', run: () => studio.toggleDevMode() },
-                    @endif
+                    { label: 'Keyboard shortcuts', hint: '?', run: () => window.dispatchEvent(new CustomEvent('studio:open-shortcuts')) },
                 ].filter((command) => command.when !== false);
 
                 @if($devModeAvailable)
@@ -1415,8 +733,8 @@
                     @keydown.up.prevent="move(-1)"
                     @keydown.enter.prevent="choose()"
                     class="min-w-0 flex-1 border-0 bg-transparent text-[13.5px] text-ink placeholder:text-faint focus:outline-none"
-                    placeholder="Search commands…"
-                    aria-label="Search commands"
+                    placeholder="Search pages and commands…"
+                    aria-label="Search pages and commands"
                 >
                 <span class="s-kbd">Esc</span>
             </div>
@@ -1439,6 +757,86 @@
                 <p x-show="!commands.length" x-cloak class="px-2.5 py-6 text-center text-[12.5px] text-faint">
                     No matching command.
                 </p>
+            </div>
+        </div>
+    </div>
+
+    {{-- ============================================================ --}}
+    {{-- Keyboard shortcuts (?)                                        --}}
+    {{-- ============================================================ --}}
+    <div
+        x-data="{ open: false }"
+        @studio:open-shortcuts.window="open = true"
+        @keydown.escape.window="open = false"
+        x-show="open"
+        x-cloak
+        class="fixed inset-0 z-[95] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard shortcuts"
+    >
+        <div class="s-modal-backdrop" x-show="open" x-transition.opacity.duration.150ms @click="open = false"></div>
+
+        <div
+            x-show="open"
+            x-transition:enter="transition ease-out duration-150"
+            x-transition:enter-start="opacity-0 scale-[0.98] translate-y-1"
+            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0 scale-[0.99]"
+            class="s-modal w-[560px] max-w-full p-5"
+        >
+            <div class="flex items-center gap-3">
+                <h2 class="text-[15px] font-semibold text-ink">Keyboard shortcuts</h2>
+                <button @click="open = false" class="s-icon-btn ml-auto" title="Close (Esc)">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+                </button>
+            </div>
+
+            @php
+                $shortcutGroups = [
+                    'Editor' => [
+                        ['Command palette', ['⌘', 'K']],
+                        ['Toggle the sidebar', ['⌘', 'B']],
+                        ['Page settings', ['⌘', ',']],
+                        ['Canvas width: desktop / tablet / mobile', ['⌥', '1–3']],
+                        ['This list', ['?']],
+                    ],
+                    'Selected section' => [
+                        ['Edit its fields', ['E']],
+                        ['Duplicate', ['⌘', 'D']],
+                        ['Move up / down', ['⌘', '↑ ↓']],
+                        ['Delete (undo from the toast)', ['⌫']],
+                        ['Deselect', ['Esc']],
+                    ],
+                ];
+                if ($devModeAvailable) {
+                    $shortcutGroups['Developer mode'] = [
+                        ['Assistant', ['⌘', 'J']],
+                        ['Open a field\'s source line', ['⌥', 'click']],
+                        ['Save the open file (Code mode)', ['⌘', 'S']],
+                    ];
+                }
+            @endphp
+            <div class="mt-4 grid grid-cols-2 gap-x-8 gap-y-5">
+                @foreach($shortcutGroups as $group => $rows)
+                    <div class="{{ $loop->last && $loop->count === 3 ? 'col-span-2' : '' }}">
+                        <p class="s-microlabel">{{ $group }}</p>
+                        <div class="mt-2 space-y-1.5">
+                            @foreach($rows as [$label, $keys])
+                                <div class="flex items-center gap-3 text-[12.5px]">
+                                    <span class="min-w-0 flex-1 truncate text-soft">{{ $label }}</span>
+                                    <span class="flex shrink-0 items-center gap-1">
+                                        @foreach($keys as $key)
+                                            <span class="s-kbd !h-5 !min-w-5 !text-[11px]">{{ $key }}</span>
+                                        @endforeach
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
             </div>
         </div>
     </div>
@@ -1514,7 +912,7 @@
                 @mousedown.prevent="
                     const surface = $el.parentElement;
                     const shield = document.createElement('div');
-                    shield.className = 's-drag-shield is-col-resize';
+                    shield.className = 's-drag-shield';
                     document.body.appendChild(shield);
                     const move = (event) => {
                         const box = surface.getBoundingClientRect();
@@ -1537,11 +935,7 @@
             ></div>
         @endif
 
-        <div
-            class="min-w-0 flex-1 overflow-auto"
-            x-show="$store.studio.canvasVisible"
-            @pointerdown="if ($event.button === 0) $store.studio.dismissFloating()"
-        >
+        <div class="min-w-0 flex-1 overflow-auto" x-show="$store.studio.canvasVisible">
             <div class="flex h-full flex-col">
                 <div
                     class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"

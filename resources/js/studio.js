@@ -108,10 +108,6 @@ const StudioEditor = {
                     window.Alpine?.store('studio')?.openInspector?.();
                     break;
 
-                case 'studio:canvas-pointerdown':
-                    window.Alpine?.store('studio')?.dismissFloating?.();
-                    break;
-
                 case 'studio:deselected':
                     this.selectedId = null;
                     window.Livewire?.dispatch('studio:deselect-section');
@@ -355,17 +351,17 @@ const StudioEditor = {
             return;
         }
 
-        // Cmd/Ctrl+J — the chat, wherever it lives, with the caret in it
+        // Cmd/Ctrl+J — the Assistant column, with the caret in the composer
         if (meta && (key === 'j' || key === 'J')) {
             preventDefault();
             window.Alpine?.store('studio')?.focusChat?.();
             return;
         }
 
-        // Cmd/Ctrl+. — hide or show the dock (the site, and nothing else)
-        if (meta && key === '.') {
+        // Cmd/Ctrl+, — page settings
+        if (meta && key === ',') {
             preventDefault();
-            window.Alpine?.store('studio')?.toggleDock?.();
+            window.Alpine?.store('studio')?.openPageSettings?.();
             return;
         }
 
@@ -388,21 +384,17 @@ const StudioEditor = {
             return;
         }
 
+        // ? — the keyboard shortcuts sheet
+        if (!meta && !alt && key === '?') {
+            preventDefault();
+            window.dispatchEvent(new CustomEvent('studio:open-shortcuts'));
+            return;
+        }
+
         if (key === 'Escape') {
             // The Assistant's pick tool stands down before anything else
             if (window.Studio?.picking) {
                 window.dispatchEvent(new CustomEvent('studio:pick-cancel'));
-                return;
-            }
-            // The floating chat's conversation folds, then an open panel
-            // closes, then the next Escape deselects
-            const studio = window.Alpine?.store('studio');
-            if (studio?.chatFloating && studio.chatOpen) {
-                studio.setChatOpen(false);
-                return;
-            }
-            if (studio?.sidebar) {
-                studio.closePanel();
                 return;
             }
             if (this.selectedId) {
@@ -1096,11 +1088,10 @@ const StudioPreview = {
             localStorage.getItem('studio.devmode') !== '0'
         );
 
-        // Preview is the default, matching the editor window's own fallback.
+        // Edit is the default, matching the editor window's own fallback.
         // Code mode hides the canvas, so as far as this document is concerned
         // it behaves exactly like Edit.
-        const savedMode = localStorage.getItem('studio.mode');
-        this.setMode(savedMode === 'preview' || savedMode === null ? 'preview' : 'edit');
+        this.setMode(localStorage.getItem('studio.mode') === 'preview' ? 'preview' : 'edit');
 
         this.setupContextMenu();
 
