@@ -1593,19 +1593,6 @@ html.studio-light .s-float:not(.is-docked):not(.is-ghost),
     box-shadow: 0 -1px 0 var(--color-line);
 }
 
-.s-chat.is-side {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-
-.s-chat.is-side .s-chat-field {
-    background: #ffffff;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.06);
-    border-color: transparent;
-}
-
-.s-chat.is-side .s-chat-field:focus-within {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 4px color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
 
 .s-chat.is-floating.is-joined.is-bar-hidden {
     box-shadow: none;
@@ -1831,51 +1818,160 @@ html.studio-light .s-pop-inverse {
         to { opacity: 1; transform: none; }
     }
 
-    /* The column: the docked panel's material — a rounded container on
-       the frame's ground, the site's radius, a hairline. Light, it is the
-       white card of the screenshot beside the site. */
+    /* The column: a plain white card beside the site, the site's radius,
+       a hairline and nothing else — no rules between the header, the
+       transcript and the composer. Header buttons are small rings; a
+       user's message is a grey bubble on the right; a reply is plain
+       text; the composer is a white pill with a soft lift, and the
+       transcript fades to white above it. */
     .s-chat.is-side {
         border-radius: var(--studio-radius, 12px);
-        background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line);
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
         overflow: hidden;
     }
 
     .s-chat.is-side .s-chat-head {
-        height: 48px;
-        padding: 0 10px 0 16px;
+        height: 56px;
+        padding: 0 14px 0 20px;
+        gap: 6px;
+        border-bottom: 0;
     }
 
     .s-chat.is-side .s-chat-head .s-microlabel {
         text-transform: none;
         letter-spacing: -0.006em;
-        font-size: 13px;
+        font-size: 13.5px;
         font-weight: 500;
         color: var(--color-ink);
     }
 
+    .s-chat.is-side .s-chat-head .s-icon-btn,
+    .s-chat.is-side .s-chat-head .s-close {
+        width: 32px;
+        height: 32px;
+        margin-left: 0;
+        border-radius: 999px;
+        background: #ffffff;
+        color: var(--color-ink);
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .s-chat.is-side .s-chat-head .s-icon-btn:hover,
+    .s-chat.is-side .s-chat-head .s-close:hover {
+        background: #f6f6f6;
+    }
+
+    .s-chat.is-side .s-chat-head .s-close::before {
+        content: none;
+    }
+
+    .s-chat.is-side .s-chat-head .s-close svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .s-chat.is-side .s-chat-head .s-chat-place {
+        background: transparent;
+        padding: 0;
+        gap: 6px;
+        margin: 0;
+    }
+
+    .s-chat.is-side .s-chat-head .s-chat-place-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        color: var(--color-ink);
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .s-chat.is-side .s-chat-head .s-chat-place-btn:hover {
+        background: #f6f6f6;
+    }
+
+    .s-chat.is-side .s-chat-head .s-chat-place-btn.is-active {
+        background: #303030;
+        color: #ffffff;
+        box-shadow: none;
+    }
+
     .s-chat.is-side .s-chat-log {
         max-height: none;
+        padding: 8px 20px 24px;
+    }
+
+    .s-chat.is-side .s-chat-msg-user {
+        margin-left: 18%;
+        border-radius: 16px;
+        background: #f1f1f1;
+        color: #303030;
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+
+    .s-chat.is-side .s-chat-msg {
+        margin-right: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        padding: 6px 0;
+        font-size: 13px;
+        color: #303030;
+    }
+
+    .s-chat.is-side .s-suggestion {
+        border-radius: 12px;
+        border-color: rgba(0, 0, 0, 0.1);
+        font-size: 12.5px;
+        padding: 10px 14px;
     }
 
     .s-chat.is-side .s-chat-fold {
-        border-top-color: transparent;
+        position: relative;
+        border-top: 0;
+    }
+
+    /* The transcript runs out under a fade into the card's white */
+    .s-chat.is-side .s-chat-fold::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 100%;
+        height: 40px;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #ffffff);
+        pointer-events: none;
+    }
+
+    .s-chat.is-side .s-chat-status {
+        padding: 0 20px 6px;
     }
 
     .s-chat.is-side .s-chat-composer {
-        padding: 6px 12px 12px;
+        padding: 4px 16px 16px;
     }
 
     .s-chat.is-side .s-chat-field {
-        border-radius: 18px;
-        background: var(--color-raised);
-        border-color: var(--color-line);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        border-radius: 20px;
+        background: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
     }
 
     .s-chat.is-side .s-chat-field:focus-within {
-        border-color: var(--color-line-strong);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 4px color-mix(in srgb, var(--color-accent) 10%, transparent);
+    }
+
+    .s-chat.is-side .s-chat-input {
+        padding: 12px 16px 4px;
+        font-size: 13.5px;
+    }
+
+    .s-chat.is-side .s-chat-tools {
+        padding: 2px 10px 10px;
     }
 
     /* Its resize seam: a 6px grab strip on the inner edge, accent while held */
