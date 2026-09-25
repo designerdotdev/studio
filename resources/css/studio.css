@@ -1,2 +1,2200 @@
 @import 'tailwindcss';
 @source '../views';
+
+/* ------------------------------------------------------------------ */
+/*  Design tokens — Designer Studio chrome                             */
+/* ------------------------------------------------------------------ */
+
+@theme {
+    --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* The frame — the black the whole editor sits in. The site and the
+       panels are rounded containers laid on it; a pinned toolbar is part
+       of it. The same in both chrome themes. */
+    --color-frame: #0b0b0b;
+
+    /* Surfaces (dark chrome: neutral near-blacks, no blue cast) */
+    --color-shell: #111111;
+    --color-panel: #1a1a1a;
+    --color-raised: #222222;
+    --color-overlay: #242424;
+
+    /* Hairlines */
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-line-strong: rgba(255, 255, 255, 0.15);
+
+    /* Text */
+    --color-ink: #f3f3f3;
+    --color-soft: #a8a8a8;
+    --color-faint: #6e6e6e;
+
+    /* Accent + status */
+    --color-accent: #4a8cff;
+    --color-accent-hover: #3a7cf2;
+    --color-layout: #a78bfa;
+    --color-block: #2dd4bf;
+    --color-ok: #36c285;
+    --color-warn: #ffb800;
+    --color-danger: #ff6b5b;
+
+    /* Canvas — the site's container, behind a narrow preview */
+    --color-canvas: #151515;
+
+    /* Hover washes — a translucent tint over any surface (flips with the theme) */
+    --color-wash: rgba(255, 255, 255, 0.06);
+    --color-wash-strong: rgba(255, 255, 255, 0.1);
+    --color-wash-faint: rgba(255, 255, 255, 0.025);
+
+    /* Scrollbar thumb */
+    --color-scroll: rgba(255, 255, 255, 0.14);
+    --color-scroll-hover: rgba(255, 255, 255, 0.24);
+}
+
+/* Light chrome — the default. White panels and a soft grey canvas on the
+   black frame: near-black ink, neutral greys, one blue for what is
+   interactive, black for the primary action. */
+html.studio-light {
+    --color-shell: #f1f1f1;
+    --color-panel: #ffffff;
+    --color-raised: #ffffff;
+    --color-overlay: #ffffff;
+    --color-line: rgba(0, 0, 0, 0.08);
+    --color-line-strong: rgba(0, 0, 0, 0.13);
+    --color-ink: #303030;
+    --color-soft: #616161;
+    --color-faint: #8a8a8a;
+    --color-accent: #005bd3;
+    --color-accent-hover: #004299;
+    --color-layout: #8051ff;
+    --color-block: #0f9b8e;
+    --color-ok: #29845a;
+    --color-warn: #b98900;
+    --color-danger: #e51c00;
+    --color-canvas: #f1f1f1;
+    --color-wash: rgba(0, 0, 0, 0.05);
+    --color-wash-strong: rgba(0, 0, 0, 0.08);
+    --color-wash-faint: rgba(0, 0, 0, 0.02);
+    --color-scroll: rgba(0, 0, 0, 0.16);
+    --color-scroll-hover: rgba(0, 0, 0, 0.28);
+    color-scheme: light;
+}
+
+/* The toolbar belongs to the frame, so it is dark in either theme — the
+   floating pill, a pinned bar, and what opens off them. Joined to the
+   composer it is part of that card instead and keeps the theme's own. */
+html.studio-light .s-dock:not(.is-joined),
+html.studio-light .s-dock-peek {
+    --color-shell: #0b0b0b;
+    --color-panel: #141414;
+    --color-raised: #1f1f1f;
+    --color-overlay: #1c1c1c;
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-line-strong: rgba(255, 255, 255, 0.16);
+    --color-ink: #f3f3f3;
+    --color-soft: #b5b5b5;
+    --color-faint: #7a7a7a;
+    --color-accent: #4a8cff;
+    --color-accent-hover: #3a7cf2;
+    --color-ok: #36c285;
+    --color-warn: #ffb800;
+    --color-danger: #ff6b5b;
+    --color-wash: rgba(255, 255, 255, 0.07);
+    --color-wash-strong: rgba(255, 255, 255, 0.12);
+    --color-wash-faint: rgba(255, 255, 255, 0.03);
+    --color-scroll: rgba(255, 255, 255, 0.14);
+    --color-scroll-hover: rgba(255, 255, 255, 0.24);
+    color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                               */
+/* ------------------------------------------------------------------ */
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
+    .studio-app {
+        font-size: 13px;
+        letter-spacing: -0.006em;
+        color: var(--color-ink);
+        background: var(--color-shell);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+
+        /* The joined unit — the toolbar and the composer as one object.
+           Three separate fixed boxes have to agree on these to the pixel,
+           and the store carries the same two numbers (joinedBar,
+           joinedPeek) because it writes the boxes. Keep them in step. */
+        --joined-radius: 24px;
+        --joined-bar: 46px;
+        --joined-peek: 14px;
+    }
+
+    .studio-app ::selection {
+        background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+    }
+
+    /* Slim, quiet scrollbars everywhere in the chrome */
+    .studio-app * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-scroll) transparent;
+    }
+
+    .studio-app *::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .studio-app *::-webkit-scrollbar-thumb {
+        background: var(--color-scroll);
+        border-radius: 99px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    .studio-app *::-webkit-scrollbar-thumb:hover {
+        background: var(--color-scroll-hover);
+        background-clip: content-box;
+    }
+
+    .studio-app *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .studio-app input,
+    .studio-app textarea,
+    .studio-app select,
+    .studio-app button {
+        font: inherit;
+        letter-spacing: inherit;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Chrome components                                                  */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+
+    /* --- buttons --------------------------------------------------- */
+
+    .s-btn,
+    .s-btn-primary,
+    .s-btn-accent,
+    .s-btn-ghost,
+    .s-btn-outline,
+    .s-btn-danger {
+        @apply inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium whitespace-nowrap transition-all duration-150 select-none;
+    }
+
+    .s-btn:active,
+    .s-btn-primary:active,
+    .s-btn-accent:active,
+    .s-btn-ghost:active,
+    .s-btn-outline:active,
+    .s-btn-danger:active {
+        transform: scale(0.98);
+    }
+
+    .s-btn:focus-visible,
+    .s-btn-primary:focus-visible,
+    .s-btn-accent:focus-visible,
+    .s-btn-ghost:focus-visible,
+    .s-btn-outline:focus-visible,
+    .s-btn-danger:focus-visible,
+    .s-input:focus-visible,
+    .s-icon-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    .s-btn:disabled,
+    .s-btn-primary:disabled,
+    .s-btn-accent:disabled,
+    .s-btn-ghost:disabled,
+    .s-btn-outline:disabled,
+    .s-btn-danger:disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .s-btn-primary {
+        @apply bg-ink text-shell;
+    }
+
+    .s-btn-primary:hover {
+        background: color-mix(in srgb, var(--color-ink) 90%, var(--color-shell));
+    }
+
+    .s-btn-accent {
+        @apply bg-accent text-white;
+    }
+
+    .s-btn-accent:hover {
+        background: var(--color-accent-hover);
+    }
+
+    .s-btn-ghost {
+        @apply text-soft;
+    }
+
+    .s-btn-ghost:hover {
+        @apply text-ink bg-wash;
+    }
+
+    .s-btn-outline {
+        @apply border border-line-strong text-ink bg-transparent;
+    }
+
+    .s-btn-outline:hover {
+        @apply bg-wash;
+    }
+
+    .s-btn-danger {
+        @apply text-danger bg-danger/10;
+    }
+
+    .s-btn-danger:hover {
+        background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+    }
+
+    .s-icon-btn {
+        @apply inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-soft transition-colors duration-150;
+    }
+
+    .s-icon-btn:hover {
+        @apply text-ink bg-wash-strong;
+    }
+
+    .s-icon-btn:active {
+        transform: scale(0.94);
+    }
+
+    /* --- form controls --------------------------------------------- */
+
+    .s-label {
+        @apply mb-1.5 block text-xs font-medium text-soft;
+    }
+
+    .s-microlabel {
+        @apply text-[10.5px] font-semibold uppercase tracking-[0.09em] text-faint;
+    }
+
+    .s-input {
+        @apply block h-8 w-full rounded-lg border border-line bg-raised px-2.5 text-[13px] text-ink transition-colors duration-150;
+    }
+
+    .s-input::placeholder {
+        color: var(--color-faint);
+    }
+
+    .s-input:hover {
+        border-color: var(--color-line-strong);
+    }
+
+    .s-input:focus {
+        outline: none;
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
+    }
+
+    textarea.s-input {
+        @apply h-auto py-2 leading-relaxed;
+        resize: vertical;
+        min-height: 64px;
+    }
+
+    select.s-input {
+        @apply appearance-none pr-8 cursor-pointer;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239d9da7'%3E%3Cpath fill-rule='evenodd' d='M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        background-size: 15px;
+    }
+
+    /* --- settings groups (Page tab) --------------------------------- */
+
+    .s-group {
+        @apply overflow-hidden rounded-xl border border-line bg-wash-faint;
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .s-group:hover,
+    .s-group.is-open {
+        border-color: var(--color-line-strong);
+    }
+
+    .s-group.is-open {
+        background: var(--color-wash-faint);
+    }
+
+    .s-group-head {
+        @apply flex w-full cursor-pointer select-none items-center gap-2.5 px-3 py-2.5 text-left;
+    }
+
+    .s-group-icon {
+        @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-soft transition-colors duration-150;
+    }
+
+    .s-group.is-open .s-group-icon {
+        @apply text-ink;
+    }
+
+    .s-group-title {
+        @apply block truncate text-[13px] font-medium text-ink;
+    }
+
+    .s-group-sub {
+        @apply mt-px block truncate text-[11px] text-faint;
+    }
+
+    .s-group-chevron {
+        @apply h-3.5 w-3.5 shrink-0 text-faint;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .s-group.is-open .s-group-chevron {
+        transform: rotate(180deg);
+    }
+
+    .s-group-body {
+        @apply space-y-4 border-t border-line p-3;
+    }
+
+    /* --- popovers / menus ------------------------------------------ */
+
+    .s-pop {
+        @apply rounded-xl border border-line-strong bg-overlay p-1 shadow-2xl;
+        box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.4),
+            0 16px 40px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .s-menu-item {
+        @apply flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-soft transition-colors duration-100;
+    }
+
+    .s-menu-item:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-kbd {
+        @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-line-strong bg-raised px-1 font-mono text-[10px] text-faint;
+    }
+
+    /* --- the stage: the site is the screen ---------------------------- */
+
+    /* The frame: the editor's black ground. Everything on it is a
+       rounded container a gutter apart — the site always, a docked panel
+       beside it. A pinned toolbar's edge swaps the gutter for the bar
+       (appInsets writes that side inline, over this padding). A faint
+       warm glow low on the left keeps the black from reading as a void. */
+    .s-app {
+        --studio-gutter: 5px;
+        --studio-radius: 12px;
+        padding: var(--studio-gutter);
+        background-color: var(--color-frame);
+        background-image: radial-gradient(ellipse 60% 45% at 0% 100%, rgba(149, 191, 71, 0.10), transparent 70%);
+    }
+
+    .s-stage {
+        @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
+        border-radius: var(--studio-radius, 0);
+    }
+
+    /* Behind a sheet: dims the site, click closes */
+    .s-scrim {
+        @apply fixed inset-0 z-20 bg-black/45;
+        backdrop-filter: blur(2px);
+    }
+
+    /* --- the floating surface (holds the Livewire panels) ------------- */
+
+    .s-float {
+        @apply fixed z-30 flex flex-col overflow-hidden bg-panel;
+        border-radius: 14px;
+        box-shadow:
+            0 0 0 1px var(--color-line),
+            0 30px 70px -20px rgba(0, 0, 0, 0.7),
+            0 8px 24px -10px rgba(0, 0, 0, 0.5);
+        animation: s-float-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-float.is-sheet {
+        top: 50%;
+        left: 50%;
+        width: min(1100px, 88vw);
+        height: 80vh;
+        transform: translate(-50%, -50%);
+        border-radius: 16px;
+        animation-name: s-sheet-in;
+    }
+
+    /* A floating panel's close control — the last thing in its top row
+       (partials/float-close). A hairline sets it apart from the row's own
+       actions; the × turns a quarter on hover. */
+    .s-close {
+        @apply relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md text-faint;
+        width: 24px;
+        height: 24px;
+        margin-left: 9px;
+        transition: color 150ms ease, background-color 150ms ease, transform 120ms ease;
+    }
+
+    .s-close::before {
+        content: '';
+        position: absolute;
+        left: -5px;
+        top: 50%;
+        width: 1px;
+        height: 14px;
+        transform: translateY(-50%);
+        background: var(--color-line);
+        pointer-events: none;
+    }
+
+    .s-close svg {
+        width: 14px;
+        height: 14px;
+        transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-close:hover,
+    .s-close:focus-visible {
+        @apply bg-wash-strong text-ink;
+        outline: none;
+    }
+
+    .s-close:hover svg {
+        transform: rotate(90deg);
+    }
+
+    .s-close:active {
+        transform: scale(0.92);
+    }
+
+    @keyframes s-float-in {
+        from { opacity: 0; transform: translateY(6px) scale(0.985); }
+        to { opacity: 1; transform: none; }
+    }
+
+    @keyframes s-sheet-in {
+        from { opacity: 0; transform: translate(-50%, -50%) scale(0.985); }
+        to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+
+    /* --- the dock ----------------------------------------------------- */
+
+    .s-dock {
+        @apply fixed z-40 flex items-center gap-0.5 text-soft;
+        height: 46px;
+        padding: 5px 6px 5px 4px;
+        border-radius: 999px;
+        /* the panel's surface — as dark as the chat and the popovers it opens */
+        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        box-shadow:
+            0 0 0 1px var(--color-line),
+            inset 0 1px 0 var(--color-wash),
+            0 20px 50px -20px rgba(0, 0, 0, 0.7),
+            0 4px 14px -6px rgba(0, 0, 0, 0.5);
+        transition:
+            left 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            top 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            opacity 200ms ease;
+        user-select: none;
+    }
+
+    .s-dock.is-dragging,
+    .s-dock.is-snapping {
+        transition: none;
+    }
+
+    .s-dock.is-vertical {
+        @apply flex-col;
+        height: auto;
+        width: 46px;
+        padding: 4px 5px 6px;
+    }
+
+    /* Hidden: parked in place, invisible, brought back by the hot strip */
+    .s-dock.is-hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .s-dock-peek {
+        @apply fixed z-40;
+    }
+
+    /* Under the dock, over everything else (incl. the canvas iframe) while it is dragged */
+    .s-drag-shield {
+        @apply fixed inset-0;
+        z-index: 39;
+        cursor: grabbing;
+        touch-action: none;
+        user-select: none;
+    }
+
+    .s-dock-grip {
+        @apply flex shrink-0 cursor-grab items-center justify-center rounded-md text-faint;
+        width: 18px;
+        height: 34px;
+        touch-action: none;
+    }
+
+    .s-dock-grip:hover {
+        @apply bg-wash text-soft;
+    }
+
+    .s-dock-grip:active {
+        cursor: grabbing;
+    }
+
+    .is-vertical .s-dock-grip {
+        width: 34px;
+        height: 18px;
+    }
+
+    .is-vertical .s-dock-grip svg {
+        transform: rotate(90deg);
+    }
+
+    .s-dock-btn {
+        @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-full text-soft;
+        width: 34px;
+        height: 34px;
+        transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+
+    .s-dock-btn:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-dock-btn.is-active {
+        @apply bg-wash-strong text-ink;
+    }
+
+    .s-dock-btn:active {
+        transform: scale(0.94);
+    }
+
+    .s-dock-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    .s-dock-btn.is-menu {
+        @apply text-ink;
+    }
+
+    /* Back / Forward / Reload: its buttons sit in the dock's own flex row */
+    .s-dock-nav {
+        display: contents;
+    }
+
+    .s-dock-sep {
+        @apply shrink-0 bg-line;
+        width: 1px;
+        height: 20px;
+        margin: 0 4px;
+    }
+
+    .is-vertical .s-dock-sep {
+        width: 18px;
+        height: 1px;
+        margin: 3px 0;
+    }
+
+    /* Preview / Edit / Code */
+    .s-dock-seg {
+        @apply flex shrink-0 rounded-full bg-wash p-0.5;
+        gap: 1px;
+    }
+
+    .is-vertical .s-dock-seg {
+        @apply flex-col;
+    }
+
+    .s-dock-seg-btn {
+        @apply flex cursor-pointer items-center justify-center rounded-full text-faint;
+        width: 32px;
+        height: 30px;
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .s-dock-seg-btn:hover {
+        @apply text-ink;
+    }
+
+    .s-dock-seg-btn.is-active {
+        background: var(--color-ink);
+        color: var(--color-shell);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    .s-dock-seg-btn.is-active.is-edit {
+        background: color-mix(in srgb, var(--color-ok) 78%, white);
+        color: #0f2a17;
+    }
+
+    .s-dock-seg-btn.is-active.is-code {
+        background: color-mix(in srgb, var(--color-accent) 80%, white);
+        color: #0e1140;
+    }
+
+    /* Publish, carrying the save-status dot */
+    .s-dock-publish {
+        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full font-semibold;
+        height: 32px;
+        padding: 0 12px 0 10px;
+        margin-left: 2px;
+        font-size: 12.5px;
+        background: var(--color-ink);
+        color: var(--color-shell);
+        transition: filter 150ms ease;
+    }
+
+    .s-dock-publish:hover {
+        filter: brightness(1.08);
+    }
+
+    .is-vertical .s-dock-publish {
+        width: 34px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .is-vertical .s-dock-publish .s-dock-publish-label {
+        display: none;
+    }
+
+    .s-dock-status {
+        @apply block shrink-0 rounded-full bg-ok;
+        width: 6px;
+        height: 6px;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ok) 25%, transparent);
+        transition: background-color 300ms ease, box-shadow 300ms ease;
+    }
+
+    .s-dock-status.is-saving {
+        @apply animate-pulse bg-warn;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-warn) 25%, transparent);
+    }
+
+    .s-dock-status.is-error {
+        @apply bg-danger;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 25%, transparent);
+    }
+
+    .s-dock-publish .s-dock-dirty {
+        @apply absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent;
+        box-shadow: 0 0 0 2px var(--color-panel);
+    }
+
+    /* Label tooltips, away from the dock's edge */
+    .s-dock-btn[data-tip]::after {
+        content: attr(data-tip);
+        position: absolute;
+        z-index: 60;
+        padding: 4px 8px;
+        border-radius: 7px;
+        background: var(--color-ink);
+        color: var(--color-shell);
+        font-size: 11.5px;
+        font-weight: 500;
+        line-height: 1.2;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 120ms ease;
+    }
+
+    .s-dock-btn[data-tip]:hover::after {
+        opacity: 1;
+        transition-delay: 450ms;
+    }
+
+    /* No tooltips while a dock popover is open (they would sit on top of
+       it), or when View → Tooltips is off */
+    .s-dock:has(.is-open) .s-dock-btn[data-tip]::after,
+    .s-dock.no-tips .s-dock-btn[data-tip]::after {
+        display: none;
+    }
+
+    .s-dock.at-bottom .s-dock-btn[data-tip]::after { bottom: calc(100% + 10px); left: 50%; translate: -50% 0; }
+    .s-dock.at-top .s-dock-btn[data-tip]::after { top: calc(100% + 10px); left: 50%; translate: -50% 0; }
+    .s-dock.at-left .s-dock-btn[data-tip]::after { left: calc(100% + 10px); top: 50%; translate: 0 -50%; }
+    .s-dock.at-right .s-dock-btn[data-tip]::after { right: calc(100% + 10px); top: 50%; translate: 0 -50%; }
+
+    /* --- pinned: a flush rail on its edge ------------------------------
+       The app root pads by the rail's size (appInsets), so it never covers
+       the site. Top/bottom: a 48px full-width bar. Left/right: a 52px
+       column. The pin button is the switch; dragging keeps the pin. */
+    .s-dock.is-pinned {
+        gap: 2px;
+        border-radius: 0;
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: none;
+        transition: none;
+    }
+
+    .s-dock.is-pinned.at-top,
+    .s-dock.is-pinned.at-bottom {
+        left: 0;
+        right: 0;
+        width: auto;
+        height: 48px;
+        padding: 0 10px 0 8px;
+    }
+
+    .s-dock.is-pinned.at-top {
+        top: 0;
+        bottom: auto;
+    }
+
+    .s-dock.is-pinned.at-bottom {
+        top: auto;
+        bottom: 0;
+    }
+
+    .s-dock.is-pinned.at-left,
+    .s-dock.is-pinned.at-right {
+        top: 0;
+        bottom: 0;
+        width: 52px;
+        height: auto;
+        padding: 8px 0;
+    }
+
+    .s-dock.is-pinned.at-left {
+        left: 0;
+        right: auto;
+    }
+
+    .s-dock.is-pinned.at-right {
+        left: auto;
+        right: 0;
+    }
+
+    /* A pinned rail has nowhere to slide, so its grip only starts a drag */
+    .s-dock.is-pinned .s-dock-grip {
+        opacity: 0.6;
+    }
+
+    .s-dock-pin.is-active svg {
+        fill: currentColor;
+    }
+
+    .s-dock-pin.is-active {
+        color: var(--color-ink);
+    }
+
+    /* Pushes the modes and Publish to the far end of a pinned rail */
+    .s-dock-spacer {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 0;
+    }
+
+    /* The page switcher, centred in a pinned top/bottom bar. Centred with
+       flex, not a transform: its popover is position:fixed, and a
+       transformed ancestor would become that popover's containing block. */
+    .s-dock-page {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+    }
+
+    .s-dock-page > * {
+        pointer-events: auto;
+    }
+
+    .s-dock-page-btn {
+        @apply flex cursor-pointer items-center gap-2 rounded-lg bg-wash;
+        height: 32px;
+        padding: 0 10px 0 11px;
+        max-width: min(360px, 32vw);
+        font-size: 12.5px;
+        transition: background-color 150ms ease;
+    }
+
+    .s-dock-page-btn:hover,
+    .s-dock-page-btn.is-open {
+        @apply bg-wash-strong;
+    }
+
+    .s-dock-page-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    /* --- docked panel: a real column beside a pinned rail ------------- */
+    /* The column beside the site. Dark, it is the frame itself — the
+       panel sits straight on the black and only the site is a card. Light,
+       it is a white container like the site: same radius, a gutter apart.
+
+       It stays in the row open or shut (the store's `column`), so opening
+       and closing are one width + margin transition, the old sidebar's
+       curve. The panel inside is held at the full width and pinned to the
+       column's outer edge, so it slides out under that edge rather than
+       reflowing as the column narrows. */
+    .s-float.is-docked {
+        position: relative;
+        inset: auto;
+        z-index: 10;
+        height: auto;
+        min-height: 0;
+        flex: none;
+        align-items: flex-end;
+        margin-right: var(--studio-gutter, 5px);
+        border-radius: var(--studio-radius, 12px);
+        box-shadow: none;
+        animation: none;
+        transition:
+            width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* The panels fade as they go. Not the column itself: the floating
+       chat is its child too, and an ancestor's opacity would take it
+       along even though it is fixed over the site. */
+    .s-float.is-docked > div:first-child > :not(.s-chat-host) {
+        transition: opacity 220ms ease;
+    }
+
+    .s-float.is-docked.is-collapsed > div:first-child > :not(.s-chat-host) {
+        opacity: 0;
+    }
+
+    .s-float.is-docked.at-right {
+        align-items: flex-start;
+        margin-right: 0;
+        margin-left: var(--studio-gutter, 5px);
+    }
+
+    .s-float.is-docked.is-collapsed {
+        margin-right: 0;
+        margin-left: 0;
+        pointer-events: none;
+    }
+
+    /* Collapsed while the chat floats, the aside is also the chat's ghost —
+       but the ghost's own rules would blank the panel mid-slide */
+    .s-float.is-docked.is-ghost {
+        visibility: visible;
+        background: var(--color-panel);
+    }
+
+    html:not(.studio-light) .s-float.is-docked {
+        background: transparent;
+    }
+
+    /* While the seam is dragged the width follows the pointer, not a curve */
+    body.select-none .s-float.is-docked {
+        transition: none;
+    }
+
+    /* Its resize seam: a 6px grab strip on the inner edge, accent while held */
+    .s-panel-seam {
+        position: absolute;
+        top: 12px;
+        bottom: 12px;
+        right: 0;
+        width: 6px;
+        z-index: 5;
+        cursor: col-resize;
+    }
+
+    .s-panel-seam::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 2px;
+        background: transparent;
+        transition: background-color 150ms ease;
+    }
+
+    .s-panel-seam:hover::after,
+    .s-panel-seam:active::after {
+        background: var(--color-accent);
+    }
+
+    .s-float.is-docked.at-right .s-panel-seam {
+        right: auto;
+        left: 0;
+    }
+
+    .s-float.is-docked.at-right .s-panel-seam::after {
+        right: auto;
+        left: 0;
+    }
+
+    /* --- the Assistant's pick tool, armed ------------------------------
+       A violet pill over the canvas: the next click adds an element to the
+       chat. Violet on purpose — Edit mode's selection is blue, and the two
+       must never read as the same thing. */
+    .s-pick-banner {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        translate: -50% 0;
+        z-index: 35;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 36px;
+        padding: 0 6px 0 13px;
+        border-radius: 999px;
+        background: #17122a;
+        color: #ede9fe;
+        font-size: 12.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        box-shadow:
+            0 0 0 1px rgba(167, 139, 250, 0.55),
+            0 14px 36px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    .s-pick-banner-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #a78bfa;
+        box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.3);
+        animation: s-pick-pulse 1.4s ease-in-out infinite;
+    }
+
+    .s-pick-banner-cancel {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 26px;
+        padding: 0 5px 0 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 120ms ease;
+    }
+
+    .s-pick-banner-cancel:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .s-pick-banner-cancel .s-kbd {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.16);
+        color: #c4b5fd;
+    }
+
+    /* The composer's pick button: a labelled pill, violet while armed */
+    .s-pick-btn {
+        @apply inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 text-soft;
+        height: 28px;
+        font-size: 11.5px;
+        font-weight: 500;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-pick-btn:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-pick-btn.is-on {
+        background: rgba(139, 92, 246, 0.16);
+        color: #c4b5fd;
+        box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.45);
+    }
+
+    html.studio-light .s-pick-btn.is-on {
+        color: #6d28d9;
+    }
+
+    @keyframes s-pick-pulse {
+        0%, 100% { box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.3); }
+        50% { box-shadow: 0 0 0 6px rgba(167, 139, 250, 0.12); }
+    }
+
+    /* Code mode's file tree column, inside the code pane */
+    .s-code-files {
+        @apply flex shrink-0 flex-col border-r border-line bg-panel;
+        width: 260px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-dock { transition: none; }
+        .s-float { animation: none; }
+        .s-pick-banner-dot { animation: none; }
+    }
+
+    /* --- rich text (collections) ------------------------------------- */
+
+    .s-richtext {
+        @apply overflow-hidden rounded-lg border border-line bg-raised;
+    }
+
+    .s-richtext-bar {
+        @apply flex flex-wrap items-center gap-0.5 border-b border-line px-1 py-1;
+    }
+
+    .s-richtext-bar button {
+        @apply flex h-6 min-w-6 cursor-pointer items-center justify-center rounded px-1.5 text-[11px] text-soft transition-colors;
+    }
+
+    .s-richtext-bar button:hover {
+        @apply text-ink bg-wash-strong;
+    }
+
+    .s-richtext-sep {
+        @apply mx-0.5 h-4 w-px bg-line;
+    }
+
+    .s-richtext-body {
+        @apply min-h-40 px-3 py-2 text-[13px] leading-relaxed text-ink outline-none;
+    }
+
+    .s-richtext-body:focus {
+        @apply bg-wash-faint;
+    }
+
+    .s-richtext-body > * + * {
+        margin-top: 0.6em;
+    }
+
+    .s-richtext-body h2 {
+        @apply text-base font-semibold;
+    }
+
+    .s-richtext-body h3 {
+        @apply text-sm font-semibold;
+    }
+
+    .s-richtext-body ul {
+        @apply list-disc pl-5;
+    }
+
+    .s-richtext-body ol {
+        @apply list-decimal pl-5;
+    }
+
+    .s-richtext-body blockquote {
+        @apply border-l-2 border-line-strong pl-3 text-soft;
+    }
+
+    .s-richtext-body a {
+        @apply text-accent underline;
+    }
+
+    .s-richtext-body code {
+        @apply rounded bg-shell px-1 font-mono text-[12px];
+    }
+
+    /* --- media panel ------------------------------------------------- */
+
+    .s-media-tile {
+        @apply relative min-w-0 rounded-lg p-0.5 transition-colors duration-150;
+    }
+
+    .s-media-tile:hover {
+        @apply bg-wash;
+    }
+
+    .s-media-tile.is-pickable button:first-child {
+        @apply cursor-copy ring-2 ring-transparent transition-shadow;
+    }
+
+    .s-media-tile.is-pickable:hover button:first-child {
+        box-shadow: 0 0 0 2px var(--color-accent);
+    }
+
+    .s-media-tile-menu {
+        @apply absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-black/60 text-white/90 opacity-0 transition-opacity duration-100;
+    }
+
+    .s-media-tile:hover .s-media-tile-menu {
+        opacity: 1;
+    }
+
+    /* --- menu button ------------------------------------------------ */
+
+    /* Assistant suggestion — a wrapping outline button */
+    .s-suggestion {
+        @apply w-full cursor-pointer rounded-lg border border-line-strong px-3 py-2 text-left text-[11.5px] leading-snug text-soft transition-colors duration-150;
+        white-space: normal;
+    }
+
+    .s-suggestion:hover {
+        @apply text-ink bg-wash;
+    }
+
+    /* Menu button: brand mark at rest, cross-fades to the hamburger on
+       hover (and stays a hamburger while the menu is open) */
+    .s-logo-btn {
+        position: relative;
+    }
+
+    .s-logo-btn > svg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        translate: -50% -50%;
+        transition: opacity 180ms ease, scale 180ms ease;
+    }
+
+    .s-logo-btn .s-logo-btn-logo {
+        opacity: 0.7;
+    }
+
+    .s-logo-btn .s-logo-btn-menu {
+        opacity: 0;
+        scale: 0.72;
+    }
+
+    /* Menu open (no hover needed): keep the hover state */
+    .s-logo-btn.is-open {
+        @apply text-ink bg-wash;
+    }
+
+    .s-logo-btn:hover .s-logo-btn-logo,
+    .s-logo-btn.is-open .s-logo-btn-logo {
+        opacity: 0;
+        scale: 0.72;
+    }
+
+    .s-logo-btn:hover .s-logo-btn-menu,
+    .s-logo-btn.is-open .s-logo-btn-menu {
+        opacity: 1;
+        scale: 1;
+    }
+
+    .s-seg {
+        @apply flex h-8 items-center gap-0.5 rounded-lg border border-line bg-raised p-0.5;
+    }
+
+    .s-seg-btn {
+        @apply flex h-7 w-7.5 cursor-pointer items-center justify-center rounded-[6px] text-faint transition-all duration-150;
+    }
+
+    .s-seg-btn:hover {
+        color: var(--color-soft);
+    }
+
+    .s-seg-btn.is-active {
+        @apply bg-wash-strong text-ink;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+    }
+
+    /* --- canvas ----------------------------------------------------- */
+
+    /* The dotted surface behind the preview — it fills the canvas edge to
+       edge, so the dots only show beside a narrow (tablet/mobile) preview */
+    .s-canvas {
+        background-color: var(--color-canvas);
+        background-image: radial-gradient(circle, var(--color-wash-strong) 1px, transparent 1px);
+        background-size: 22px 22px;
+    }
+
+    /* Square, flush frame for the preview and Code mode's editor */
+    .s-frame {
+        @apply flex h-full flex-col overflow-hidden;
+    }
+
+    /* A narrow preview gets hairline edges against the dots */
+    .s-frame.is-narrow {
+        @apply border-x border-line;
+    }
+
+    .s-frame iframe {
+        transition: opacity 200ms ease, filter 200ms ease;
+    }
+
+    .s-frame iframe.is-loading {
+        opacity: 0.55;
+        filter: saturate(0.7);
+    }
+
+    /* --- section list (layers) -------------------------------------- */
+
+    .s-section-row {
+        @apply relative flex w-full cursor-pointer items-center gap-2 rounded-lg py-1.5 pr-1 pl-1.5 text-left transition-colors duration-100;
+    }
+
+    .s-section-row:hover {
+        @apply bg-wash;
+    }
+
+    .s-section-row.is-active {
+        @apply bg-accent/14;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent);
+    }
+
+    .s-section-row .row-actions {
+        @apply flex items-center opacity-0 transition-opacity duration-100;
+    }
+
+    .s-section-row:hover .row-actions,
+    .s-section-row.is-active .row-actions {
+        opacity: 1;
+    }
+
+    .s-section-row.is-ghost {
+        opacity: 0.35;
+    }
+
+    .s-section-row.is-chosen {
+        @apply bg-raised;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--color-line-strong);
+    }
+
+    .s-drag-handle {
+        @apply flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-faint opacity-0 transition-opacity duration-100;
+        touch-action: none;
+    }
+
+    .s-section-row:hover .s-drag-handle {
+        opacity: 1;
+    }
+
+    .s-drag-handle:active {
+        cursor: grabbing;
+    }
+
+    /* --- toasts ------------------------------------------------------ */
+
+    #studio-toasts {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2147483000;
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: 8px;
+        pointer-events: none;
+    }
+
+    .studio-toast {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        max-width: 420px;
+        padding: 9px 14px 9px 11px;
+        border-radius: 12px;
+        background: var(--color-overlay);
+        border: 1px solid var(--color-line-strong);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: -0.006em;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 32px -8px rgba(0, 0, 0, 0.65);
+        cursor: pointer;
+        opacity: 0;
+        transform: translateY(8px) scale(0.97);
+        transition: opacity 200ms ease, transform 200ms cubic-bezier(0.21, 1.02, 0.73, 1);
+    }
+
+    .studio-toast.is-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    .studio-toast__action {
+        margin-left: 4px;
+        padding: 3px 10px;
+        border: 1px solid var(--color-line-strong);
+        border-radius: 8px;
+        background: var(--color-wash);
+        color: var(--color-ink);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .studio-toast__action:hover {
+        background: var(--color-wash-strong);
+        border-color: var(--color-line-strong);
+    }
+
+    .studio-toast__icon {
+        display: flex;
+        width: 16px;
+        height: 16px;
+    }
+
+    .studio-toast__icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .studio-toast--success .studio-toast__icon {
+        color: var(--color-ok);
+    }
+
+    .studio-toast--error .studio-toast__icon {
+        color: var(--color-danger);
+    }
+
+    .studio-toast--info .studio-toast__icon {
+        color: var(--color-accent);
+    }
+
+    /* --- modals ------------------------------------------------------ */
+
+    .s-modal-backdrop {
+        @apply fixed inset-0 z-[90] bg-black/70;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+
+    .s-modal {
+        @apply relative z-[95] rounded-2xl border border-line-strong bg-panel;
+        box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.5),
+            0 32px 80px -16px rgba(0, 0, 0, 0.8);
+    }
+
+    /* --- library preview cards --------------------------------------- */
+
+    .s-preview-card {
+        @apply relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left transition-all duration-150;
+    }
+
+    .s-preview-card:hover {
+        border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+        transform: translateY(-1px);
+    }
+
+    .s-preview-card:active {
+        transform: translateY(0) scale(0.995);
+    }
+
+    .s-preview-viewport {
+        @apply pointer-events-none relative w-full overflow-hidden bg-white;
+        aspect-ratio: 16 / 10;
+    }
+
+    .s-preview-viewport iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1200px;
+        height: 750px;
+        border: 0;
+        transform-origin: top left;
+        background: #fff;
+    }
+
+    /* Loading shimmer behind preview iframes */
+    .s-preview-viewport::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(100deg, #f4f4f5 40%, #fafafa 50%, #f4f4f5 60%);
+        background-size: 200% 100%;
+        animation: s-shimmer 1.4s linear infinite;
+    }
+
+    @keyframes s-shimmer {
+        to {
+            background-position: -200% 0;
+        }
+    }
+
+    /* --- misc --------------------------------------------------------- */
+
+    .s-divider {
+        @apply h-px w-full bg-line;
+    }
+
+    .s-chip {
+        @apply inline-flex items-center rounded-md border border-line bg-raised px-1.5 py-0.5 text-[10.5px] font-medium text-soft;
+    }
+
+    .s-status-dot {
+        @apply h-1.5 w-1.5 rounded-full;
+    }
+
+    /* Fade-slide used when swapping panel views */
+    .s-panel-enter {
+        animation: s-panel-in 200ms cubic-bezier(0.21, 1.02, 0.73, 1);
+    }
+
+    @keyframes s-panel-in {
+        from {
+            opacity: 0;
+            transform: translateX(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .s-panel-enter-back {
+        animation: s-panel-in-back 200ms cubic-bezier(0.21, 1.02, 0.73, 1);
+    }
+
+    @keyframes s-panel-in-back {
+        from {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    /* Monaco paints its own theme; the pane bg covers the lazy-load gap */
+    .s-code-pane {
+        background: var(--color-shell);
+    }
+
+    .s-code-pane .monaco-editor {
+        outline: none;
+    }
+
+    /* The accent pip on the Design tree toggle — the same colour that tints
+       design folders in the Laravel tree, so the two read as one idea */
+    .s-tree-dot {
+        @apply h-1.5 w-1.5 shrink-0 rounded-[2px];
+        background: var(--color-accent);
+    }
+
+    /* The drag seam between Code mode's editor and the live preview — a
+       hairline with an 8px grab area, accent-coloured while hovered */
+    .s-code-seam {
+        @apply relative z-10 w-px shrink-0 cursor-col-resize bg-line;
+        transition: background-color 150ms ease;
+    }
+
+    .s-code-seam::before {
+        content: '';
+        position: absolute;
+        inset: 0 -4px;
+    }
+
+    .s-code-seam:hover,
+    .s-code-seam:active {
+        background: var(--color-accent);
+    }
+
+    /* The dock's drag shield, reused while the seam is dragged */
+    .s-drag-shield.is-col-resize {
+        cursor: col-resize;
+    }
+
+    /* Empty-state dashed tile */
+    .s-empty-tile {
+        @apply flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong px-4 py-8 text-center transition-colors duration-150;
+    }
+
+    .s-empty-tile:hover {
+        border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+        background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+    }
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Light chrome adjustments                                           */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+
+html.studio-light .s-pop {
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 12px 32px -8px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Off the dark toolbar a popover is dark too, so it keeps the dark lift */
+html.studio-light .s-dock:not(.is-joined) .s-pop {
+    border-color: var(--color-line-strong);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Floating surfaces over the site — a white card lifts with a soft,
+   neutral shadow rather than the dark theme's deep one */
+html.studio-light .s-float:not(.is-docked):not(.is-ghost),
+html.studio-light .s-chat.is-floating,
+html.studio-light .s-joined {
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.08),
+        0 24px 56px -20px rgba(0, 0, 0, 0.28),
+        0 6px 16px -8px rgba(0, 0, 0, 0.12);
+}
+
+html.studio-light .s-chat.is-floating.is-joined {
+    box-shadow: 0 -1px 0 var(--color-line);
+}
+
+html.studio-light .s-chat.is-floating.is-joined.is-bar-hidden {
+    box-shadow: none;
+}
+
+/* Buttons with a little depth: the primary is a black key with a lit top
+   edge; the outline button a white one with a heavier bottom edge */
+html.studio-light .s-btn-primary {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #303030;
+    color: #ffffff;
+    box-shadow:
+        inset 0 -1px 0 1px rgba(0, 0, 0, 0.8),
+        inset 0 0 0 1px #303030,
+        inset 0 0.5px 0 1.5px rgba(255, 255, 255, 0.22);
+}
+
+html.studio-light .s-btn-primary:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #1a1a1a;
+}
+
+html.studio-light .s-btn-outline {
+    border-color: transparent;
+    background: #ffffff;
+    box-shadow:
+        inset 0 -1px 0 0 #b5b5b5,
+        inset 0 0 0 1px rgba(0, 0, 0, 0.1),
+        inset 0 0.5px 0 1.5px #ffffff;
+}
+
+html.studio-light .s-btn-outline:hover {
+    background: #fafafa;
+}
+
+html.studio-light .s-input {
+    border-color: rgba(0, 0, 0, 0.16);
+}
+
+html.studio-light .s-input:hover {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+/* The selected row is a quiet grey key, not a blue box */
+html.studio-light .s-section-row.is-active {
+    background: rgba(0, 0, 0, 0.07);
+    box-shadow: none;
+}
+
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Inverse popover — the main menu is black in either chrome theme,   */
+/*  borderless, like the Sites menu                                    */
+/* ------------------------------------------------------------------ */
+
+.s-pop-inverse {
+    --color-overlay: #141417;
+    --color-ink: #f4f4f6;
+    --color-soft: #b9b9c2;
+    --color-faint: #7c7c86;
+    --color-line: rgba(255, 255, 255, 0.1);
+    --color-line-strong: rgba(255, 255, 255, 0.16);
+    --color-wash: rgba(255, 255, 255, 0.08);
+    --color-wash-strong: rgba(255, 255, 255, 0.14);
+    border: 0;
+    /* a hairline keeps black-on-dark from melting into the dark chrome */
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px -8px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+html.studio-light .s-pop-inverse {
+    box-shadow: 0 16px 40px -8px rgba(17, 17, 20, 0.35), 0 2px 6px rgba(17, 17, 20, 0.12);
+}
+
+
+/* An inspector field the canvas just selected — a brief, quiet flash so the
+   eye finds it without the panel jumping around. */
+@keyframes s-field-flash {
+    from { background-color: color-mix(in oklab, var(--color-accent) 22%, transparent); }
+    to   { background-color: transparent; }
+}
+
+.s-field-flash {
+    animation: s-field-flash 900ms ease-out;
+    border-radius: 6px;
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  The chat — the Assistant in the rail, or floating over the site     */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+
+    /* With the chat floating, the aside stays mounted as a ghost: nothing
+       of it shows or takes the pointer, but the chat card inside it can be
+       fixed over the site while every other panel stays where it was. */
+    .s-float.is-ghost {
+        visibility: hidden;
+        pointer-events: none;
+        background: transparent;
+        box-shadow: none;
+        animation: none;
+        /* a transformed ancestor would become the fixed card's containing block */
+        transform: none;
+    }
+
+    /* The wrapper around the Assistant, floating: a card over the bottom
+       of the site, centred, never wider than the composer needs. The
+       store sets `bottom` so it clears the dock. */
+    .s-chat-host {
+        position: fixed;
+        left: max(16px, calc(50% - 265px));
+        width: min(530px, calc(100vw - 32px));
+        height: auto !important;
+        max-height: calc(100vh - 32px);
+        z-index: 8;
+        visibility: visible;
+        pointer-events: auto;
+        animation: s-chat-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @keyframes s-chat-in {
+        from { opacity: 0; transform: translateY(12px) scale(0.985); }
+        to { opacity: 1; transform: none; }
+    }
+
+    /* The card itself: the dock's material, so the two read as one family */
+    .s-chat.is-floating {
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow:
+            0 0 0 1px var(--color-line),
+            inset 0 1px 0 var(--color-wash),
+            0 24px 60px -24px rgba(0, 0, 0, 0.7),
+            0 6px 18px -8px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        transition: opacity 180ms ease;
+    }
+
+    /* While the pick tool is armed the card steps back so the canvas and
+       its banner are unmistakably where the action is */
+    .s-chat.is-floating.is-picking {
+        opacity: 0.55;
+    }
+
+    .s-chat.is-floating.is-picking:hover {
+        opacity: 1;
+    }
+
+    /* --- joined: the toolbar and the composer as one object ------------
+       One shell carries the material and the radius for both, so the outer
+       corner is a single continuous curve instead of two that have to be
+       kept in step. The row and the composer go transparent and sit over
+       it. At rest the row is tucked behind the composer with only
+       --joined-peek of it clearing; pointing at either surface brings it
+       out. Nothing is ever clipped: while the row is down, the composer —
+       which is opaque and above it — is simply in front of it.
+
+       The three boxes are placed from one pass in the chat card's
+       place(), which is the only thing that knows the composer's height. */
+
+    .s-joined {
+        position: fixed;
+        /* The row has to sit between them: over the shell, which would
+           otherwise paint across it, and under the composer, which is what
+           it tucks behind. The chat host is z-8. */
+        z-index: 6;
+        /* It paints and nothing else — the row and the composer over it
+           are what you point at */
+        pointer-events: none;
+        border-radius: var(--joined-radius);
+        background: color-mix(in srgb, var(--color-panel) 96%, transparent);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow:
+            0 0 0 1px var(--color-line),
+            inset 0 1px 0 var(--color-wash),
+            0 24px 60px -24px rgba(0, 0, 0, 0.7),
+            0 6px 18px -8px rgba(0, 0, 0, 0.5);
+        /* No transition by default. This box tracks the composer, and the
+           composer's height changes on every keystroke that grows the
+           textarea, on a context chip, on the thread folding — animating
+           those would leave the shell visibly lagging behind the thing it
+           is wrapping. A reveal arms the transition for its own 260ms
+           (is-sliding) and nothing else ever animates this box. */
+        transition: none;
+    }
+
+    .s-joined.is-sliding {
+        transition:
+            top 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            box-shadow 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    /* The row out: the unit lifts off the site a little further */
+    .s-joined:has(~ .s-dock.is-joined.is-out) {
+        box-shadow:
+            0 0 0 1px var(--color-line-strong),
+            inset 0 1px 0 var(--color-wash),
+            0 34px 80px -28px rgba(0, 0, 0, 0.78),
+            0 10px 26px -10px rgba(0, 0, 0, 0.55);
+    }
+
+    /* The row, joined: an invisible frame. It paints nothing at all — no
+       surface, no ring, no radius — because the shell paints for it, and
+       anything it drew would show above the shell's top edge while the row
+       is tucked away. Its box is fixed; only its contents ride. */
+    .s-dock.is-joined {
+        z-index: 7;
+        height: var(--joined-bar);
+        padding: 5px 6px 5px 4px;
+        background: none;
+        border-radius: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        /* Its box is written, not slid — but ⌘. still fades it */
+        transition: opacity 200ms ease;
+    }
+
+    /* A menu, its flyouts and Publish are children of the row, so they
+       stack wherever it does — and z-7 is under the composer and under an
+       open panel (both live in the z-30 float). While one of them is up the
+       row is out, clear of the composer, so it takes the dock's usual place
+       above everything and what it opened comes with it. */
+    .s-dock.is-joined.is-raised {
+        z-index: 40;
+    }
+
+    /* The reveal. The contents ride up the same 32px the shell's top edge
+       rises, in the same curve, so the row grows upward out from behind
+       the composer rather than appearing in place. Down, they are behind
+       the composer AND transparent: transparent because the tallest of
+       them — Publish, the mode pill — would otherwise poke out above the
+       composer's top edge by the few pixels they sit higher in the row. */
+    .s-dock.is-joined > * {
+        transform: translateY(calc(var(--joined-bar) - var(--joined-peek)));
+        opacity: 0;
+        pointer-events: none;
+        /* Leaving: the contents go before the edge closes over them */
+        transition:
+            transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            opacity 110ms ease;
+    }
+
+    .s-dock.is-joined.is-out > * {
+        transform: none;
+        opacity: 1;
+        pointer-events: auto;
+        /* Arriving: the edge leads, the contents follow it up */
+        transition:
+            transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            opacity 170ms ease 70ms;
+    }
+
+    /* Tucked away, the strip would be bare, which reads as a gap rather
+       than an affordance. A grabber says there is a row behind the
+       composer and that pointing at it brings it out. It rides the row's
+       bottom --joined-peek, which is the part that clears, and widens as
+       it fades so the two never overlap. */
+    .s-dock.is-joined::before {
+        content: '';
+        position: absolute;
+        bottom: 5px;
+        left: 50%;
+        width: 30px;
+        height: 3.5px;
+        translate: -50% 0;
+        border-radius: 999px;
+        background: var(--color-line-strong);
+        transition: opacity 140ms ease, width 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-dock.is-joined.is-out::before {
+        opacity: 0;
+        width: 44px;
+    }
+
+    /* Tooltips. Joined at the bottom edge the space above the row is open
+       canvas, so they go there. At the top edge they have nowhere to go —
+       the window's edge is 12px above, and below the row is the composer,
+       which is opaque and stacked over the row — so the row does without
+       them, the way it already does while a popover is open off it. The
+       buttons keep their aria-labels either way. */
+    .s-dock.is-joined.at-bottom .s-dock-btn[data-tip]::after {
+        top: auto;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        translate: -50% 0;
+    }
+
+    .s-dock.is-joined.at-top .s-dock-btn[data-tip]::after {
+        display: none;
+    }
+
+    /* The composer, joined: opaque, so it is what the row tucks behind,
+       and square where it meets the row. The seam is the same hairline
+       the conversation's header uses.
+
+       Square is only right while the whole row is out. Tucked, the seam
+       sits --joined-peek under the shell's top edge, which is inside the
+       shell's --joined-radius corner: the arc is still turning there, and
+       a square composer corner pokes out past it (2px at 14 under 24 —
+       enough to read as a notch). So the composer is clipped to the
+       shell's own outline — its box carried up by however much of the row
+       is showing, same radius — and the unit's silhouette is one curve
+       whatever the two numbers are. The seam's hairline lies inside that
+       outline and ends on the arc with it. The inset moves in the shell's
+       curve and time, so the two edges travel together on a reveal. */
+    .s-chat.is-floating.is-joined {
+        background: var(--color-panel);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-radius: 0 0 var(--joined-radius) var(--joined-radius);
+        box-shadow: 0 -1px 0 var(--color-line);
+        clip-path: inset(calc(-1 * var(--joined-peek)) 0 0 0 round var(--joined-radius));
+        transition:
+            opacity 180ms ease,
+            clip-path 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-chat.is-floating.is-joined.is-row-out {
+        clip-path: inset(calc(-1 * var(--joined-bar)) 0 0 0 round var(--joined-radius));
+    }
+
+    .s-chat.is-floating.is-joined.is-bar-hidden {
+        border-radius: var(--joined-radius);
+        box-shadow: none;
+        clip-path: none;
+    }
+
+    /* The host is only a frame now — the shell behind it does the drawing,
+       and the card's own entrance would fight the shell's placement */
+    .s-chat-host:has(> .s-chat.is-joined) {
+        animation: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-joined.is-sliding,
+        .s-dock.is-joined > *,
+        .s-dock.is-joined.is-out > *,
+        .s-dock.is-joined::before,
+        .s-chat.is-floating.is-joined {
+            transition: none;
+        }
+    }
+
+    /* --- the conversation ---------------------------------------------
+       In the rail it fills the panel. Floating, it folds out of the
+       composer: a grid row that grows from nothing, so the card's height
+       animates without measuring anything. */
+    .s-chat-thread {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
+    .s-chat-thread-inner {
+        display: flex;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
+    .s-chat.is-floating .s-chat-thread {
+        display: grid;
+        flex: none;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .s-chat.is-floating.is-open .s-chat-thread {
+        grid-template-rows: 1fr;
+    }
+
+    .s-chat.is-floating .s-chat-thread-inner {
+        overflow: hidden;
+    }
+
+    .s-chat-head {
+        @apply flex shrink-0 items-center gap-1 border-b border-line px-3;
+        height: 44px;
+    }
+
+    .s-chat-log {
+        @apply min-h-0 flex-1 overflow-y-auto p-3;
+    }
+
+    .s-chat.is-floating .s-chat-log {
+        max-height: 52vh;
+        padding: 14px 16px;
+    }
+
+    /* Messages */
+    .s-chat-msg-user {
+        @apply ml-6 rounded-xl rounded-br-sm bg-wash-strong px-3 py-2 text-[12.5px] leading-relaxed text-ink;
+    }
+
+    .s-chat-msg {
+        @apply mr-6 rounded-xl rounded-bl-sm border border-line bg-raised px-3 py-2 text-[12.5px] leading-relaxed;
+        color: color-mix(in srgb, var(--color-ink) 90%, transparent);
+    }
+
+    .s-chat.is-floating .s-chat-msg-user { margin-left: 15%; }
+    .s-chat.is-floating .s-chat-msg { margin-right: 15%; }
+
+    /* --- the folded part: status + composer --------------------------- */
+    .s-chat-fold {
+        @apply shrink-0 border-t border-line;
+    }
+
+    /* Floating and folded there is nothing above the composer to divide from */
+    .s-chat.is-floating:not(.is-open) .s-chat-fold {
+        border-top-color: transparent;
+    }
+
+    /* One line of what is happening, or what was last said */
+    .s-chat-status {
+        @apply flex w-full cursor-pointer items-center gap-2 text-left text-soft;
+        padding: 10px 16px 0;
+        font-size: 12px;
+        transition: color 150ms ease;
+    }
+
+    .s-chat-status:hover {
+        @apply text-ink;
+    }
+
+    .s-chat-status-dot {
+        @apply block shrink-0 rounded-full bg-faint;
+        width: 6px;
+        height: 6px;
+        transition: background-color 300ms ease;
+    }
+
+    .s-chat-status-dot.is-live {
+        @apply animate-pulse bg-accent;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+    }
+
+    .s-chat-composer {
+        padding: 8px;
+    }
+
+    .s-chat.is-floating .s-chat-composer {
+        padding: 10px;
+    }
+
+    .s-chat-chips {
+        @apply mb-1.5 flex flex-wrap gap-1;
+    }
+
+    .s-chat.is-floating .s-chat-chips {
+        padding: 0 4px;
+    }
+
+    .s-chat-chip {
+        @apply inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] text-ink;
+        border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+        background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    }
+
+    .s-chat-chip.is-image {
+        @apply border-line bg-wash font-sans text-[11px] text-soft;
+    }
+
+    .s-chat-chip-x {
+        @apply ml-0.5 cursor-pointer text-faint;
+    }
+
+    .s-chat-chip-x:hover {
+        @apply text-ink;
+    }
+
+    /* The field: textarea on top, the tool row underneath */
+    .s-chat-field {
+        @apply rounded-xl border border-line bg-raised;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .s-chat-field:focus-within {
+        border-color: var(--color-line-strong);
+    }
+
+    .s-chat.is-floating .s-chat-field {
+        @apply rounded-2xl;
+        background: var(--color-wash-faint);
+    }
+
+    .s-chat.is-floating .s-chat-field:focus-within {
+        background: var(--color-wash);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
+    }
+
+    .s-chat-input {
+        @apply block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-ink;
+        max-height: 168px;
+        overflow-y: auto;
+    }
+
+    .s-chat-input::placeholder {
+        color: var(--color-faint);
+    }
+
+    .s-chat-input:focus {
+        outline: none;
+    }
+
+    .s-chat.is-floating .s-chat-input {
+        padding: 12px 14px 4px;
+        font-size: 13.5px;
+    }
+
+    .s-chat-tools {
+        @apply flex items-center gap-1 px-1.5 pb-1.5;
+    }
+
+    .s-chat.is-floating .s-chat-tools {
+        padding: 2px 8px 8px;
+    }
+
+    .s-chat-tool {
+        @apply inline-flex h-7 min-w-7 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 text-soft;
+        font-size: 11px;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-chat-tool:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-chat-tool.is-on {
+        @apply text-accent;
+    }
+
+    .s-chat-tool:disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    /* The composer's pick button keeps its label only where there is room */
+    .s-chat:not(.is-floating) .s-chat-tool-label {
+        display: none;
+    }
+
+    @media (max-width: 820px) {
+        .s-chat-tool-label { display: none; }
+    }
+
+    /* Ask | Build */
+    .s-chat-seg {
+        @apply inline-flex shrink-0 rounded-full bg-wash p-0.5;
+        gap: 1px;
+    }
+
+    .s-chat-seg-btn {
+        @apply flex cursor-pointer items-center justify-center rounded-full text-faint;
+        height: 24px;
+        padding: 0 10px;
+        font-size: 11.5px;
+        font-weight: 500;
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .s-chat-seg-btn:hover {
+        @apply text-ink;
+    }
+
+    .s-chat-seg-btn.is-active {
+        background: var(--color-ink);
+        color: var(--color-shell);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    .s-chat-seg-btn.is-active.is-build {
+        background: color-mix(in srgb, var(--color-accent) 80%, white);
+        color: #0e1140;
+    }
+
+    .s-chat-send {
+        @apply flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-ink text-shell;
+        transition: opacity 150ms ease, transform 120ms ease, background-color 150ms ease;
+    }
+
+    .s-chat-send:hover {
+        background: color-mix(in srgb, var(--color-ink) 88%, var(--color-shell));
+    }
+
+    .s-chat-send:active {
+        transform: scale(0.94);
+    }
+
+    .s-chat-send:disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    .s-chat-count {
+        @apply rounded-full bg-wash-strong px-1.5 text-[10px] font-medium text-soft;
+        min-width: 18px;
+        line-height: 16px;
+        text-align: center;
+    }
+
+    /* The dock's Assistant button carries a dot while a turn runs */
+    .s-dock-btn.is-busy::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-accent);
+        box-shadow: 0 0 0 2px var(--color-panel);
+        animation: s-chat-busy 1.2s ease-in-out infinite;
+    }
+
+    @keyframes s-chat-busy {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+    }
+
+    /* Workspace rows in the main menu: a glyph, a name and a hint */
+    .s-workspace-item {
+        align-items: flex-start;
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
+
+    .s-workspace-item > svg:first-child {
+        margin-top: 2px;
+    }
+
+    .s-workspace-item.is-active {
+        color: var(--color-ink);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-chat-host { animation: none; }
+        .s-chat.is-floating .s-chat-thread { transition: none; }
+        .s-chat-status-dot.is-live { animation: none; }
+        .s-dock-btn.is-busy::before { animation: none; }
+    }
+}

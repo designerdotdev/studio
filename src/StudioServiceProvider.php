@@ -2,22 +2,34 @@
 
 namespace Designer\Studio;
 
-use Designer\Studio\Console\Commands\SeedSampleData;
+use Designer\Studio\Console\Commands\DevReset;
+use Designer\Studio\Console\Commands\InlineVerify;
+use Designer\Studio\Console\Commands\PublishAssets;
 use Designer\Studio\Console\Commands\SyncDesigns;
+use Designer\Studio\Console\Commands\TemplatesExport;
+use Designer\Studio\Console\Commands\TemplatesImport;
+use Designer\Studio\Console\Commands\TemplatesLink;
+use Designer\Studio\Console\Commands\TemplatesSync;
 use Designer\Studio\Console\Commands\Uninstall;
-use Designer\Studio\Livewire\ComponentEditor;
-use Designer\Studio\Livewire\TemplateEditor;
-use Designer\Studio\Services\BladeGenerator;
+use Designer\Studio\Livewire\EditorPanel;
+use Designer\Studio\Services\Site\SiteMirror;
 use Designer\Studio\Services\Storage\ComponentRepository;
 use Designer\Studio\Services\Storage\PageRepository;
 use Designer\Studio\Services\Storage\StudioStorage;
+use Designer\Studio\Support\SitePaths;
+use Designer\Studio\Support\StudioAssets;
 use Designer\Studio\View\Components\Layouts\App;
 use Designer\Studio\View\Components\Layouts\Iframe;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
+/**
+ * The editor. The site itself is served by the runtime provider installed
+ * into the app (app/Providers/DesignerServiceProvider.php), which is why
+ * nothing here registers a public route: remove this package and the site
+ * keeps working.
+ */
 class StudioServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -27,24 +39,50 @@ class StudioServiceProvider extends ServiceProvider
         // Register services as singletons
         $this->app->singleton(StudioStorage::class);
         $this->app->singleton(PageRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\LayoutRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\BlockRepository::class);
         $this->app->singleton(ComponentRepository::class);
-        $this->app->singleton(BladeGenerator::class);
-        $this->app->singleton(\Designer\Studio\Services\TemplateRegistry::class);
-
-        // Register asset version for cache busting
-        $this->app->singleton('studio.asset.version', function () {
-            $manifestPath = __DIR__ . '/../dist/.vite/manifest.json';
-            if (file_exists($manifestPath)) {
-                return md5_file($manifestPath);
-            }
-            return 'dev';
-        });
+        $this->app->singleton(\Designer\Studio\Services\PublishService::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\SiteRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\SectionRenderer::class);
+        $this->app->singleton(\Designer\Studio\Services\RenderContext::class);
+        $this->app->singleton(\Designer\Studio\Services\Storage\CollectionRepository::class);
+        $this->app->singleton(\Designer\Studio\Services\CollectionBinder::class);
+        $this->app->singleton(\Designer\Studio\Services\MediaLibrary::class);
+        $this->app->singleton(\Designer\Studio\Support\SiteChrome::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateSync::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateCatalog::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateChrome::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\SiteReader::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\SiteWriter::class);
+        $this->app->singleton(SiteMirror::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\SiteInstaller::class);
+        $this->app->singleton(\Designer\Studio\Support\TemplateLink::class);
+        $this->app->singleton(\Designer\Studio\Services\Templates\TemplateExporter::class);
+        $this->app->singleton(\Designer\Studio\Services\Site\RuntimeInstaller::class);
+        $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
+        $this->app->singleton(\Designer\Studio\Services\Inline\EchoScanner::class);
     }
 
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+
+        // Browse template repositories without installing them — local only
+        if (\Designer\Studio\Services\Templates\TemplatePreview::enabled()) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/template-preview.php');
+        }
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'studio');
+
+        // "designer studio · Edit" on pages the site serves (see studio.badge)
+        $this->app['router']->pushMiddlewareToGroup('web', \Designer\Studio\Http\Middleware\InjectEditBadge::class);
+
+        // Sections compose the site's other components (<x-nav>, an icon…).
+        // The runtime provider registers the same path for the live site;
+        // Studio needs it for the canvas even before that provider exists.
+        if (is_dir(SitePaths::components())) {
+            Blade::anonymousComponentPath(SitePaths::components());
+        }
 
         // NOTE: No migrations - we use JSON file storage!
 
@@ -53,18 +91,35 @@ class StudioServiceProvider extends ServiceProvider
         Blade::component('studio::layouts.iframe', Iframe::class);
 
         // Register Livewire components
-        Livewire::component('studio::component-editor', ComponentEditor::class);
-        Livewire::component('studio::template-editor', TemplateEditor::class);
+        Livewire::component('studio::editor-panel', EditorPanel::class);
+        Livewire::component('studio::pages-panel', \Designer\Studio\Livewire\PagesPanel::class);
+        Livewire::component('studio::media-panel', \Designer\Studio\Livewire\MediaPanel::class);
+        Livewire::component('studio::content-panel', \Designer\Studio\Livewire\ContentPanel::class);
+        Livewire::component('studio::assistant-panel', \Designer\Studio\Livewire\AssistantPanel::class);
 
         // Register Blade directives for self-contained assets
         $this->registerAssetDirectives();
 
         if ($this->app->runningInConsole()) {
-            $this->commands([
-                SeedSampleData::class,
+            $commands = [
+                DevReset::class,
+                PublishAssets::class,
                 SyncDesigns::class,
+                TemplatesExport::class,
+                TemplatesImport::class,
+                TemplatesLink::class,
+                TemplatesSync::class,
                 Uninstall::class,
-            ]);
+            ];
+
+            // Read-only regression gate for inline editing, but still a
+            // dev-mode surface per the spec — same gate as the dev-mode
+            // routes and the Code-mode workspace.
+            if (\Designer\Studio\Support\DevMode::enabled()) {
+                $commands[] = InlineVerify::class;
+            }
+
+            $this->commands($commands);
 
             $this->publishes([
                 __DIR__ . '/../config/studio.php' => config_path('studio.php'),
@@ -79,70 +134,70 @@ class StudioServiceProvider extends ServiceProvider
                     => resource_path('views/vendor/studio/components/layouts/iframe.blade.php'),
             ], 'studio-iframe-layout');
 
-            $this->publishes([
-                __DIR__ . '/../resources/views/designer' => resource_path('views/designer'),
-            ], 'studio-designs');
+            $publishableAssets = [];
+            foreach (StudioAssets::FILES as $file) {
+                $publishableAssets[__DIR__ . '/../dist/' . $file] = public_path(StudioAssets::PUBLISH_PATH . '/' . $file);
+            }
+            $this->publishes($publishableAssets, 'studio-assets');
         }
-
-        // Auto-publish design files on first boot if not already present
-        $this->publishDesignsOnInstall();
 
         // Initialize storage directories on first request
         $this->app->booted(function () {
             if (!$this->app->runningInConsole()) {
                 $storage = $this->app->make(StudioStorage::class);
                 $storage->ensureDirectoryExists();
-                $storage->ensureDirectoryExists('pages');
                 $storage->ensureDirectoryExists('components/library');
+
+                if (config('studio.draft_mode', true)) {
+                    $this->app->make(\Designer\Studio\Services\PublishService::class)->ensureDraftSeeded();
+                }
             }
         });
-    }
 
-    protected function publishDesignsOnInstall(): void
-    {
-        $destination = resource_path('views/designer');
+        // With draft mode off, edits go straight to the live documents —
+        // which mirror the site's files, so write them back once the
+        // request is done.
+        $this->app->terminating(function () {
+            if ($this->app->resolved(StudioStorage::class) && $this->app->make(StudioStorage::class)->consumeLiveChanges()) {
+                $this->app->make(SiteMirror::class)->flush();
+            }
+        });
 
-        if (is_dir($destination)) {
-            return;
-        }
+        // The site is linked to a template folder (studio:templates:link):
+        // whatever this request wrote to the site is exported back into it.
+        // Registered after the flush above so a draft-mode-off write is
+        // on disk before it is copied.
+        $this->app->terminating(function () {
+            if (!$this->app->resolved(\Designer\Studio\Support\TemplateLink::class)) {
+                return;
+            }
 
-        $source = __DIR__ . '/../resources/views/designer';
+            $link = $this->app->make(\Designer\Studio\Support\TemplateLink::class);
 
-        $filesystem = new Filesystem;
-        $filesystem->ensureDirectoryExists($destination);
-        $filesystem->copyDirectory($source, $destination);
+            if (!$link->consumePending() || !$link->linked()) {
+                return;
+            }
+
+            try {
+                $this->app->make(\Designer\Studio\Services\Templates\TemplateExporter::class)->export();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Studio template link: ' . $e->getMessage());
+            }
+        });
     }
 
     protected function registerAssetDirectives(): void
     {
         Blade::directive('studioStyles', function () {
-            return '<?php
-                $__studioVersion = app("studio.asset.version");
-                $__studioPrefix = config("studio.path", "studio");
-                echo \'<link rel="stylesheet" href="\' . url($__studioPrefix . "/assets/studio-css.css") . \'?v=\' . $__studioVersion . \'">\';
-            ?>';
+            return '<?php echo \'<link rel="stylesheet" href="\' . \Designer\Studio\Support\StudioAssets::url("studio-css.css") . \'">\'; ?>';
         });
 
         Blade::directive('studioScripts', function () {
-            return '<?php
-                $__studioVersion = app("studio.asset.version");
-                $__studioPrefix = config("studio.path", "studio");
-                echo \'<script src="\' . url($__studioPrefix . "/assets/studio.js") . \'?v=\' . $__studioVersion . \'" defer></script>\';
-            ?>';
+            return '<?php echo \'<script src="\' . \Designer\Studio\Support\StudioAssets::url("studio.js") . \'" defer></script>\'; ?>';
         });
 
         Blade::directive('studioIframeCore', function () {
-            return '<?php
-                $__studioVersion = app("studio.asset.version");
-                $__studioPrefix = config("studio.path", "studio");
-                echo \'<script src="\' . url($__studioPrefix . "/assets/studio.js") . \'?v=\' . $__studioVersion . \'" defer></script>\';
-                echo \'<style>
-                    [data-component] { cursor: pointer; position: relative; }
-                    [data-component]::before { content: \\\'\\\'; position: absolute; inset: 0; pointer-events: none; z-index: 9999; transition: box-shadow 0.15s ease; }
-                    [data-component]:hover::before { box-shadow: inset 0 0 0 2px #3b82f6; }
-                    [data-component].selected::before { box-shadow: inset 0 0 0 3px #3b82f6; }
-                </style>\';
-            ?>';
+            return '<?php echo \'<script src="\' . \Designer\Studio\Support\StudioAssets::url("studio.js") . \'" defer></script>\'; ?>';
         });
     }
 }
