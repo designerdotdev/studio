@@ -393,7 +393,7 @@ html.studio-light .s-dock-peek {
        (appInsets writes that side inline, over this padding). A faint
        warm glow low on the left keeps the black from reading as a void. */
     .s-app {
-        --studio-gutter: 5px;
+        --studio-gutter: 4px;
         --studio-radius: 12px;
         padding: var(--studio-gutter);
         background-color: var(--color-frame);
