@@ -214,6 +214,97 @@ class TemplatePreview
     }
 
     /**
+     * One section rendered on its own, inside the template's layout so it gets the site's
+     * stylesheet, fonts and scripts — for a still of it. The tag is written the way the first
+     * page that places the section writes it (`<x-sections.stats :items="$stats" />`), so a
+     * block alone shows the data it shows on the page; a section no page uses renders from its
+     * defaults. The section sits in `[data-section-preview]`, which is what a capture
+     * screenshots. Null when the template or the section does not exist.
+     */
+    public function renderSection(string $slug, string $name): ?string
+    {
+        if (($dir = $this->directory($slug)) === null || ! preg_match('/^[a-z0-9][a-z0-9-]*$/', $name)) {
+            return null;
+        }
+
+        $resources = $dir . '/files/resources';
+
+        if (! is_file($resources . '/views/components/sections/' . $name . '.blade.php')) {
+            return null;
+        }
+
+        $data = $this->loadData($resources);
+        $usage = $this->sectionUsage($resources, $name, $data);
+        $layout = $this->layout($resources);
+        $blade = '<x-layouts.' . $layout . ' title="' . e($name) . '"><div data-section-preview="' . e($name) . '">' . $usage['tag'] . '</div></x-layouts.' . $layout . '>';
+
+        $html = $this->withTemplateComponents(
+            $resources . '/views/components',
+            fn () => $this->renderView(['blade' => $blade, 'data' => $usage['data']], $data, $resources)
+        );
+
+        return $this->rewriteUrls($html, $slug, $dir);
+    }
+
+    /** The template's `main` layout, else the first one it has (a lab template may only carry `bare`). */
+    protected function layout(string $resources): string
+    {
+        $layouts = $resources . '/views/components/layouts';
+
+        if (is_file($layouts . '/main.blade.php')) {
+            return 'main';
+        }
+
+        $files = glob($layouts . '/*.blade.php') ?: [];
+
+        return $files === [] ? 'main' : basename($files[0], '.blade.php');
+    }
+
+    /**
+     * How the template's pages place a section: the opening tag of its first use (the index
+     * page first, then the rest by path) with the same attributes, and the variables a
+     * [collection.field] page would have given it (its first entry). A section no page uses
+     * gets a bare tag.
+     *
+     * @return array{tag: string, data: array}
+     */
+    protected function sectionUsage(string $resources, string $name, array $data): array
+    {
+        $pages = $resources . '/views/pages';
+        $files = [];
+
+        if (is_dir($pages)) {
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($pages, \FilesystemIterator::SKIP_DOTS));
+
+            foreach ($iterator as $file) {
+                if (str_ends_with($file->getFilename(), '.blade.php')) {
+                    $files[] = $file->getPathname();
+                }
+            }
+        }
+
+        usort($files, fn ($a, $b) => [$a !== $pages . '/index.blade.php', $a] <=> [$b !== $pages . '/index.blade.php', $b]);
+
+        foreach ($files as $file) {
+            if (! preg_match('/<x-sections\.' . preg_quote($name, '/') . '(?=[\s\/>])([^>]*?)\/?>/s', (string) file_get_contents($file), $m)) {
+                continue;
+            }
+
+            $vars = [];
+
+            if (preg_match('/^\[([A-Za-z_]\w*)\.([A-Za-z_]\w*)\]$/', basename($file, '.blade.php'), $page)) {
+                $entries = $data[$page[1]] ?? [];
+                $entries = is_array($entries) ? $entries : [];
+                $vars = [$page[1] => $entries[0] ?? new \stdClass, 'entries' => $entries];
+            }
+
+            return ['tag' => '<x-sections.' . $name . rtrim($m[1]) . ' />', 'data' => $vars];
+        }
+
+        return ['tag' => '<x-sections.' . $name . ' />', 'data' => []];
+    }
+
+    /**
      * The page file for a path, plus the data it renders with — the runtime
      * provider's resolution: a flat file, a folder's index, or a
      * [collection.field] page matched against that collection's rows.
@@ -265,6 +356,7 @@ class TemplatePreview
         return null;
     }
 
+    /** @param array{file?: string, blade?: string, data: array} $page  a page file, or an inline Blade string */
     protected function renderView(array $page, array $data, string $resources): string
     {
         $factory = app('view');
@@ -279,7 +371,9 @@ class TemplatePreview
         app()->instance(Vite::class, $this->inlineVite($vite, $resources));
 
         try {
-            return $factory->file($page['file'], $page['data'])->render();
+            return isset($page['blade'])
+                ? BladeCompiler::render($page['blade'], $page['data'], deleteCachedView: true)
+                : $factory->file($page['file'], $page['data'])->render();
         } finally {
             app()->instance(Vite::class, $vite);
         }

@@ -35,6 +35,17 @@ class TemplatePreviewController
             ->header('Cache-Control', 'no-store');
     }
 
+    public function section(string $slug, string $name)
+    {
+        $html = TemplatePreview::make()->renderSection($slug, $name);
+
+        abort_if($html === null, 404);
+
+        return response($html)
+            ->header('Content-Type', 'text/html; charset=UTF-8')
+            ->header('Cache-Control', 'no-store');
+    }
+
     public function file(string $slug, string $path)
     {
         $file = TemplatePreview::make()->file($slug, $path);
