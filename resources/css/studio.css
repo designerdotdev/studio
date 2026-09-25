@@ -80,6 +80,37 @@ html.studio-light {
     color-scheme: light;
 }
 
+/* The chat is a white card in either theme — the composer over the site,
+   a column beside it, the panel in the rail — and, joined, the toolbar
+   row and the shell take the same material so the unit stays one object.
+   The same values as the light chrome, scoped. */
+.s-chat,
+.s-joined,
+.s-dock.is-joined {
+    --color-shell: #f1f1f1;
+    --color-panel: #ffffff;
+    --color-raised: #ffffff;
+    --color-overlay: #ffffff;
+    --color-line: rgba(0, 0, 0, 0.08);
+    --color-line-strong: rgba(0, 0, 0, 0.13);
+    --color-ink: #303030;
+    --color-soft: #616161;
+    --color-faint: #8a8a8a;
+    --color-accent: #005bd3;
+    --color-accent-hover: #004299;
+    --color-layout: #8051ff;
+    --color-block: #0f9b8e;
+    --color-ok: #29845a;
+    --color-warn: #b98900;
+    --color-danger: #e51c00;
+    --color-wash: rgba(0, 0, 0, 0.05);
+    --color-wash-strong: rgba(0, 0, 0, 0.08);
+    --color-wash-faint: rgba(0, 0, 0, 0.02);
+    --color-scroll: rgba(0, 0, 0, 0.16);
+    --color-scroll-hover: rgba(0, 0, 0, 0.28);
+    color-scheme: light;
+}
+
 /* The toolbar belongs to the frame, so it is dark in either theme — the
    floating pill, a pinned bar, and what opens off them. Joined to the
    composer it is part of that card instead and keeps the theme's own. */
@@ -409,7 +440,7 @@ html.studio-light .s-dock-peek {
        there (the store writes the padding). One curve for the site sliding
        over and the column arriving, so the two read as a single motion. */
     .s-app-row {
-        transition: padding-right 360ms cubic-bezier(0.22, 1, 0.36, 1);
+        transition: padding 360ms cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     /* While the column's seam is dragged the site follows the pointer */
@@ -1550,34 +1581,41 @@ html.studio-light .s-dock:not(.is-joined) .s-pop {
 /* Floating surfaces over the site — a white card lifts with a soft,
    neutral shadow rather than the dark theme's deep one */
 html.studio-light .s-float:not(.is-docked):not(.is-ghost),
-html.studio-light .s-chat.is-floating,
-html.studio-light .s-joined {
+.s-chat.is-floating,
+.s-joined {
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.08),
         0 24px 56px -20px rgba(0, 0, 0, 0.28),
         0 6px 16px -8px rgba(0, 0, 0, 0.12);
 }
 
-html.studio-light .s-chat.is-floating.is-joined {
+.s-chat.is-floating.is-joined {
     box-shadow: 0 -1px 0 var(--color-line);
 }
 
-html.studio-light .s-chat.is-side {
+.s-chat.is-side {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
-html.studio-light .s-chat.is-side .s-chat-field {
+.s-chat.is-side .s-chat-field {
     background: #ffffff;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.06);
     border-color: transparent;
 }
 
-html.studio-light .s-chat.is-side .s-chat-field:focus-within {
+.s-chat.is-side .s-chat-field:focus-within {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 4px color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 
-html.studio-light .s-chat.is-floating.is-joined.is-bar-hidden {
+.s-chat.is-floating.is-joined.is-bar-hidden {
     box-shadow: none;
+}
+
+/* Popovers off the chat (history, the engine picker) lift like light ones */
+.s-chat .s-pop,
+.s-dock.is-joined .s-pop {
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 12px 32px -8px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 /* Buttons with a little depth: the primary is a black key with a lit top
@@ -1753,6 +1791,25 @@ html.studio-light .s-pop-inverse {
         to { opacity: 0; transform: translateX(calc(100% + 24px)); }
     }
 
+    /* On the left it comes and goes past the left edge instead */
+    .s-chat-host.is-side.at-left {
+        animation-name: s-chat-side-in-left;
+    }
+
+    .s-chat-host.is-side.at-left.is-leaving {
+        animation-name: s-chat-side-out-left;
+    }
+
+    @keyframes s-chat-side-in-left {
+        from { opacity: 0; transform: translateX(calc(-100% - 24px)); }
+        to { opacity: 1; transform: none; }
+    }
+
+    @keyframes s-chat-side-out-left {
+        from { opacity: 1; transform: none; }
+        to { opacity: 0; transform: translateX(calc(-100% - 24px)); }
+    }
+
     /* The panel's content settles a beat after the column: a short fade
        and drift, so it reads as arriving with the column rather than
        being painted onto it */
@@ -1762,6 +1819,15 @@ html.studio-light .s-pop-inverse {
 
     @keyframes s-chat-side-content {
         from { opacity: 0; transform: translateX(10px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    .s-chat-host.is-side.at-left:not(.is-leaving) > .s-chat > * {
+        animation-name: s-chat-side-content-left;
+    }
+
+    @keyframes s-chat-side-content-left {
+        from { opacity: 0; transform: translateX(-10px); }
         to { opacity: 1; transform: none; }
     }
 
@@ -1837,6 +1903,17 @@ html.studio-light .s-pop-inverse {
     .s-chat-side-seam:hover::after,
     .s-chat-side-seam:active::after {
         background: var(--color-accent);
+    }
+
+    /* On the left the inner edge is the right one */
+    .s-chat-host.at-left .s-chat-side-seam {
+        left: auto;
+        right: 0;
+    }
+
+    .s-chat-host.at-left .s-chat-side-seam::after {
+        left: auto;
+        right: 0;
     }
 
     /* --- joined: the toolbar and the composer as one object ------------
@@ -2036,6 +2113,33 @@ html.studio-light .s-pop-inverse {
         .s-chat.is-floating.is-joined {
             transition: none;
         }
+    }
+
+    /* In the rail the chat is the one white panel: it paints its own
+       surface (the dark column is transparent on the frame) */
+    .s-chat:not(.is-floating):not(.is-side) {
+        background: var(--color-panel);
+    }
+
+    /* Where the chat lives, in its header: three glyphs, the current one filled */
+    .s-chat-place {
+        @apply inline-flex shrink-0 items-center rounded-lg bg-wash p-0.5;
+        gap: 1px;
+        margin: 0 4px;
+    }
+
+    .s-chat-place-btn {
+        @apply flex h-6 w-7 cursor-pointer items-center justify-center rounded-md text-faint;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-chat-place-btn:hover {
+        @apply text-ink;
+    }
+
+    .s-chat-place-btn.is-active {
+        @apply bg-panel text-ink;
+        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.08);
     }
 
     /* --- the conversation ---------------------------------------------
@@ -2241,6 +2345,15 @@ html.studio-light .s-pop-inverse {
         .s-chat-tool-label { display: none; }
     }
 
+    /* A narrow column has no room for the label either */
+    .s-chat-field {
+        container-type: inline-size;
+    }
+
+    @container (max-width: 430px) {
+        .s-chat-tool-label { display: none; }
+    }
+
     /* Ask | Build */
     .s-chat-seg {
         @apply inline-flex shrink-0 rounded-full bg-wash p-0.5;
@@ -2334,6 +2447,8 @@ html.studio-light .s-pop-inverse {
         .s-chat-host { animation: none; }
         .s-chat-host.is-side,
         .s-chat-host.is-side.is-leaving,
+        .s-chat-host.is-side.at-left,
+        .s-chat-host.is-side.at-left.is-leaving,
         .s-chat-host.is-side:not(.is-leaving) > .s-chat > * { animation: none; }
         .s-app-row { transition: none; }
         .s-chat.is-floating .s-chat-thread { transition: none; }

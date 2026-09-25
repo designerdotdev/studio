@@ -121,18 +121,21 @@
                     // Composer workspace) and whether it applies right now.
                     // Leaving developer mode puts the chat away without
                     // forgetting where it was.
-                    /* Three homes: `panel` (a rail item like the others),
+                    /* Four homes: `panel` (a rail item like the others),
                        `float` (the composer card over the bottom of the
-                       site) and `side` (a full-height column pinned to the
-                       right of the site, the site pushed over by its width).
+                       site), and `left` / `right` (a full-height column
+                       pinned to that side of the site, the site pushed over
+                       by its width — independent of where the toolbar is).
                        The old boolean key is read once for anyone upgrading. */
                     chatPlace: (() => {
                         const saved = localStorage.getItem('studio.chat-place');
-                        if (['panel', 'float', 'side'].includes(saved)) return saved;
+                        if (saved === 'side') return 'right';
+                        if (['panel', 'float', 'left', 'right'].includes(saved)) return saved;
                         return localStorage.getItem('studio.chat-float') === '1' ? 'float' : 'panel';
                     })(),
                     get chatFloating() { return this.chatPlace === 'float' && this.chatAvailable },
-                    get chatSide() { return this.chatPlace === 'side' && this.chatAvailable },
+                    // Which side the column is on, or null
+                    get chatSide() { return ['left', 'right'].includes(this.chatPlace) && this.chatAvailable ? this.chatPlace : null },
                     // Out of the panel, either way: the aside is then a ghost
                     get chatOut() { return this.chatFloating || this.chatSide },
                     chatOpen: localStorage.getItem('studio.chat-open') === '1',
@@ -144,7 +147,7 @@
                     chatSideOut: false,
                     chatSideTimer: null,
                     setChatPlace(place) {
-                        if (!this.chatAvailable || !['panel', 'float', 'side'].includes(place)) return;
+                        if (!this.chatAvailable || !['panel', 'float', 'left', 'right'].includes(place)) return;
                         if (place === this.chatPlace && !this.chatSideOut) return;
                         clearTimeout(this.chatSideTimer);
                         const apply = () => {
@@ -158,13 +161,13 @@
                                 // The float or the column takes over from the panel
                                 if (this.sidebar && this.rail === 'assistant') this.closePanel();
                             }
-                            // Back from the column the card lands folded, just the composer
-                            if (place === 'float' && from === 'side') this.setChatOpen(false);
+                            // Back from a column the card lands folded, just the composer
+                            if (place === 'float' && (from === 'left' || from === 'right')) this.setChatOpen(false);
                             window.dispatchEvent(new CustomEvent('studio:chat', { detail: { floating: this.chatFloating, place } }));
                             window.dispatchEvent(new CustomEvent('studio:reflow'));
                         };
                         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                        if (this.chatPlace === 'side' && place === 'float' && !reduced) {
+                        if (this.chatSide && place === 'float' && !reduced) {
                             this.chatSideOut = true;
                             this.chatSideTimer = setTimeout(apply, 340);
                             return;
@@ -173,20 +176,20 @@
                     },
                     setChatFloating(on) { this.setChatPlace(on ? 'float' : 'panel') },
                     // The composer's sidebar button and the column's close
-                    toggleChatSide() { this.setChatPlace(this.chatSide ? 'float' : 'side') },
+                    toggleChatSide() { this.setChatPlace(this.chatSide ? 'float' : 'right') },
                     // The column's width, set by the seam on its inner edge
                     chatSideWidth: (n => (n >= 320 && n <= 640) ? n : 400)(parseInt(localStorage.getItem('studio.chat-side-width'), 10)),
                     setChatSideWidth(px) {
                         this.chatSideWidth = Math.round(Math.min(640, Math.max(320, px)));
                         localStorage.setItem('studio.chat-side-width', String(this.chatSideWidth));
                     },
-                    // A floating toolbar on the right edge would sit on the
-                    // column: the column stands in from it (12 + 46 + 12,
-                    // less the gutter the row already keeps)
+                    // A floating toolbar on the column's edge would sit on
+                    // it: the column stands in from it (12 + 46 + 12, less
+                    // the gutter the row already keeps)
                     get chatSideClear() {
-                        return this.dock.edge === 'right' && !this.dock.pinned && !this.dockHidden ? 65 : 0;
+                        return this.chatSide && this.dock.edge === this.chatSide && !this.dock.pinned && !this.dockHidden ? 65 : 0;
                     },
-                    // What the app row reserves on its right for the column
+                    // What the app row reserves on the column's side for it
                     get chatSideSpace() {
                         return this.chatSide && !this.chatSideOut ? this.chatSideWidth + this.chatSideClear : 0;
                     },
@@ -1235,8 +1238,8 @@
                         this.placeJoined(w, left);
                     },
 
-                    // Pinned to the right: a column as tall as the app row,
-                    // flush with its right edge (the row's padding is what
+                    // Pinned to a side: a column as tall as the app row,
+                    // flush with that edge of it (the row's padding is what
                     // keeps the site a gutter away from it). Its own frame
                     // is fixed, so the site slides under it, not with it.
                     placeSide() {
@@ -1244,11 +1247,14 @@
                         const row = document.querySelector('.s-app-row');
                         if (!row) return;
                         const r = row.getBoundingClientRect();
+                        const clear = $store.studio.chatSideClear;
+                        const side = $store.studio.chatSide === 'left'
+                            ? { left: Math.round(r.left + clear) + 'px', right: 'auto' }
+                            : { left: 'auto', right: Math.round(window.innerWidth - r.right + clear) + 'px' };
                         this.style = {
-                            left: 'auto',
+                            ...side,
                             top: Math.round(r.top) + 'px',
                             bottom: Math.round(window.innerHeight - r.bottom) + 'px',
-                            right: Math.round(window.innerWidth - r.right + $store.studio.chatSideClear) + 'px',
                             width: $store.studio.chatSideWidth + 'px',
                         };
                     },
@@ -1324,7 +1330,7 @@
                     },
                 }"
                 class="flex h-full min-h-0 flex-col"
-                :class="{ 's-chat-host': $store.studio.chatOut, 'is-side': $store.studio.chatSide, 'is-leaving': $store.studio.chatSideOut }"
+                :class="{ 's-chat-host': $store.studio.chatOut, 'is-side': $store.studio.chatSide, 'at-left': $store.studio.chatSide === 'left', 'at-right': $store.studio.chatSide === 'right', 'is-leaving': $store.studio.chatSideOut }"
                 :style="style"
                 x-effect="$store.studio.chatFloating; $store.studio.chatSide; $store.studio.chatSideWidth; $store.studio.chatSideOut; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
                 @resize.window.debounce.50ms="place()"
@@ -1356,8 +1362,10 @@
                         const shield = document.createElement('div');
                         shield.className = 's-drag-shield is-col-resize';
                         document.body.appendChild(shield);
+                        const left = $store.studio.chatSide === 'left';
                         const move = (event) => {
-                            $store.studio.setChatSideWidth(host.getBoundingClientRect().right - event.clientX);
+                            const box = host.getBoundingClientRect();
+                            $store.studio.setChatSideWidth(left ? event.clientX - box.left : box.right - event.clientX);
                         };
                         const stop = () => {
                             shield.remove();
@@ -1419,8 +1427,10 @@
                     @if($devModeAvailable)
                     { label: 'Assistant panel', hint: 'Panel', when: studio.chatAvailable && !studio.chatFloating, run: () => studio.setRail('assistant', true) },
                     { label: 'Focus the chat', hint: 'Chat', when: studio.chatAvailable, run: () => studio.focusChat() },
-                    { label: studio.chatFloating ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', when: studio.chatAvailable, run: () => studio.setChatFloating(!studio.chatFloating) },
-                    { label: studio.chatSide ? 'Close the chat column' : 'Pin the chat to the right', hint: 'Chat', when: studio.chatAvailable, run: () => studio.toggleChatSide() },
+                    { label: studio.chatOut ? 'Dock the chat as a panel' : 'Float the chat over the site', hint: 'Chat', when: studio.chatAvailable, run: () => { if (studio.chatOut) { studio.setChatPlace('panel'); studio.setRail('assistant', true); } else studio.setChatFloating(true); } },
+                    { label: 'Chat on the left', hint: 'Chat', when: studio.chatAvailable && studio.chatSide !== 'left', run: () => studio.setChatPlace('left') },
+                    { label: 'Chat at the bottom', hint: 'Chat', when: studio.chatAvailable && !studio.chatFloating, run: () => studio.setChatPlace('float') },
+                    { label: 'Chat on the right', hint: 'Chat', when: studio.chatAvailable && studio.chatSide !== 'right', run: () => studio.setChatPlace('right') },
                     { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Editor', run: () => studio.toggleDevMode() },
                     @endif
                     // One per workspace, minus the one you are in and the

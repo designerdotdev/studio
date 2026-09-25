@@ -3,8 +3,10 @@
      ($store.studio.chatFloating) the same markup becomes the chat card over
      the bottom of the site: the composer is always there, and the
      conversation (with the header) folds upward out of it
-     ($store.studio.chatOpen). Pinned to the right ($store.studio.chatSide)
-     it is a full-height column beside the site, always open. The wrapper
+     ($store.studio.chatOpen). Pinned to a side ($store.studio.chatSide,
+     'left' | 'right') it is a full-height column beside the site, always
+     open. The header's placement control moves it between the three
+     from any of them. The wrapper
      in home.blade.php does the positioning; this file only changes shape. --}}
 @php
     $engines = $this->engines;
@@ -265,18 +267,25 @@
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                 </button>
 
-                {{-- Where the chat lives: float it over the site, pin it to the right, or dock it back as a panel --}}
-                <button type="button" class="s-icon-btn" x-show="!floating && !side" title="Float the chat over the site" aria-label="Float the chat over the site" @click="$store.studio.setChatFloating(true)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="5.5" y="11.25" width="9" height="3" rx="1.5" fill="currentColor" stroke="none"/></svg>
-                </button>
-                <button type="button" class="s-icon-btn" x-show="floating || side" x-cloak title="Dock the chat as a panel" aria-label="Dock the chat as a panel" @click="$store.studio.setChatPlace('panel'); $store.studio.setRail('assistant', true)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="2.75" y="3.25" width="5.5" height="13.5" rx="2.5" fill="currentColor" stroke="none"/></svg>
-                </button>
+                {{-- Where the chat lives — a column on the left, the composer
+                     at the bottom, a column on the right — from any of them.
+                     (Back into the rail panel: the ⌘K palette or a workspace.) --}}
+                <div class="s-chat-place" role="radiogroup" aria-label="Where the chat lives">
+                    <button type="button" class="s-chat-place-btn" :class="side === 'left' && 'is-active'" role="radio" :aria-checked="side === 'left'" title="Chat on the left of the site" aria-label="Chat on the left" @click="$store.studio.setChatPlace('left')">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="2.75" y="3.25" width="5.5" height="13.5" rx="2.5" fill="currentColor" stroke="none"/></svg>
+                    </button>
+                    <button type="button" class="s-chat-place-btn" :class="floating && 'is-active'" role="radio" :aria-checked="floating" title="Chat at the bottom, over the site" aria-label="Chat at the bottom" @click="$store.studio.setChatPlace('float')">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="5.5" y="11.25" width="9" height="3" rx="1.5" fill="currentColor" stroke="none"/></svg>
+                    </button>
+                    <button type="button" class="s-chat-place-btn" :class="side === 'right' && 'is-active'" role="radio" :aria-checked="side === 'right'" title="Chat on the right of the site" aria-label="Chat on the right" @click="$store.studio.setChatPlace('right')">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="11.75" y="3.25" width="5.5" height="13.5" rx="2.5" fill="currentColor" stroke="none"/></svg>
+                    </button>
+                </div>
 
                 <button type="button" class="s-close" x-show="floating" x-cloak title="Fold the conversation (Esc)" aria-label="Fold the conversation" @click="$store.studio.setChatOpen(false)">
                     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6.5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
-                {{-- Pinned to the right: closing slides the column away and leaves the composer --}}
+                {{-- Pinned to a side: closing slides the column away and leaves the composer --}}
                 <button type="button" class="s-close" x-show="side" x-cloak title="Close — back to the composer" aria-label="Close the chat column" @click="$store.studio.setChatPlace('float')">
                     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
@@ -480,7 +489,7 @@
                             :class="side && 'is-on'"
                             x-show="floating || side"
                             x-cloak
-                            :title="side ? 'Back to the composer' : 'Pin the chat to the right of the site'"
+                            :title="side ? 'Back to the composer' : 'Pin the chat beside the site'"
                             :aria-pressed="side"
                             @click="$store.studio.toggleChatSide()"
                         >

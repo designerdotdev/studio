@@ -142,15 +142,18 @@
                 {{-- One row: the docked panel (when the toolbar is pinned)
                      and the stage. A right rail flips the row so the panel
                      sits beside it. --}}
-                {{-- With the chat pinned to the right the row keeps its
+                {{-- With the chat pinned to a side the row keeps its
                      width free on that side (a padding, transitioned, so
                      the site slides over as the column arrives) and the
                      chat's fixed host sits in the strip. --}}
                 <div
                     class="s-app-row flex min-h-0 min-w-0 flex-1"
                     :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'"
-                    :style="{ paddingRight: $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px' }"
-                    @transitionend.self="if ($event.propertyName === 'padding-right') window.dispatchEvent(new CustomEvent('studio:reflow'))"
+                    :style="{
+                        paddingLeft: $store.studio.chatSide === 'left' && $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px',
+                        paddingRight: $store.studio.chatSide === 'right' && $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px',
+                    }"
+                    @transitionend.self="if ($event.propertyName === 'padding-left' || $event.propertyName === 'padding-right') window.dispatchEvent(new CustomEvent('studio:reflow'))"
                 >
 
                 {{-- The floating surface: every panel lives here, one visible
