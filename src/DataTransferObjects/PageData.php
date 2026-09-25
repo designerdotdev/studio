@@ -10,10 +10,13 @@ class PageData
         public readonly string $title,
         public readonly string $description,
         public readonly ?string $layout,
+        public readonly ?string $layout_ref,
         public readonly string $created_at,
         public readonly string $updated_at,
         public readonly array $meta,
         public readonly array $components,
+        /** Position in the Pages panel; null = unordered (sorted after ordered pages, by title) */
+        public readonly ?int $order = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -24,10 +27,12 @@ class PageData
             title: $data['title'] ?? 'Untitled',
             description: $data['description'] ?? '',
             layout: $data['layout'] ?? null,
+            layout_ref: $data['layout_ref'] ?? null,
             created_at: $data['created_at'] ?? now()->toIso8601String(),
             updated_at: $data['updated_at'] ?? now()->toIso8601String(),
             meta: $data['meta'] ?? [],
             components: $data['components'] ?? [],
+            order: isset($data['order']) ? (int) $data['order'] : null,
         );
     }
 
@@ -39,10 +44,12 @@ class PageData
             'title' => $this->title,
             'description' => $this->description,
             'layout' => $this->layout,
+            'layout_ref' => $this->layout_ref,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'meta' => $this->meta,
             'components' => $this->components,
+            'order' => $this->order,
         ];
     }
 }

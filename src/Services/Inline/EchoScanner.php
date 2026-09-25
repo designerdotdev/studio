@@ -1,0 +1,430 @@
+<?php
+
+namespace Designer\Studio\Services\Inline;
+
+/**
+ * Finds every echo of a declared field in a section's Blade source.
+ *
+ * One left-to-right pass with a three-state HTML machine, so an echo inside
+ * an attribute value is told apart from one in element content. Nothing is
+ * ever evaluated, and the matching is deliberately conservative: an
+ * expression this does not recognise yields no reference at all rather than
+ * a wrong one — the field simply stays panel-only.
+ */
+final class EchoScanner
+{
+    /** Regions where an echo is not editable markup. */
+    private const SKIP = [
+        ['{{--', '--}}'],
+        ['<!--', '-->'],
+        ['@verbatim', '@endverbatim'],
+        ['@php', '@endphp'],
+    ];
+
+    /**
+     * Names {@see scanUndeclared()} never offers to promote: Blade/Studio's
+     * own implicit variables, not candidate top-level fields.
+     */
+    private const RESERVED = ['loop', 'slot', 'attributes', 'errors', 'site'];
+
+    /** `@foreach (<anything> as [$key =>] $alias)` — group 1 the source, 2 the alias. */
+    private const LOOP_OPEN = '/\G@(?:foreach|forelse)\s*\((.+?)\s+as\s+(?:\$\w+\s*=>\s*)?\$(\w+)\s*\)/A';
+
+    /**
+     * @param array<string, array> $fields the section's yml field contract
+     * @return list<EchoRef>
+     */
+    public function scan(string $source, array $fields): array
+    {
+        if ($fields === []) {
+            return [];
+        }
+
+        $refs = [];
+        $skips = $this->skipRegions($source);
+        $length = strlen($source);
+        $at = 0;
+
+        $state = 'TEXT';            // TEXT | TAG | ATTR
+        $quote = null;
+        $attribute = null;
+        $tagNameEnd = null;         // where an attribute may be inserted
+        $tagIsComponent = false;    // <x-…> is never annotated
+
+        /** @var list<array{alias: string, field: ?string}> innermost last */
+        $loops = [];
+
+        while ($at < $length) {
+            if (($jump = $this->skipTo($skips, $at)) !== null) {
+                $at = $jump;
+                $state = 'TEXT';
+
+                continue;
+            }
+
+            $char = $source[$at];
+
+            if ($state === 'TEXT' && $char === '@') {
+                // Every loop is pushed, even one over something that isn't a
+                // field (`$link->children`): its @endforeach pops, and an
+                // unpushed loop would pop the enclosing one instead — leaving
+                // everything after it (an @else branch, a second copy of the
+                // list) unmapped.
+                if (preg_match(self::LOOP_OPEN, $source, $m, 0, $at)) {
+                    $field = preg_match('/^\$(\w+)(?:\[[^\]]*\])?$/', trim($m[1]), $f) && isset($fields[$f[1]]) ? $f[1] : null;
+                    $loops[] = ['alias' => $m[2], 'field' => $field];
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (preg_match('/\G@end(?:foreach|forelse)/A', $source, $m, 0, $at)) {
+                    array_pop($loops);
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                // A toggle governs the element its @if opens — but only when
+                // that element follows immediately, so the marker can never
+                // drift onto unrelated markup further down the file.
+                if (preg_match('/\G@if\s*\(\s*\$(\w+)\s*\)\s*<([a-zA-Z][\w:.-]*)/A', $source, $m, 0, $at)) {
+                    if (($fields[$m[1]]['type'] ?? null) === 'toggle' && !str_starts_with($m[2], 'x-')) {
+                        $refs[] = new EchoRef(
+                            key: $m[1],
+                            path: $m[1],
+                            context: 'when',
+                            offset: $at + strlen($m[0]),
+                            end: null,
+                            line: $this->lineAt($source, $at),
+                        );
+                    }
+
+                    // Only the directive is consumed; the tag is scanned normally.
+                    $at += strlen($m[0]) - strlen($m[2]) - 1;
+
+                    continue;
+                }
+
+                if (substr($source, $at, 3) === '@{{') {
+                    $at += 3;
+
+                    continue;
+                }
+            }
+
+            $raw = substr($source, $at, 3) === '{!!';
+            $escaped = !$raw && substr($source, $at, 2) === '{{';
+
+            if ($raw || $escaped) {
+                [$open, $close] = $raw ? ['{!!', '!!}'] : ['{{', '}}'];
+                $closeAt = strpos($source, $close, $at + strlen($open));
+
+                if ($closeAt === false) {
+                    $at += strlen($open);
+
+                    continue;
+                }
+
+                $expression = substr($source, $at + strlen($open), $closeAt - $at - strlen($open));
+                $echoEnd = $closeAt + strlen($close);
+                [$key, $path] = $this->resolve($expression, $fields, $loops);
+
+                if ($key !== null && $state === 'TEXT') {
+                    $refs[] = new EchoRef($key, $path, 'text', $at, $echoEnd, $this->lineAt($source, $at));
+                } elseif ($key !== null && $state === 'ATTR' && $attribute !== null && $tagNameEnd !== null && !$tagIsComponent) {
+                    $refs[] = new EchoRef($key, $path, 'attr', $tagNameEnd, null, $this->lineAt($source, $at), $attribute);
+                }
+
+                $at = $echoEnd;
+
+                continue;
+            }
+
+            if ($state === 'TEXT') {
+                if ($char === '<' && preg_match('/\G<([a-zA-Z][\w:.-]*)/A', $source, $m, 0, $at)) {
+                    $state = 'TAG';
+                    $tagNameEnd = $at + strlen($m[0]);
+                    $tagIsComponent = str_starts_with($m[1], 'x-');
+                    $at = $tagNameEnd;
+
+                    continue;
+                }
+
+                if (substr($source, $at, 2) === '</') {
+                    $state = 'TAG';
+                    $tagNameEnd = null;
+                    $tagIsComponent = true;
+                    $at += 2;
+
+                    continue;
+                }
+
+                $at++;
+
+                continue;
+            }
+
+            if ($state === 'TAG') {
+                if ($char === '>') {
+                    $state = 'TEXT';
+                    $at++;
+
+                    continue;
+                }
+
+                if ($char === '"' || $char === "'") {
+                    $before = substr($source, max(0, $at - 100), min(100, $at));
+                    $attribute = preg_match('/([\w:@.\-]+)\s*=\s*$/', $before, $m) ? $m[1] : null;
+                    $state = 'ATTR';
+                    $quote = $char;
+                    $at++;
+
+                    continue;
+                }
+
+                $at++;
+
+                continue;
+            }
+
+            // ATTR
+            if ($char === $quote) {
+                $state = 'TAG';
+                $attribute = null;
+            }
+
+            $at++;
+        }
+
+        return $refs;
+    }
+
+    /**
+     * Bare `{{ $name }}` echoes in element text whose name has no yml
+     * field — a section a developer edited in Code mode ahead of its
+     * contract. A separate, deliberately narrower pass from {@see scan()}:
+     * it never touches that method's traversal, so the verified mapping it
+     * produces (and the coverage gate built on it) cannot move because of
+     * this one. Only the plain single-variable form is recognised — the
+     * same conservative rule `scan()` uses for a declared field — and never
+     * inside an attribute value, a `@php`/comment region, or governing an
+     * `@if`. What comes back here is informational only: nothing in this
+     * package ever treats it as an editable field.
+     *
+     * @param array<string, array> $fields the section's yml field contract
+     * @return list<EchoRef> refs with context `undeclared`
+     */
+    public function scanUndeclared(string $source, array $fields): array
+    {
+        $refs = [];
+        $skips = $this->skipRegions($source);
+        $length = strlen($source);
+        $at = 0;
+
+        $state = 'TEXT';    // TEXT | TAG | ATTR
+        $quote = null;
+
+        /** @var list<string> loop aliases in scope, innermost last */
+        $loopAliases = [];
+
+        while ($at < $length) {
+            if (($jump = $this->skipTo($skips, $at)) !== null) {
+                $at = $jump;
+                $state = 'TEXT';
+
+                continue;
+            }
+
+            $char = $source[$at];
+
+            if ($state === 'TEXT' && $char === '@') {
+                if (preg_match(self::LOOP_OPEN, $source, $m, 0, $at)) {
+                    $loopAliases[] = $m[2];
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (preg_match('/\G@end(?:foreach|forelse)/A', $source, $m, 0, $at)) {
+                    array_pop($loopAliases);
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (substr($source, $at, 3) === '@{{') {
+                    $at += 3;
+
+                    continue;
+                }
+            }
+
+            $raw = substr($source, $at, 3) === '{!!';
+            $escaped = !$raw && substr($source, $at, 2) === '{{';
+
+            if ($raw || $escaped) {
+                [$open, $close] = $raw ? ['{!!', '!!}'] : ['{{', '}}'];
+                $closeAt = strpos($source, $close, $at + strlen($open));
+
+                if ($closeAt === false) {
+                    $at += strlen($open);
+
+                    continue;
+                }
+
+                $expression = trim(substr($source, $at + strlen($open), $closeAt - $at - strlen($open)));
+                $echoEnd = $closeAt + strlen($close);
+
+                if (
+                    $state === 'TEXT'
+                    && preg_match('/^\$(\w+)(?:\s*\?\?.*)?$/s', $expression, $m)
+                    && !isset($fields[$m[1]])
+                    && !in_array($m[1], $loopAliases, true)
+                    && !in_array($m[1], self::RESERVED, true)
+                ) {
+                    $refs[] = new EchoRef($m[1], $m[1], 'undeclared', $at, $echoEnd, $this->lineAt($source, $at));
+                }
+
+                $at = $echoEnd;
+
+                continue;
+            }
+
+            if ($state === 'TEXT') {
+                if ($char === '<' && preg_match('/\G<([a-zA-Z][\w:.-]*)/A', $source, $m, 0, $at)) {
+                    $state = 'TAG';
+                    $at += strlen($m[0]);
+
+                    continue;
+                }
+
+                if (substr($source, $at, 2) === '</') {
+                    $state = 'TAG';
+                    $at += 2;
+
+                    continue;
+                }
+
+                $at++;
+
+                continue;
+            }
+
+            if ($state === 'TAG') {
+                if ($char === '>') {
+                    $state = 'TEXT';
+                    $at++;
+
+                    continue;
+                }
+
+                if ($char === '"' || $char === "'") {
+                    $state = 'ATTR';
+                    $quote = $char;
+                    $at++;
+
+                    continue;
+                }
+
+                $at++;
+
+                continue;
+            }
+
+            // ATTR
+            if ($char === $quote) {
+                $state = 'TAG';
+            }
+
+            $at++;
+        }
+
+        return $refs;
+    }
+
+    /**
+     * Which field an expression echoes, if any.
+     *
+     * Only the innermost loop is consulted: inside a nested loop the
+     * `$loop->index` a sentinel would emit belongs to that inner loop, so a
+     * repeater echo there is left unmapped rather than mislabelled.
+     *
+     * @return array{0: ?string, 1: ?string} [field key, sentinel path]
+     */
+    private function resolve(string $expression, array $fields, array $loops): array
+    {
+        $expression = trim($expression);
+
+        // {{ $heading }} and {{ $heading ?? 'fallback' }}
+        if (preg_match('/^\$(\w+)(?:\s*\?\?.*)?$/s', $expression, $m) && isset($fields[$m[1]])) {
+            return [$m[1], $m[1]];
+        }
+
+        $loop = end($loops);
+
+        if (!$loop || $loop['field'] === null) {
+            return [null, null];
+        }
+
+        // {{ $item['title'] }} / {{ $item->title }} inside @foreach ($people as $item)
+        $alias = preg_quote($loop['alias'], '/');
+
+        if (preg_match('/^\$' . $alias . '(?:\[[\'"](\w+)[\'"]\]|->(\w+))(?:\s*\?\?.*)?$/s', $expression, $m)) {
+            $sub = ($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? '');
+
+            return [$loop['field'], $loop['field'] . '.{{ $loop->index }}.' . $sub];
+        }
+
+        return [null, null];
+    }
+
+    /** @return list<array{0: int, 1: int}> */
+    private function skipRegions(string $source): array
+    {
+        $regions = [];
+
+        foreach (self::SKIP as [$open, $close]) {
+            $at = 0;
+
+            while (($start = strpos($source, $open, $at)) !== false) {
+                $closeAt = strpos($source, $close, $start + strlen($open));
+                // An unterminated region skips only its opener — never to EOF,
+                // which would silently blind the scanner to the whole file.
+                $end = $closeAt === false ? $start + strlen($open) : $closeAt + strlen($close);
+                $regions[] = [$start, $end];
+                $at = $end;
+            }
+        }
+
+        foreach (['script', 'style'] as $tag) {
+            $at = 0;
+
+            while (($start = stripos($source, '<' . $tag, $at)) !== false) {
+                $closeAt = stripos($source, '</' . $tag, $start);
+                $end = $closeAt === false ? $start + strlen($tag) + 1 : $closeAt;
+                $regions[] = [$start, $end];
+                $at = $end + 1;
+            }
+        }
+
+        return $regions;
+    }
+
+    /** @param list<array{0: int, 1: int}> $regions */
+    private function skipTo(array $regions, int $offset): ?int
+    {
+        foreach ($regions as [$start, $end]) {
+            if ($offset >= $start && $offset < $end) {
+                return $end;
+            }
+        }
+
+        return null;
+    }
+
+    private function lineAt(string $source, int $offset): int
+    {
+        return substr_count($source, "\n", 0, $offset) + 1;
+    }
+}

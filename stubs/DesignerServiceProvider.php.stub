@@ -1,0 +1,545 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Foundation\Vite;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * Serves the site in resources/designer.
+ *
+ * Designer Studio installed this file, but nothing in it depends on Studio:
+ * remove the package and the site keeps working, because this provider and
+ * the files it reads are the whole runtime.
+ *
+ *   resources/designer/views/pages/*.blade.php       one page per URL; index.blade.php is "/"
+ *   resources/designer/views/components/**            anonymous components: <x-sections.hero>, <x-layouts.main>
+ *   resources/designer/data/site.json                 $site, in every page and component
+ *   resources/designer/data/collections/<name>.json   $<name>, likewise
+ *   resources/designer/data/content/<dir>/*.md        $<dir>, markdown entries
+ *   resources/designer/css/*.css                      the site's stylesheets (see @vite below)
+ *   resources/designer/designer.json                  per-page SEO tags and redirects for renamed pages
+ *   public/designer/**                                images, scripts, and uploads, served as static files
+ *
+ * A page named [posts.slug].blade.php is served once per row of the `posts`
+ * collection, at /<folder>/<slug>: inside it $posts is that row and $entries
+ * the whole collection.
+ *
+ * `@vite([...])` entries under resources/designer are inlined for Tailwind's
+ * browser build — the site needs no build step. Every other entry goes to
+ * your app's own Vite as usual.
+ *
+ * Your routes always win: the site is served from Route::fallback, which
+ * only runs when no route of your own matched.
+ *
+ * @version 1
+ */
+class DesignerServiceProvider extends ServiceProvider
+{
+    /** Middleware for the site's pages. */
+    protected const MIDDLEWARE = ['web'];
+
+    /** Tailwind's browser build, which compiles the inlined stylesheets. */
+    public const TAILWIND = 'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4';
+
+    public function boot(): void
+    {
+        if (! is_dir(self::path('views/pages'))) {
+            return;
+        }
+
+        Blade::anonymousComponentPath(self::path('views/components'));
+
+        if (! $this->app->routesAreCached()) {
+            Route::middleware(self::MIDDLEWARE)->group(function () {
+                Route::fallback(static fn (Request $request) => \{{ namespace }}\DesignerServiceProvider::serve($request));
+            });
+        }
+    }
+
+    /**
+     * Answer a request no other route matched: a page, a renamed page's new
+     * address, the sitemap, or the site's 404 page.
+     */
+    public static function serve(Request $request): Response
+    {
+        if ($request->expectsJson() && ! $request->acceptsHtml()) {
+            abort(404);
+        }
+
+        $path = trim($request->path(), '/');
+
+        if ($path === 'sitemap.xml') {
+            return self::sitemap();
+        }
+
+        if ($page = self::resolve($path)) {
+            return self::render($page, 200);
+        }
+
+        // The home page's own slug: "/" is canonical, unless the app keeps
+        // "/" for itself — then the home page lives at its slug.
+        $home = self::manifest()['home'] ?? 'home';
+        $index = self::path('views/pages/index.blade.php');
+
+        if ($path === $home && is_file($index)) {
+            return self::appOwnsRoot()
+                ? self::render(['file' => $index, 'data' => [], 'slug' => $home], 200)
+                : redirect('/', 301);
+        }
+
+        if ($redirect = self::redirectFor($path)) {
+            return redirect($redirect, 301);
+        }
+
+        if (is_file($notFound = self::path('views/pages/404.blade.php'))) {
+            return self::render(['file' => $notFound, 'data' => [], 'slug' => null], 404);
+        }
+
+        abort(404);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Pages                                                              */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The page file for a URL path, plus the data it renders with.
+     *
+     * @return array{file: string, data: array, slug: ?string}|null
+     */
+    protected static function resolve(string $path): ?array
+    {
+        $segments = $path === '' ? [] : explode('/', $path);
+
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment[0] === '.') {
+                return null; // traversal and hidden files never resolve
+            }
+        }
+
+        $pages = self::path('views/pages');
+        $relative = $path === '' ? 'index' : $path;
+
+        // A flat file wins over a same-named folder's index
+        foreach ([$relative . '.blade.php', $relative . '/index.blade.php'] as $candidate) {
+            if (is_file($pages . '/' . $candidate)) {
+                return ['file' => $pages . '/' . $candidate, 'data' => [], 'slug' => self::slugFor($relative)];
+            }
+        }
+
+        // /<folder>/<value> against [collection.field].blade.php in <folder>
+        if ($segments === []) {
+            return null;
+        }
+
+        $value = array_pop($segments);
+        $folder = $pages . ($segments === [] ? '' : '/' . implode('/', $segments));
+
+        foreach (glob($folder . '/[[]*[]].blade.php') ?: [] as $file) {
+            if (! preg_match('/^\[([A-Za-z_]\w*)\.([A-Za-z_]\w*)\]$/', basename($file, '.blade.php'), $m)) {
+                continue;
+            }
+
+            $entries = self::data()[$m[1]] ?? [];
+
+            foreach (is_array($entries) ? $entries : [] as $entry) {
+                $field = is_object($entry) ? ($entry->{$m[2]} ?? null) : null;
+
+                if (is_scalar($field) && (string) $field === $value) {
+                    // The row shadows its collection in this page only
+                    return ['file' => $file, 'data' => [$m[1] => $entry, 'entries' => $entries], 'slug' => null];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Render a page with the site's data and the static @vite projection. */
+    protected static function render(array $page, int $status): Response
+    {
+        $factory = app('view');
+
+        // Collections first and $site last, so a collection named "site"
+        // can never displace the site object.
+        foreach (self::data() as $key => $value) {
+            $factory->share($key, $value);
+        }
+
+        $vite = app(Vite::class);
+        app()->instance(Vite::class, self::staticVite($vite));
+
+        try {
+            $html = $factory->file($page['file'], $page['data'])->render();
+        } finally {
+            app()->instance(Vite::class, $vite);
+        }
+
+        if ($page['slug'] !== null) {
+            $html = self::withSeo($html, $page['slug']);
+        }
+
+        return response($html, $status)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    /** The designer.json key for a flat page ("index" is the home page). */
+    protected static function slugFor(string $relative): ?string
+    {
+        if (str_contains($relative, '/')) {
+            return null;
+        }
+
+        return $relative === 'index' ? (self::manifest()['home'] ?? 'home') : $relative;
+    }
+
+    /** Where a renamed page lives now. */
+    protected static function redirectFor(string $path): ?string
+    {
+        if ($path === '' || str_contains($path, '/')) {
+            return null;
+        }
+
+        $manifest = self::manifest();
+        $home = $manifest['home'] ?? 'home';
+
+        foreach ($manifest['pages'] ?? [] as $slug => $settings) {
+            if (in_array($path, (array) ($settings['previous_slugs'] ?? []), true)) {
+                return $slug === $home && ! self::appOwnsRoot() ? '/' : '/' . $slug;
+            }
+        }
+
+        return null;
+    }
+
+    /** Whether one of the app's own routes answers "/". */
+    protected static function appOwnsRoot(): bool
+    {
+        foreach (Route::getRoutes()->get('GET') as $route) {
+            if ($route->uri() === '/' && ! $route->isFallback) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Data                                                               */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * $site, every collection, and every markdown content folder — decoded
+     * as objects, exactly as the pages were written against.
+     */
+    protected static function data(): array
+    {
+        return self::once('data', function () {
+            return self::loadData();
+        });
+    }
+
+    /**
+     * Memoise for the current request only — a long-lived worker (Octane)
+     * must see a publish on the very next request.
+     */
+    protected static function once(string $key, \Closure $load): mixed
+    {
+        $attributes = request()->attributes;
+        $key = 'designer.' . $key;
+
+        if (! $attributes->has($key)) {
+            $attributes->set($key, $load());
+        }
+
+        return $attributes->get($key);
+    }
+
+    protected static function loadData(): array
+    {
+        $data = [];
+
+        foreach (glob(self::path('data/collections/*.json')) ?: [] as $file) {
+            $name = basename($file, '.json');
+            $rows = json_decode((string) file_get_contents($file));
+
+            if (preg_match('/^[A-Za-z_]\w*$/', $name) && is_array($rows)) {
+                $data[$name] = $rows;
+            }
+        }
+
+        foreach (glob(self::path('data/content/*'), GLOB_ONLYDIR) ?: [] as $folder) {
+            $name = basename($folder);
+            $files = glob($folder . '/*.md') ?: [];
+            sort($files);
+
+            if (! preg_match('/^[A-Za-z_]\w*$/', $name) || $files === []) {
+                continue;
+            }
+
+            $data[$name] = array_values(array_filter(array_map(
+                fn ($file) => self::markdownEntry($file, $name),
+                $files
+            )));
+        }
+
+        $site = is_file(self::path('data/site.json'))
+            ? json_decode((string) file_get_contents(self::path('data/site.json')))
+            : null;
+
+        $data['site'] = is_object($site) ? $site : new \stdClass;
+
+        return $data;
+    }
+
+    /** A markdown file as {…frontmatter, content, link}, or null if unreadable. */
+    protected static function markdownEntry(string $file, string $folder): ?object
+    {
+        $source = (string) file_get_contents($file);
+        $fields = [];
+
+        if (preg_match('/\A\x{FEFF}?---\r?\n(.*?)\r?\n---\r?\n?(.*)\z/su', $source, $m)) {
+            foreach (preg_split('/\r?\n/', $m[1]) as $line) {
+                if (trim($line) === '') {
+                    continue;
+                }
+
+                if (! preg_match('/^([^\s:][^:]*):\s*(.+)$/', $line, $pair)) {
+                    return null; // only flat `key: value` frontmatter is supported
+                }
+
+                $value = trim($pair[2]);
+                $fields[trim($pair[1])] = match (true) {
+                    preg_match('/^(["\']).*\1$/', $value) === 1 => substr($value, 1, -1),
+                    $value === 'true' => true,
+                    $value === 'false' => false,
+                    preg_match('/^-?\d+$/', $value) === 1 => (int) $value,
+                    preg_match('/^-?\d+\.\d+$/', $value) === 1 => (float) $value,
+                    default => $value,
+                };
+            }
+
+            $source = $m[2];
+        }
+
+        $fields['content'] = Str::markdown($source, ['html_input' => 'allow', 'allow_unsafe_links' => true]);
+        $fields['link'] = '/' . $folder . '/' . basename($file, '.md');
+
+        return (object) $fields;
+    }
+
+    /** resources/designer/designer.json, decoded. */
+    protected static function manifest(): array
+    {
+        return self::once('manifest', function () {
+            $decoded = is_file(self::path('designer.json'))
+                ? json_decode((string) file_get_contents(self::path('designer.json')), true)
+                : null;
+
+            return is_array($decoded) ? $decoded : [];
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  SEO                                                                */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The head tags a page's settings add on top of its layout's own
+     * <title> and description: canonical URL, robots, Open Graph, X, and
+     * structured data. A tag the layout already writes is left to it.
+     */
+    protected static function withSeo(string $html, string $slug): string
+    {
+        $meta = (array) (self::manifest()['pages'][$slug]['meta'] ?? []);
+        $title = preg_match('/<title[^>]*>(.*?)<\/title>/is', $html, $m) ? html_entity_decode(trim($m[1])) : null;
+        $description = preg_match('/<meta\s+name=["\']description["\']\s+content=["\']([^"\']*)["\']/i', $html, $m) ? html_entity_decode($m[1]) : null;
+        $image = $meta['og_image'] ?? null;
+        $tags = [];
+
+        $add = function (string $marker, string $tag) use ($html, &$tags) {
+            if (stripos($html, $marker) === false) {
+                $tags[] = $tag;
+            }
+        };
+
+        $add('rel="canonical"', '<link rel="canonical" href="' . e(($meta['canonical_url'] ?? '') ?: url()->current()) . '">');
+
+        if (! empty($meta['noindex']) || ! empty($meta['nofollow'])) {
+            $add('name="robots"', '<meta name="robots" content="' . (! empty($meta['noindex']) ? 'noindex' : 'index') . ', ' . (! empty($meta['nofollow']) ? 'nofollow' : 'follow') . '">');
+        }
+
+        if (! empty($meta['seo_keywords'])) {
+            $add('name="keywords"', '<meta name="keywords" content="' . e($meta['seo_keywords']) . '">');
+        }
+
+        if ($title !== null) {
+            $add('property="og:title"', '<meta property="og:title" content="' . e($title) . '">');
+        }
+
+        if ($description) {
+            $add('property="og:description"', '<meta property="og:description" content="' . e($description) . '">');
+        }
+
+        $add('property="og:type"', '<meta property="og:type" content="' . e($meta['og_type'] ?? 'website') . '">');
+        $add('property="og:url"', '<meta property="og:url" content="' . e(($meta['canonical_url'] ?? '') ?: url()->current()) . '">');
+        $add('property="og:site_name"', '<meta property="og:site_name" content="' . e(($meta['og_site_name'] ?? '') ?: (self::data()['site']->name ?? config('app.name'))) . '">');
+
+        if (! empty($meta['og_locale'])) {
+            $add('property="og:locale"', '<meta property="og:locale" content="' . e($meta['og_locale']) . '">');
+        }
+
+        if ($image) {
+            $add('property="og:image"', '<meta property="og:image" content="' . e(str_starts_with($image, '/') ? url($image) : $image) . '">');
+
+            if (! empty($meta['og_image_alt'])) {
+                $add('property="og:image:alt"', '<meta property="og:image:alt" content="' . e($meta['og_image_alt']) . '">');
+            }
+        }
+
+        $add('name="twitter:card"', '<meta name="twitter:card" content="' . e($meta['twitter_card'] ?? ($image ? 'summary_large_image' : 'summary')) . '">');
+
+        foreach (['twitter_site' => 'twitter:site', 'twitter_creator' => 'twitter:creator'] as $key => $name) {
+            if (! empty($meta[$key])) {
+                $add('name="' . $name . '"', '<meta name="' . $name . '" content="' . e($meta[$key]) . '">');
+            }
+        }
+
+        if (! empty($meta['favicon'])) {
+            $tags[] = '<link rel="icon" href="' . e($meta['favicon']) . '">';
+        }
+
+        if (! empty($meta['theme_color'])) {
+            $add('name="theme-color"', '<meta name="theme-color" content="' . e($meta['theme_color']) . '">');
+        }
+
+        if (! empty($meta['json_ld']) && ($decoded = json_decode($meta['json_ld'])) !== null) {
+            $tags[] = '<script type="application/ld+json">' . json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>';
+        }
+
+        if (! empty($meta['head_html'])) {
+            $tags[] = $meta['head_html'];
+        }
+
+        if ($tags === [] || ($at = stripos($html, '</head>')) === false) {
+            return $html;
+        }
+
+        return substr($html, 0, $at) . '    ' . implode("\n    ", $tags) . "\n" . substr($html, $at);
+    }
+
+    /** /sitemap.xml: every page, and every row of a dynamic page. */
+    protected static function sitemap(): Response
+    {
+        $pages = self::path('views/pages');
+        $manifest = self::manifest();
+        $urls = [];
+
+        $files = is_dir($pages)
+            ? new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($pages, \FilesystemIterator::SKIP_DOTS))
+            : [];
+
+        foreach ($files as $file) {
+            if (! str_ends_with($file->getFilename(), '.blade.php')) {
+                continue;
+            }
+
+            $relative = substr($file->getPathname(), strlen($pages) + 1, -strlen('.blade.php'));
+            $name = basename($relative);
+            $folder = dirname($relative) === '.' ? '' : dirname($relative);
+
+            if ($name === '404') {
+                continue;
+            }
+
+            if (preg_match('/^\[([A-Za-z_]\w*)\.([A-Za-z_]\w*)\]$/', $name, $m)) {
+                foreach ((array) (self::data()[$m[1]] ?? []) as $entry) {
+                    $value = is_object($entry) ? ($entry->{$m[2]} ?? null) : null;
+
+                    if (is_scalar($value) && (string) $value !== '' && ! str_contains((string) $value, '/')) {
+                        $urls[] = [ltrim($folder . '/' . $value, '/'), $file->getMTime()];
+                    }
+                }
+
+                continue;
+            }
+
+            $slug = self::slugFor($relative);
+
+            if ($slug !== null && ! empty($manifest['pages'][$slug]['meta']['noindex'])) {
+                continue;
+            }
+
+            $path = $name === 'index' ? $folder : ltrim($folder . '/' . $name, '/');
+            $urls[] = [$path, $file->getMTime()];
+        }
+
+        usort($urls, fn ($a, $b) => strcmp($a[0], $b[0]));
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+        foreach ($urls as [$path, $modified]) {
+            $xml .= '    <url><loc>' . e(url($path)) . '</loc><lastmod>' . date('Y-m-d', $modified) . '</lastmod></url>' . "\n";
+        }
+
+        return response($xml . '</urlset>' . "\n", 200)->header('Content-Type', 'application/xml');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  @vite                                                              */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The app's Vite, except that entries under resources/designer come
+     * back inlined for Tailwind's browser build instead of needing a build.
+     */
+    protected static function staticVite(Vite $vite): Vite
+    {
+        return new class ($vite) extends Vite {
+            public function __construct(Vite $app)
+            {
+                // Keep every setting the app gave its own Vite instance
+                foreach (get_object_vars($app) as $property => $value) {
+                    $this->{$property} = $value;
+                }
+            }
+
+            public function __invoke($entrypoints = null, $buildDirectory = null)
+            {
+                $entries = is_string($entrypoints) ? [$entrypoints] : (array) $entrypoints;
+                $site = [];
+                $app = [];
+
+                foreach ($entries as $entry) {
+                    str_starts_with((string) $entry, 'resources/designer/') ? $site[] = $entry : $app[] = $entry;
+                }
+
+                $html = $app === [] ? '' : (string) parent::__invoke($app, $buildDirectory);
+                $styles = [];
+
+                foreach ($site as $entry) {
+                    if (! str_ends_with($entry, '.js') && is_file(base_path($entry))) {
+                        $styles[] = '<style type="text/tailwindcss">' . file_get_contents(base_path($entry)) . '</style>';
+                    }
+                }
+
+                if ($styles !== []) {
+                    $html .= '<script src="' . DesignerServiceProvider::TAILWIND . '"></script>' . "\n" . implode("\n", $styles);
+                }
+
+                return new HtmlString($html);
+            }
+        };
+    }
+
+    protected static function path(string $path = ''): string
+    {
+        return resource_path('designer' . ($path === '' ? '' : '/' . $path));
+    }
+}

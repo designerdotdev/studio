@@ -1,136 +1,296 @@
 <x-studio::layouts.app>
-    <div class="w-full h-full flex items-center justify-center bg-gray-100">
-        <p class="text-gray-400 text-sm">Complete the setup to get started.</p>
-    </div>
+    <x-slot:title>Welcome — Designer Studio</x-slot:title>
 
-    <x-slot:sidebar>
-        <div class="flex flex-col h-full">
-            <div class="p-4 border-b border-gray-200 bg-white">
-                <span class="font-medium text-gray-900">Designer Studio</span>
-            </div>
-        </div>
-    </x-slot:sidebar>
+    <style>
+        @keyframes onboard-up {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-    {{-- Onboarding Modal --}}
+        .onboard-up {
+            opacity: 0;
+            animation: onboard-up 600ms cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+        }
+    </style>
+
     <div
+        class="s-canvas relative h-full w-full overflow-y-auto"
         x-data="{
             step: 1,
-            selectedTemplate: null,
+            selected: @js(array_key_first(array_filter($templates, fn ($t) => $t['active'])) ?? array_key_first($templates)),
+            filter: 'all',
+            theme: 'all',
+            query: '',
+            showInactive: false,
             applying: false,
+            templates: @js(array_map(fn ($key, $t) => [
+                'key' => $key,
+                'title' => $t['title'],
+                'category' => $t['category'],
+                'theme' => $t['theme'],
+                'active' => $t['active'],
+                'search' => \Illuminate\Support\Str::lower($t['title'] . ' ' . $key . ' ' . $t['category'] . ' ' . $t['theme'] . ' ' . $t['description']),
+            ], array_keys($templates), $templates)),
+
+            showTemplates() {
+                this.step = 2;
+            },
+
+            matches(template) {
+                const needle = this.query.trim().toLowerCase();
+
+                return (template.active || this.showInactive)
+                    && (this.filter === 'all' || template.category === this.filter)
+                    && (this.theme === 'all' || template.theme === this.theme)
+                    && (!needle || template.search.includes(needle));
+            },
+
+            get shown() {
+                return this.templates.filter((t) => this.matches(t)).length;
+            },
+
+            /* What the count is out of: the offered templates, or all of them. */
+            get offered() {
+                return this.showInactive ? this.templates.length : this.templates.filter((t) => t.active).length;
+            },
+
+            get selectedTitle() {
+                return this.templates.find((t) => t.key === this.selected)?.title ?? '—';
+            },
+
+            reset() {
+                this.filter = 'all';
+                this.theme = 'all';
+                this.query = '';
+            },
 
             async apply() {
-                if (!this.selectedTemplate || this.applying) return;
-
+                if (!this.selected || this.applying) return;
                 this.applying = true;
                 try {
-                    const response = await fetch('{{ route('studio.api.onboarding.apply') }}', {
+                    const response = await fetch(@js(route('studio.api.onboarding.apply')), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
                         },
-                        body: JSON.stringify({ template: this.selectedTemplate }),
+                        body: JSON.stringify({ template: this.selected }),
                     });
                     const data = await response.json();
                     if (data.success && data.redirect) {
                         window.location.href = data.redirect;
+                        return;
                     }
+                    window.Studio?.toast(data.message || 'The template could not be installed', 'error', 8000);
                 } catch (e) {
-                    console.error(e);
-                    this.applying = false;
+                    window.Studio?.toast('Something went wrong — please try again', 'error');
                 }
+                this.applying = false;
             }
         }"
-        class="fixed inset-0 z-50 overflow-y-auto"
-        aria-labelledby="onboarding-title"
-        role="dialog"
-        aria-modal="true"
     >
-        <div class="flex items-center justify-center min-h-screen px-4">
-            {{-- Backdrop --}}
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+        {{-- Step 1 — Welcome --}}
+        <div x-show="step === 1" class="flex min-h-full flex-col items-center justify-center px-6 py-16 text-center">
+            <div class="onboard-up flex h-16 w-16 items-center  text-ink justify-center rounded-2xl" style="animation-delay: 60ms">
+                <svg class="h-8 w-auto text-ink" viewBox="0 0 72 75" fill="none">
+                    <path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/>
+                </svg>
+            </div>
 
-            {{-- Modal --}}
-            <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full p-8">
-                {{-- Step 1: Welcome --}}
-                <div x-show="step === 1">
-                    <div class="text-center">
-                        <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-blue-100 mb-5">
-                            <svg class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
-                            </svg>
-                        </div>
-                        <h2 id="onboarding-title" class="text-2xl font-bold text-gray-900">
-                            Welcome to Designer
-                        </h2>
-                        <p class="mt-3 text-gray-600 leading-relaxed">
-                            Build beautiful pages visually with a drag-and-drop editor. Choose a starting template and you'll be up and running in seconds.
-                        </p>
-                    </div>
-                    <div class="mt-8">
-                        <button
-                            @click="step = 2"
-                            class="w-full inline-flex justify-center rounded-lg border border-transparent px-5 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                        >
-                            Next
-                        </button>
-                    </div>
+            <h1 class="onboard-up mt-8 text-4xl font-semibold tracking-tight text-ink" style="animation-delay: 140ms">
+                Welcome to Designer Studio
+            </h1>
+            <p class="onboard-up mt-4 max-w-md text-[15px] leading-relaxed text-soft" style="animation-delay: 220ms">
+                The visual designer for your Laravel site. Developers define the sections — anyone on the team edits the pages.
+            </p>
+
+            <div class="onboard-up mt-10" style="animation-delay: 300ms">
+                <button @click="showTemplates()" class="s-btn-primary !h-11 !px-7 !text-sm">
+                    Choose a template
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+
+            <p class="onboard-up mt-16 text-xs text-faint" style="animation-delay: 380ms">
+                Everything can be changed later — templates are just a starting point.
+            </p>
+        </div>
+
+        {{-- Step 2 — Template picker --}}
+        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
+            <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                    <p class="s-microlabel">Step 2 of 2</p>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-ink">Pick a starting point</h1>
+                    <p class="mt-1.5 max-w-2xl text-[13.5px] text-soft">Whole sites, ready to edit. Its files are added to your app in <span class="font-mono text-[12px] text-ink/80">resources/designer</span> and <span class="font-mono text-[12px] text-ink/80">public/designer</span> — yours to keep, with or without Studio.</p>
                 </div>
+                <button @click="step = 1" class="s-btn-ghost shrink-0">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>
+                    Back
+                </button>
+            </div>
 
-                {{-- Step 2: Template Selection --}}
-                <div x-show="step === 2" x-cloak>
-                    <div class="text-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-900">
-                            Choose a Template
-                        </h2>
-                        <p class="mt-2 text-gray-600">
-                            Pick a starting point for your first page.
-                        </p>
-                    </div>
-
-                    <div class="space-y-3">
-                        @foreach($templates as $key => $template)
-                            <button
-                                @click="selectedTemplate = '{{ $key }}'"
-                                :class="selectedTemplate === '{{ $key }}'
-                                    ? 'border-blue-500 ring-2 ring-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'"
-                                class="w-full text-left p-4 rounded-lg border-2 transition-all"
+            @if(count($templates) > 1)
+                <div class="mt-8 flex flex-wrap items-center gap-3">
+                    @if(count($templates) > 6)
+                        <label class="relative block w-full max-w-[280px]">
+                            <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <input
+                                type="search"
+                                x-model="query"
+                                x-ref="search"
+                                @keydown.escape="query = ''; $el.blur()"
+                                @keydown.window.slash="if (step === 2 && document.activeElement !== $refs.search && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) { $event.preventDefault(); $refs.search.focus() }"
+                                class="s-input !pl-8"
+                                placeholder="Search templates"
+                                autocomplete="off"
+                                aria-label="Search templates"
                             >
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <h3 class="font-semibold text-gray-900">{{ $template['title'] }}</h3>
-                                        <p class="text-sm text-gray-500 mt-0.5">{{ $template['description'] }}</p>
-                                    </div>
-                                    <div
-                                        x-show="selectedTemplate === '{{ $key }}'"
-                                        class="flex-shrink-0 ml-3"
-                                    >
-                                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </button>
-                        @endforeach
-                    </div>
+                        </label>
+                    @endif
 
-                    <div class="mt-8 flex gap-3">
+                    @if(count($categories) > 1)
+                        <div class="s-seg" role="tablist" aria-label="Filter templates by category">
+                            <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === 'all' && 'is-active'" :aria-selected="filter === 'all'" @click="filter = 'all'">All</button>
+                            @foreach($categories as $category => $label)
+                                <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="filter === @js($category) && 'is-active'" :aria-selected="filter === @js($category)" @click="filter = @js($category)">{{ $label }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if(count($themes) > 1)
+                        <div class="s-seg" role="tablist" aria-label="Filter templates by theme">
+                            <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="theme === 'all' && 'is-active'" :aria-selected="theme === 'all'" @click="theme = 'all'">Any theme</button>
+                            @foreach($themes as $option)
+                                <button type="button" role="tab" class="s-seg-btn !w-auto px-3 text-[12.5px] font-medium" :class="theme === @js($option) && 'is-active'" :aria-selected="theme === @js($option)" @click="theme = @js($option)">{{ \Illuminate\Support\Str::headline($option) }}</button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($local && count(array_filter($templates, fn ($t) => ! $t['active'])) > 0)
                         <button
-                            @click="step = 1"
-                            class="flex-1 inline-flex justify-center rounded-lg border border-gray-300 px-5 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                            type="button"
+                            class="s-btn-ghost !h-7 px-2.5 text-[12.5px]"
+                            :class="showInactive && '!text-ink !bg-wash'"
+                            :aria-pressed="showInactive"
+                            @click="showInactive = ! showInactive"
                         >
-                            Back
+                            <span x-text="showInactive ? 'Hide inactive' : 'Show inactive'">Show inactive</span>
                         </button>
-                        <button
-                            @click="apply()"
-                            :disabled="!selectedTemplate || applying"
-                            class="flex-1 inline-flex justify-center rounded-lg border border-transparent px-5 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    @endif
+
+                    <span class="text-xs text-faint tabular-nums" x-text="shown + ' of ' + offered + ' templates'">{{ count(array_filter($templates, fn ($t) => $t['active'])) }} templates</span>
+                </div>
+            @endif
+
+            <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach($templates as $key => $template)
+                    <button
+                        type="button"
+                        x-show="matches(templates[{{ $loop->index }}])"
+                        @click="selected = @js($key)"
+                        @dblclick="selected = @js($key); apply()"
+                        class="group relative flex flex-col overflow-hidden rounded-2xl border bg-raised text-left transition-all duration-150"
+                        :class="selected === @js($key)
+                            ? 'border-accent shadow-[0_0_0_3px_color-mix(in_srgb,#4c7dfa_25%,transparent)] -translate-y-0.5'
+                            : 'border-line hover:border-line-strong hover:-translate-y-0.5'"
+                    >
+                        {{-- Preview --}}
+                        <span
+                            data-template-preview
+                            class="pointer-events-none relative block w-full overflow-hidden bg-white"
+                            style="aspect-ratio: 16/11"
                         >
-                            <span x-show="!applying">Get Started</span>
-                            <span x-show="applying">Setting up...</span>
-                        </button>
-                    </div>
+                            {{-- Each template ships a picture of itself --}}
+                            <img
+                                src="{{ route('studio.preview.thumbnail', ['name' => $key]) }}"
+                                loading="lazy"
+                                alt="{{ $template['title'] }} preview"
+                                class="absolute inset-0 h-full w-full object-cover object-top"
+                            >
+                            <span class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/5 to-transparent"></span>
+
+                            {{-- Selected check --}}
+                            <span
+                                x-show="selected === @js($key)"
+                                x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-75"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                class="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-white shadow-lg"
+                            >
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
+                            </span>
+                        </span>
+
+                        {{-- Meta --}}
+                        <span class="flex flex-1 flex-col border-t border-line p-4">
+                            <span class="flex items-center gap-2">
+                                <span class="text-[13.5px] font-semibold text-ink">{{ $template['title'] }}</span>
+                                @unless($template['active'])
+                                    <span class="s-chip !border-dashed !text-faint">inactive</span>
+                                @endunless
+                                @if($template['pages'] > 1)
+                                    <span class="s-chip">{{ $template['pages'] }} pages</span>
+                                @endif
+                            </span>
+                            <span class="mt-1 line-clamp-3 text-xs leading-relaxed text-soft">{{ $template['description'] }}</span>
+                            @if($template['preview_url'])
+                                <span class="mt-3 flex items-center gap-3 text-[12px]">
+                                    <a
+                                        href="{{ $template['preview_url'] }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        @click.stop
+                                        @dblclick.stop
+                                        class="inline-flex items-center gap-1 font-medium text-soft transition-colors hover:text-ink"
+                                    >
+                                        Preview
+                                        <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6h7m-3-3 3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </a>
+                                    @if($template['theme'])
+                                        <span class="text-faint">{{ \Illuminate\Support\Str::headline($template['theme']) }}</span>
+                                    @endif
+                                </span>
+                            @endif
+                        </span>
+                    </button>
+                @endforeach
+            </div>
+
+            <div x-show="shown === 0" x-cloak class="py-20 text-center text-[13.5px] text-soft">
+                <p>No templates match those filters.</p>
+                <button type="button" @click="reset()" class="s-btn-ghost mt-3">Clear filters</button>
+            </div>
+
+        </div>
+
+        {{-- Step 2 — pinned action bar (always visible while browsing templates) --}}
+        <div
+            x-show="step === 2"
+            x-cloak
+            class="sticky bottom-0 z-20 border-t border-line bg-shell/85 shadow-[0_-16px_40px_-16px_rgba(0,0,0,0.65)] backdrop-blur-xl"
+        >
+            <div class="mx-auto flex w-full max-w-6xl items-center gap-4 px-6 py-3.5">
+                <p class="hidden text-xs text-faint sm:block">Tip: double-click a template to jump straight in.</p>
+
+                <div class="ml-auto flex items-center gap-3">
+                    <p class="text-[13px] text-soft">
+                        <span class="text-faint">Selected:</span>
+                        <span class="font-medium text-ink" x-text="selectedTitle"></span>
+                    </p>
+                    <button
+                        @click="apply()"
+                        :disabled="!selected || applying"
+                        class="s-btn-primary !h-10 !px-6"
+                    >
+                        <span x-show="!applying">Use this template</span>
+                        <span x-show="applying" x-cloak class="flex items-center gap-2">
+                            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
+                            Setting up your site…
+                        </span>
+                    </button>
                 </div>
             </div>
         </div>

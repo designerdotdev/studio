@@ -12,11 +12,32 @@ class PageRepository
         protected StudioStorage $storage
     ) {}
 
+    /**
+     * Every page, in Pages-panel order: explicitly ordered pages first
+     * (by `order`), then the rest by title.
+     */
     public function all(): Collection
     {
         $slugs = $this->storage->list('pages');
 
-        return collect($slugs)->map(fn($slug) => $this->find($slug))->filter();
+        return collect($slugs)
+            ->map(fn($slug) => $this->find($slug))
+            ->filter()
+            ->sortBy(fn(PageData $p) => [$p->order ?? PHP_INT_MAX, mb_strtolower($p->title)])
+            ->values();
+    }
+
+    /** Persist a new order: the position of each slug in the list */
+    public function reorder(array $slugs): void
+    {
+        foreach (array_values($slugs) as $position => $slug) {
+            $existing = $this->storage->read("pages/{$slug}.json");
+
+            if ($existing && ($existing['order'] ?? null) !== $position) {
+                $existing['order'] = $position;
+                $this->storage->write("pages/{$slug}.json", $existing);
+            }
+        }
     }
 
     public function find(string $slug): ?PageData
@@ -32,21 +53,26 @@ class PageRepository
 
     public function create(array $data): PageData
     {
-        $slug = $data['slug'] ?? Str::slug($data['title'] ?? 'untitled');
+        $slug = Str::slug(($data['slug'] ?? '') ?: ($data['title'] ?? 'untitled'));
 
-        // Ensure unique slug
-        $originalSlug = $slug;
-        $counter = 1;
-        while ($this->storage->exists("pages/{$slug}.json")) {
-            $slug = $originalSlug . '-' . $counter++;
+        if ($slug === '') {
+            $slug = 'untitled';
         }
+
+        $slug = $this->uniqueSlug($slug);
 
         $pageData = [
             'id' => (string) Str::uuid(),
             'slug' => $slug,
             'title' => $data['title'] ?? 'Untitled Page',
             'description' => $data['description'] ?? '',
-            'layout' => $data['layout'] ?? config('studio.default_layout', 'layouts.app'),
+            'layout' => $data['layout'] ?? null,
+            // The layout the page file wraps its sections in. A new page
+            // gets the site's main one — without a layout a page has no
+            // <head>, so no fonts or styles.
+            'layout_ref' => array_key_exists('layout_ref', $data)
+                ? $data['layout_ref']
+                : app(LayoutRepository::class)->primary(),
             'created_at' => now()->toIso8601String(),
             'updated_at' => now()->toIso8601String(),
             'meta' => $data['meta'] ?? [],
@@ -66,10 +92,22 @@ class PageRepository
             return null;
         }
 
-        // Handle slug change
-        $newSlug = $data['slug'] ?? $slug;
+        // Handle slug change (slugify, keep unique, move the file)
+        $newSlug = Str::slug($data['slug'] ?? $slug) ?: $slug;
+
         if ($newSlug !== $slug) {
+            $newSlug = $this->uniqueSlug($newSlug);
+            $data['slug'] = $newSlug;
+
+            // Remember retired slugs so published URLs can 301 to the new one
+            $data['previous_slugs'] = array_values(array_diff(
+                array_unique([...($existing['previous_slugs'] ?? []), $slug]),
+                [$newSlug]
+            ));
+
             $this->storage->delete("pages/{$slug}.json");
+        } else {
+            $data['slug'] = $slug;
         }
 
         $updated = array_merge($existing, $data, [
@@ -81,12 +119,117 @@ class PageRepository
         return PageData::fromArray($updated);
     }
 
+    /**
+     * A slug no other page uses — Studio's pages, and the hand-written pages
+     * in the site's files (the 404 page, say), whose URLs are taken too.
+     */
+    protected function uniqueSlug(string $slug): string
+    {
+        $reserved = app(\Designer\Studio\Services\Site\SiteMirror::class)->reservedSlugs();
+        $base = $slug;
+        $counter = 1;
+
+        while ($this->storage->exists("pages/{$slug}.json") || in_array($slug, $reserved, true)) {
+            $slug = $base . '-' . $counter++;
+        }
+
+        return $slug;
+    }
+
     public function delete(string $slug): bool
     {
         return $this->storage->delete("pages/{$slug}.json");
     }
 
-    public function addComponent(string $pageSlug, string $componentRef, array $variables = [], ?int $order = null): ?PageData
+    /**
+     * Duplicate a page (components get fresh instance ids).
+     */
+    public function duplicate(string $slug): ?PageData
+    {
+        $existing = $this->storage->read("pages/{$slug}.json");
+
+        if (!$existing) {
+            return null;
+        }
+
+        $components = array_map(function ($comp) {
+            $comp['id'] = (string) Str::uuid();
+
+            return $comp;
+        }, $existing['components'] ?? []);
+
+        return $this->create([
+            'title' => ($existing['title'] ?? 'Untitled') . ' Copy',
+            'slug' => ($existing['slug'] ?? $slug) . '-copy',
+            'description' => $existing['description'] ?? '',
+            'layout' => $existing['layout'] ?? null,
+            'layout_ref' => $existing['layout_ref'] ?? null,
+            'meta' => $existing['meta'] ?? [],
+            'components' => $components,
+        ]);
+    }
+
+    /**
+     * Duplicate a section instance in place (inserted directly below the original).
+     */
+    public function duplicateComponent(string $pageSlug, string $componentId): ?PageData
+    {
+        $page = $this->storage->read("pages/{$pageSlug}.json");
+
+        if (!$page) {
+            return null;
+        }
+
+        $components = collect($page['components'] ?? [])->sortBy('order')->values()->toArray();
+        $index = null;
+
+        foreach ($components as $i => $comp) {
+            if ($comp['id'] === $componentId) {
+                $index = $i;
+                break;
+            }
+        }
+
+        if ($index === null) {
+            return null;
+        }
+
+        $copy = $components[$index];
+        $copy['id'] = (string) Str::uuid();
+
+        array_splice($components, $index + 1, 0, [$copy]);
+
+        foreach ($components as $i => &$comp) {
+            $comp['order'] = $i;
+        }
+        unset($comp);
+
+        return $this->update($pageSlug, ['components' => $components]);
+    }
+
+    /**
+     * Toggle a section's visibility without removing it from the page.
+     */
+    public function setComponentHidden(string $pageSlug, string $componentId, bool $hidden): ?PageData
+    {
+        $page = $this->storage->read("pages/{$pageSlug}.json");
+
+        if (!$page) {
+            return null;
+        }
+
+        $components = collect($page['components'] ?? [])->map(function ($comp) use ($componentId, $hidden) {
+            if ($comp['id'] === $componentId) {
+                $comp['hidden'] = $hidden;
+            }
+
+            return $comp;
+        })->toArray();
+
+        return $this->update($pageSlug, ['components' => $components]);
+    }
+
+    public function addComponent(string $pageSlug, string $componentRef, array $variables = [], ?int $insertAtIndex = null): ?PageData
     {
         $page = $this->storage->read("pages/{$pageSlug}.json");
 
@@ -95,19 +238,74 @@ class PageRepository
         }
 
         $components = $page['components'] ?? [];
-        $maxOrder = collect($components)->max('order') ?? -1;
 
-        $components[] = [
+        // Sort existing by order
+        usort($components, fn($a, $b) => $a['order'] <=> $b['order']);
+
+        $newComponent = [
             'id' => (string) Str::uuid(),
             'component_ref' => $componentRef,
-            'order' => $order ?? ($maxOrder + 1),
+            'order' => 0,
             'variables' => $variables,
         ];
 
-        // Re-sort by order
-        usort($components, fn($a, $b) => $a['order'] <=> $b['order']);
+        // A repeater declared with `source: collections.<name>` starts
+        // bound to that collection when it exists in this site.
+        if ($bindings = self::defaultBindings($componentRef)) {
+            $newComponent['bindings'] = $bindings;
+        }
+
+        if ($insertAtIndex !== null && $insertAtIndex >= 0 && $insertAtIndex <= count($components)) {
+            // Insert at specific position
+            array_splice($components, $insertAtIndex, 0, [$newComponent]);
+        } else {
+            // Append at end
+            $components[] = $newComponent;
+        }
+
+        // Re-number orders sequentially
+        foreach ($components as $i => &$comp) {
+            $comp['order'] = $i;
+        }
+        unset($comp);
 
         return $this->update($pageSlug, ['components' => $components]);
+    }
+
+    /**
+     * The bindings a freshly added section should start with: every field
+     * whose yml declares a `source` — `collections.<name>` (a collection
+     * that exists) or `site.<key>` (site-wide data such as a menu). Shared
+     * by pages and layouts.
+     */
+    public static function defaultBindings(string $componentRef): array
+    {
+        $component = app(ComponentRepository::class)->find($componentRef);
+
+        if (!$component) {
+            return [];
+        }
+
+        $collections = app(CollectionRepository::class);
+        $bindings = [];
+
+        foreach ($component->fields as $key => $config) {
+            $source = $config['source'] ?? null;
+
+            if (is_string($source) && str_starts_with($source, 'collections.')) {
+                if ($name = $collections->resolveName(substr($source, strlen('collections.')))) {
+                    $bindings[$key] = 'collections.' . $name;
+                }
+
+                continue;
+            }
+
+            if (\Designer\Studio\Services\CollectionBinder::sitePath($source) !== null) {
+                $bindings[$key] = $source;
+            }
+        }
+
+        return $bindings;
     }
 
     public function updateComponentVariables(string $pageSlug, string $componentId, array $variables): ?PageData
@@ -121,6 +319,38 @@ class PageRepository
         $components = collect($page['components'] ?? [])->map(function ($comp) use ($componentId, $variables) {
             if ($comp['id'] === $componentId) {
                 $comp['variables'] = array_merge($comp['variables'] ?? [], $variables);
+            }
+
+            return $comp;
+        })->toArray();
+
+        return $this->update($pageSlug, ['components' => $components]);
+    }
+
+    /**
+     * Replace an instance's collection bindings (`{field: "collections.x"}`).
+     * Passing an empty array unbinds every field; `$variables`, when given,
+     * is merged at the same time (used to keep a copy of the rows on unbind).
+     */
+    public function updateComponentBindings(string $pageSlug, string $componentId, array $bindings, ?array $variables = null): ?PageData
+    {
+        $page = $this->storage->read("pages/{$pageSlug}.json");
+
+        if (!$page) {
+            return null;
+        }
+
+        $components = collect($page['components'] ?? [])->map(function ($comp) use ($componentId, $bindings, $variables) {
+            if ($comp['id'] === $componentId) {
+                if ($bindings === []) {
+                    unset($comp['bindings']);
+                } else {
+                    $comp['bindings'] = $bindings;
+                }
+
+                if ($variables !== null) {
+                    $comp['variables'] = array_merge($comp['variables'] ?? [], $variables);
+                }
             }
 
             return $comp;
