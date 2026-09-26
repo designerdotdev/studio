@@ -142,19 +142,7 @@
                 {{-- One row: the docked panel (when the toolbar is pinned)
                      and the stage. A right rail flips the row so the panel
                      sits beside it. --}}
-                {{-- With the chat pinned to a side the row keeps its
-                     width free on that side (a padding, transitioned, so
-                     the site slides over as the column arrives) and the
-                     chat's fixed host sits in the strip. --}}
-                <div
-                    class="s-app-row flex min-h-0 min-w-0 flex-1"
-                    :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'"
-                    :style="{
-                        paddingLeft: $store.studio.chatSide === 'left' && $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px',
-                        paddingRight: $store.studio.chatSide === 'right' && $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px',
-                    }"
-                    @transitionend.self="if ($event.propertyName === 'padding-left' || $event.propertyName === 'padding-right') window.dispatchEvent(new CustomEvent('studio:reflow'))"
-                >
+                <div class="s-app-row flex min-h-0 min-w-0 flex-1" :class="$store.studio.docked && $store.studio.panelSide === 'right' && 'flex-row-reverse'">
 
                 {{-- The floating surface: every panel lives here, one visible
                      at a time. Anchored to its dock button (popover), centred
@@ -285,8 +273,20 @@
                     ></div>
                 </aside>
 
-                {{-- The site is the screen: the stage fills what is left. --}}
-                <main class="s-stage">
+                {{-- The site is the screen: the stage fills what is left.
+                     With the chat pinned to a side the stage keeps a margin
+                     free on that side (transitioned, so the site slides over
+                     as the column arrives) and the chat's fixed host sits in
+                     it — always right beside the site, inside any docked
+                     panel column on that side. --}}
+                <main
+                    class="s-stage"
+                    :style="{
+                        marginLeft: $store.studio.chatSide === 'left' && $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px',
+                        marginRight: $store.studio.chatSide === 'right' && $store.studio.chatSideSpace ? `calc(${$store.studio.chatSideSpace}px + var(--studio-gutter, 5px))` : '0px',
+                    }"
+                    @transitionend.self="if ($event.propertyName === 'margin-left' || $event.propertyName === 'margin-right') window.dispatchEvent(new CustomEvent('studio:reflow'))"
+                >
                     {{ $slot }}
                 </main>
 

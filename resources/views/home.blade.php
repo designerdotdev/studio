@@ -1239,20 +1239,30 @@
                     },
 
                     // Pinned to a side: a column as tall as the app row,
-                    // flush with that edge of it (the row's padding is what
-                    // keeps the site a gutter away from it). Its own frame
-                    // is fixed, so the site slides under it, not with it.
+                    // right beside the site. Its outer edge is the row's
+                    // edge — or, with a panel column docked on that side,
+                    // that column's inner edge (read live, so the chat glides
+                    // with it as it opens and closes). The stage's margin is
+                    // what keeps the site a gutter away. Its own frame is
+                    // fixed, so the site slides under it, not with it.
                     placeSide() {
                         this.joinedReset();
                         const row = document.querySelector('.s-app-row');
                         if (!row) return;
                         const r = row.getBoundingClientRect();
-                        const clear = $store.studio.chatSideClear;
-                        const side = $store.studio.chatSide === 'left'
-                            ? { left: Math.round(r.left + clear) + 'px', right: 'auto' }
-                            : { left: 'auto', right: Math.round(window.innerWidth - r.right + clear) + 'px' };
+                        const side = $store.studio.chatSide;
+                        let edge = side === 'left' ? r.left + $store.studio.chatSideClear : r.right - $store.studio.chatSideClear;
+                        const aside = document.querySelector('aside.s-float');
+                        if (aside && $store.studio.column && $store.studio.panelSide === side) {
+                            const a = aside.getBoundingClientRect();
+                            const m = getComputedStyle(aside);
+                            edge = side === 'left' ? a.right + parseFloat(m.marginRight) : a.left - parseFloat(m.marginLeft);
+                        }
+                        const along = side === 'left'
+                            ? { left: Math.round(edge) + 'px', right: 'auto' }
+                            : { left: 'auto', right: Math.round(window.innerWidth - edge) + 'px' };
                         this.style = {
-                            ...side,
+                            ...along,
                             top: Math.round(r.top) + 'px',
                             bottom: Math.round(window.innerHeight - r.bottom) + 'px',
                             width: $store.studio.chatSideWidth + 'px',
@@ -1332,7 +1342,7 @@
                 class="flex h-full min-h-0 flex-col"
                 :class="{ 's-chat-host': $store.studio.chatOut, 'is-side': $store.studio.chatSide, 'at-left': $store.studio.chatSide === 'left', 'at-right': $store.studio.chatSide === 'right', 'is-leaving': $store.studio.chatSideOut }"
                 :style="style"
-                x-effect="$store.studio.chatFloating; $store.studio.chatSide; $store.studio.chatSideWidth; $store.studio.chatSideOut; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
+                x-effect="$store.studio.chatFloating; $store.studio.chatSide; $store.studio.chatSideWidth; $store.studio.chatSideOut; $store.studio.column; $store.studio.panelSide; $store.studio.sidebar; $store.studio.docked; $store.studio.panelWidth; $store.studio.dock; $store.studio.dockHidden; $store.studio.mode; $store.studio.codeSplit; $store.studio.joined; $store.studio.joinedOut; $nextTick(() => place())"
                 @resize.window.debounce.50ms="place()"
                 @studio:reflow.window="place()"
                 {{-- Every frame while a docked panel slides the site over --}}

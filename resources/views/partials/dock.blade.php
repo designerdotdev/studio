@@ -9,8 +9,8 @@
      docked column while it is pinned. --}}
 @php
     $dev = \Designer\Studio\Support\DevMode::enabled();
+    // The Assistant has its own button by the modes (below); these share the panel group
     $panels = array_values(array_filter([
-        $dev ? ['assistant', 'Assistant', '<path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/>'] : null,
         ['sections', 'Sections', '<path d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/>'],
         ['pages', 'Pages', '<path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>'],
         ['content', 'Content', '<path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 3.75v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75"/>'],
@@ -238,24 +238,15 @@
     <span class="s-dock-sep"></span>
 
     @foreach($panels as [$name, $label, $icon])
-        @php
-            // The Assistant's button follows the floating chat when it is out:
-            // lit while the conversation is open, pulsing while a turn runs
-            $active = $name === 'assistant'
-                ? "\$store.studio.chatFloating ? \$store.studio.chatOpen : (\$store.studio.chatSide || (\$store.studio.rail === 'assistant' && \$store.studio.sidebar))"
-                : "\$store.studio.rail === '{$name}' && \$store.studio.sidebar";
-        @endphp
         <button
             type="button"
             class="s-dock-btn"
             data-panel="{{ $name }}"
-            :data-tip="{{ $name === 'assistant' ? "\$store.studio.chatFloating ? (\$store.studio.chatOpen ? 'Fold the conversation' : 'Open the conversation') : (\$store.studio.chatSide ? 'Close the chat column' : 'Assistant')" : "'{$label}'" }}"
-            :class="{ 'is-active': {{ $active }}, 'is-busy': {{ $name === 'assistant' ? '$store.studio.chatBusy' : 'false' }} }"
-            :aria-pressed="{{ $active }}"
+            data-tip="{{ $label }}"
+            :class="{ 'is-active': $store.studio.rail === '{{ $name }}' && $store.studio.sidebar }"
+            :aria-pressed="$store.studio.rail === '{{ $name }}' && $store.studio.sidebar"
             @click="$store.studio.setRail('{{ $name }}')"
             aria-label="{{ $label }}"
-            {{-- The Assistant exists only in developer mode (the menu's switch) --}}
-            @if($name === 'assistant') x-show="$store.studio.chatAvailable" x-cloak @endif
         >
             <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $icon !!}</svg>
         </button>
@@ -366,6 +357,32 @@
             <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
         </button>
     </div>
+
+    @if($dev)
+        {{-- The Assistant: its own key by the modes, not one of the panel
+             buttons — a lit gradient disc that follows the chat wherever it
+             lives (filled while the conversation is open, a running ring
+             while a turn streams). Developer mode only (the menu's switch). --}}
+        @php
+            $chatActive = "\$store.studio.chatFloating ? \$store.studio.chatOpen : (\$store.studio.chatSide || (\$store.studio.rail === 'assistant' && \$store.studio.sidebar))";
+        @endphp
+        <span class="s-dock-sep" x-show="$store.studio.chatAvailable" x-cloak></span>
+        <button
+            type="button"
+            class="s-dock-btn s-dock-ai"
+            data-panel="assistant"
+            :data-tip="$store.studio.chatFloating ? ($store.studio.chatOpen ? 'Fold the conversation' : 'Open the conversation') : ($store.studio.chatSide ? 'Close the chat column' : 'Assistant')"
+            :class="{ 'is-active': {{ $chatActive }}, 'is-busy': $store.studio.chatBusy }"
+            :aria-pressed="{{ $chatActive }}"
+            @click="$store.studio.setRail('assistant')"
+            aria-label="Assistant"
+            x-show="$store.studio.chatAvailable"
+            x-cloak
+        >
+            <span class="s-dock-ai-ring" aria-hidden="true"></span>
+            <svg class="s-dock-ai-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
+        </button>
+    @endif
 
     <span class="s-dock-sep"></span>
 
