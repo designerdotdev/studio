@@ -85,7 +85,7 @@
         {{-- ======================================================== --}}
         <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="inspector-{{ $selectedId }}">
             {{-- Inspector header --}}
-            <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
+            <div class="s-panel-head !pl-2">
                 <button wire:click="closeInspector" class="s-icon-btn" title="Back to sections (Esc)">
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
@@ -705,11 +705,11 @@
                                         <svg class="h-3 w-3" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3.5" r="1.2"/><circle cx="11" cy="3.5" r="1.2"/><circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="5" cy="12.5" r="1.2"/><circle cx="11" cy="12.5" r="1.2"/></svg>
                                     </span>
 
-                                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-raised {{ !empty($section['block']) ? 'border-block/40 text-block' : 'border-line ' . ($section['hidden'] ? 'text-faint' : 'text-soft') }}">
+                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center {{ !empty($section['block']) ? 'text-block' : ($section['hidden'] ? 'text-faint' : 'text-soft') }}">
                                         @include('studio::partials.category-icon', ['category' => $section['category']])
                                     </span>
 
-                                    <span class="min-w-0 flex-1 truncate text-[13px] {{ $section['hidden'] ? 'text-faint line-through decoration-line-strong' : 'text-ink' }}">
+                                    <span class="min-w-0 flex-1 truncate text-[12.5px] {{ $section['hidden'] ? 'text-faint line-through decoration-line-strong' : 'text-ink' }}">
                                         {{ $section['title'] }}
                                     </span>
 

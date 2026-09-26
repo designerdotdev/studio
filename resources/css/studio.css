@@ -12,13 +12,13 @@
     /* The frame — the ground the whole editor sits on. The top bar sits
        straight on it; the site, the sidebar and the Assistant column are
        rounded containers laid on it a gutter apart. */
-    --color-frame: #0b0b0b;
+    --color-frame: #111111;
 
     /* Surfaces (dark chrome: neutral near-blacks, no blue cast) */
     --color-shell: #111111;
-    --color-panel: #1a1a1a;
-    --color-raised: #222222;
-    --color-overlay: #242424;
+    --color-panel: #161616;
+    --color-raised: #202020;
+    --color-overlay: #1f1f1f;
 
     /* Hairlines */
     --color-line: rgba(255, 255, 255, 0.1);
@@ -30,16 +30,16 @@
     --color-faint: #6e6e6e;
 
     /* Accent + status */
-    --color-accent: #4a8cff;
-    --color-accent-hover: #3a7cf2;
+    --color-accent: #4c7dfa;
+    --color-accent-hover: #3d6cea;
     --color-layout: #a78bfa;
     --color-block: #2dd4bf;
     --color-ok: #36c285;
     --color-warn: #ffb800;
     --color-danger: #ff6b5b;
 
-    /* Canvas — the site's container, behind a narrow preview */
-    --color-canvas: #151515;
+    /* Canvas — the surface behind a narrow preview */
+    --color-canvas: #171717;
 
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
@@ -55,26 +55,26 @@
    ink, neutral greys, one blue for what is interactive, black for the
    primary action. */
 html.studio-light {
-    --color-frame: #e9e9eb;
-    --color-shell: #f4f4f5;
+    --color-frame: #ffffff;
+    --color-shell: #ffffff;
     --color-panel: #ffffff;
     --color-raised: #ffffff;
     --color-overlay: #ffffff;
     --color-line: rgba(0, 0, 0, 0.08);
-    --color-line-strong: rgba(0, 0, 0, 0.13);
-    --color-ink: #303030;
-    --color-soft: #616161;
-    --color-faint: #8a8a8a;
-    --color-accent: #005bd3;
-    --color-accent-hover: #004299;
+    --color-line-strong: rgba(0, 0, 0, 0.14);
+    --color-ink: #1f2023;
+    --color-soft: #6b6f76;
+    --color-faint: #9a9ea5;
+    --color-accent: #4c7dfa;
+    --color-accent-hover: #3d6cea;
     --color-layout: #8051ff;
     --color-block: #0f9b8e;
     --color-ok: #29845a;
     --color-warn: #b98900;
     --color-danger: #e51c00;
-    --color-canvas: #f1f1f1;
-    --color-wash: rgba(0, 0, 0, 0.05);
-    --color-wash-strong: rgba(0, 0, 0, 0.08);
+    --color-canvas: #f5f5f6;
+    --color-wash: rgba(0, 0, 0, 0.045);
+    --color-wash-strong: rgba(0, 0, 0, 0.075);
     --color-wash-faint: rgba(0, 0, 0, 0.02);
     --color-scroll: rgba(0, 0, 0, 0.16);
     --color-scroll-hover: rgba(0, 0, 0, 0.28);
@@ -153,7 +153,7 @@ html.studio-light {
     .s-btn-ghost,
     .s-btn-outline,
     .s-btn-danger {
-        @apply inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium whitespace-nowrap transition-all duration-150 select-none;
+        @apply inline-flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium whitespace-nowrap transition-all duration-150 select-none;
     }
 
     .s-btn:active,
@@ -228,7 +228,9 @@ html.studio-light {
     }
 
     .s-icon-btn {
-        @apply inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-soft transition-colors duration-150;
+        @apply inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md text-soft transition-colors duration-150;
+        width: 26px;
+        height: 26px;
     }
 
     .s-icon-btn:hover {
@@ -242,15 +244,15 @@ html.studio-light {
     /* --- form controls --------------------------------------------- */
 
     .s-label {
-        @apply mb-1.5 block text-xs font-medium text-soft;
+        @apply mb-1 block text-[11.5px] font-medium text-soft;
     }
 
     .s-microlabel {
-        @apply text-[10.5px] font-semibold uppercase tracking-[0.09em] text-faint;
+        @apply text-[12px] font-medium text-soft;
     }
 
     .s-input {
-        @apply block h-8 w-full rounded-lg border border-line bg-raised px-2.5 text-[13px] text-ink transition-colors duration-150;
+        @apply block h-7 w-full rounded-md border border-line bg-raised px-2 text-[12.5px] text-ink transition-colors duration-150;
     }
 
     .s-input::placeholder {
@@ -264,7 +266,7 @@ html.studio-light {
     .s-input:focus {
         outline: none;
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
     }
 
     textarea.s-input {
@@ -284,7 +286,7 @@ html.studio-light {
     /* --- settings groups (Page tab) --------------------------------- */
 
     .s-group {
-        @apply overflow-hidden rounded-xl border border-line bg-wash-faint;
+        @apply overflow-hidden rounded-lg border border-line bg-wash-faint;
         transition: border-color 150ms ease, background-color 150ms ease;
     }
 
@@ -298,11 +300,11 @@ html.studio-light {
     }
 
     .s-group-head {
-        @apply flex w-full cursor-pointer select-none items-center gap-2.5 px-3 py-2.5 text-left;
+        @apply flex w-full cursor-pointer select-none items-center gap-2.5 px-2.5 py-2 text-left;
     }
 
     .s-group-icon {
-        @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-soft transition-colors duration-150;
+        @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-line bg-raised text-soft transition-colors duration-150;
     }
 
     .s-group.is-open .s-group-icon {
@@ -310,7 +312,7 @@ html.studio-light {
     }
 
     .s-group-title {
-        @apply block truncate text-[13px] font-medium text-ink;
+        @apply block truncate text-[12.5px] font-medium text-ink;
     }
 
     .s-group-sub {
@@ -327,20 +329,23 @@ html.studio-light {
     }
 
     .s-group-body {
-        @apply space-y-4 border-t border-line p-3;
+        @apply space-y-3.5 border-t border-line p-2.5;
     }
 
     /* --- popovers / menus ------------------------------------------ */
 
     .s-pop {
-        @apply rounded-xl border border-line-strong bg-overlay p-1 shadow-2xl;
+        @apply rounded-lg border border-line-strong bg-overlay p-1 shadow-2xl;
         box-shadow:
             0 0 0 1px rgba(0, 0, 0, 0.4),
             0 16px 40px -12px rgba(0, 0, 0, 0.7);
     }
 
     .s-menu-item {
-        @apply flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-soft transition-colors duration-100;
+        @apply flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 text-left text-[12.5px] text-soft transition-colors duration-100;
+        min-height: 28px;
+        padding-top: 4px;
+        padding-bottom: 4px;
     }
 
     .s-menu-item:hover {
@@ -357,21 +362,13 @@ html.studio-light {
        the sidebar (light theme) and the Assistant column are rounded
        containers laid on it a gutter apart. */
     .s-app {
-        --studio-gutter: 6px;
-        --studio-radius: 10px;
-        --studio-topbar: 48px;
-        padding: 0 var(--studio-gutter) var(--studio-gutter);
+        --studio-topbar: 44px;
         background-color: var(--color-frame);
-    }
-
-    .s-app-row {
-        gap: var(--studio-gutter);
     }
 
     /* The site is the screen: the stage fills what the columns leave */
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
-        border-radius: var(--studio-radius);
     }
 
     /* Over everything (incl. the canvas iframe, which would otherwise
@@ -387,9 +384,9 @@ html.studio-light {
     /* --- the top bar --------------------------------------------------- */
 
     .s-topbar {
-        @apply flex shrink-0 items-center text-soft;
+        @apply flex shrink-0 items-center border-b border-line text-soft;
         height: var(--studio-topbar);
-        padding: 0 4px 0 2px;
+        padding: 0 8px;
         gap: 2px;
         user-select: none;
     }
@@ -414,8 +411,8 @@ html.studio-light {
 
     .s-tb-btn {
         @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-md text-soft;
-        width: 32px;
-        height: 32px;
+        width: 28px;
+        height: 28px;
         transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
     }
 
@@ -439,8 +436,8 @@ html.studio-light {
     .s-tb-btn.is-busy::before {
         content: '';
         position: absolute;
-        top: 5px;
-        right: 5px;
+        top: 4px;
+        right: 4px;
         width: 6px;
         height: 6px;
         border-radius: 999px;
@@ -457,7 +454,7 @@ html.studio-light {
     .s-tb-sep {
         @apply shrink-0 bg-line;
         width: 1px;
-        height: 18px;
+        height: 16px;
         margin: 0 6px;
     }
 
@@ -483,10 +480,10 @@ html.studio-light {
     /* The page switcher: title, path, the save-status pip */
     .s-page-btn {
         @apply flex min-w-0 cursor-pointer items-center gap-2 rounded-md;
-        height: 32px;
-        padding: 0 8px 0 10px;
+        height: 28px;
+        padding: 0 6px 0 8px;
         max-width: min(360px, 34vw);
-        font-size: 13px;
+        font-size: 12.5px;
         transition: background-color 120ms ease;
     }
 
@@ -500,19 +497,20 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Edit | Preview | Code */
+    /* Edit | Preview | Code — a grey well with the active segment lifted */
     .s-mode {
-        @apply flex shrink-0 rounded-lg bg-wash p-0.5;
+        @apply flex shrink-0 rounded-[7px] bg-wash;
+        padding: 2px;
         gap: 1px;
     }
 
     .s-mode-btn {
-        @apply flex cursor-pointer items-center gap-1.5 rounded-[6px] text-faint;
-        height: 28px;
-        padding: 0 11px;
-        font-size: 12.5px;
+        @apply flex cursor-pointer items-center gap-1.5 rounded-[5px] text-soft;
+        height: 24px;
+        padding: 0 10px;
+        font-size: 12px;
         font-weight: 500;
-        transition: background-color 150ms ease, color 150ms ease;
+        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
     }
 
     .s-mode-btn:hover {
@@ -520,14 +518,18 @@ html.studio-light {
     }
 
     .s-mode-btn.is-active {
-        background: var(--color-ink);
-        color: var(--color-shell);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        @apply text-ink;
+        background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    html:not(.studio-light) .s-mode-btn.is-active {
+        background: var(--color-raised);
+        box-shadow: 0 0 0 1px var(--color-line-strong);
     }
 
     .s-mode-btn.is-active.is-code {
-        background: var(--color-accent);
-        color: #ffffff;
+        color: var(--color-accent);
     }
 
     .s-mode-btn:focus-visible {
@@ -535,17 +537,18 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Canvas widths — three small icon radios */
+    /* Canvas widths — three small icon radios in the same well */
     .s-widths {
-        @apply flex shrink-0 rounded-lg bg-wash p-0.5;
+        @apply flex shrink-0 rounded-[7px] bg-wash;
+        padding: 2px;
         gap: 1px;
     }
 
     .s-widths-btn {
-        @apply flex cursor-pointer items-center justify-center rounded-[6px] text-faint;
-        width: 30px;
-        height: 28px;
-        transition: background-color 150ms ease, color 150ms ease;
+        @apply flex cursor-pointer items-center justify-center rounded-[5px] text-faint;
+        width: 28px;
+        height: 24px;
+        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
     }
 
     .s-widths-btn:hover {
@@ -553,14 +556,21 @@ html.studio-light {
     }
 
     .s-widths-btn.is-active {
-        @apply bg-wash-strong text-ink;
+        @apply text-ink;
+        background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    html:not(.studio-light) .s-widths-btn.is-active {
+        background: var(--color-raised);
+        box-shadow: 0 0 0 1px var(--color-line-strong);
     }
 
     /* Publish, carrying the save-status pip */
     .s-publish {
-        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md font-semibold;
-        height: 32px;
-        padding: 0 12px 0 10px;
+        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md font-medium;
+        height: 28px;
+        padding: 0 11px;
         margin-left: 4px;
         font-size: 12.5px;
         background: var(--color-ink);
@@ -600,7 +610,7 @@ html.studio-light {
     }
 
     .s-publish .s-dirty-pip {
-        @apply absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent;
+        @apply absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent;
         box-shadow: 0 0 0 2px var(--color-frame);
     }
 
@@ -650,11 +660,11 @@ html.studio-light {
         content: attr(data-tip);
         position: absolute;
         z-index: 60;
-        top: calc(100% + 8px);
+        top: calc(100% + 6px);
         left: 50%;
         translate: -50% 0;
-        padding: 4px 8px;
-        border-radius: 6px;
+        padding: 3px 7px;
+        border-radius: 5px;
         background: var(--color-ink);
         color: var(--color-shell);
         font-size: 11.5px;
@@ -691,33 +701,27 @@ html.studio-light {
         flex-direction: column;
         min-height: 0;
         overflow: hidden;
-        border-radius: var(--studio-radius);
         background: var(--color-panel);
         transition:
             width 240ms cubic-bezier(0.22, 1, 0.36, 1),
-            margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-width 240ms step-end,
             opacity 180ms ease;
     }
 
-    html:not(.studio-light) .s-sidebar,
-    html:not(.studio-light) .s-assistant {
-        background: transparent;
+    .s-sidebar {
+        border-right: 1px solid var(--color-line);
+    }
+
+    .s-assistant {
+        border-left: 1px solid var(--color-line);
     }
 
     .s-sidebar.is-collapsed,
     .s-assistant.is-collapsed {
         width: 0 !important;
+        border-width: 0;
         opacity: 0;
         pointer-events: none;
-    }
-
-    /* The row's gap is the gutter; a collapsed column gives it back */
-    .s-sidebar.is-collapsed {
-        margin-right: calc(-1 * var(--studio-gutter));
-    }
-
-    .s-assistant.is-collapsed {
-        margin-left: calc(-1 * var(--studio-gutter));
     }
 
     /* Held at exactly the column's width so the panel slides, never reflows */
@@ -781,17 +785,17 @@ html.studio-light {
     /* The sidebar's tab strip: Sections · Pages · Content · Media */
     .s-tabs {
         @apply flex shrink-0 items-center border-b border-line;
-        height: 44px;
+        height: 40px;
         padding: 0 8px;
         gap: 2px;
     }
 
     .s-tab {
-        @apply flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-faint;
-        height: 30px;
+        @apply flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-soft;
+        height: 26px;
         min-width: 0;
         padding: 0 4px;
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 500;
         white-space: nowrap;
         transition: background-color 120ms ease, color 120ms ease;
@@ -811,8 +815,8 @@ html.studio-light {
     }
 
     .s-tab svg {
-        width: 15px;
-        height: 15px;
+        width: 14px;
+        height: 14px;
         flex: none;
     }
 
@@ -829,13 +833,13 @@ html.studio-light {
     /* A panel's top row: a title, actions at the end */
     .s-panel-head {
         @apply flex shrink-0 items-center gap-1 border-b border-line;
-        height: 44px;
+        height: 40px;
         padding: 0 8px 0 12px;
     }
 
     /* The Getting-started card on first run */
     .s-tipcard {
-        @apply relative m-2 rounded-lg border border-line p-3;
+        @apply relative mx-2 mt-2 rounded-lg border border-line p-2.5;
         background: color-mix(in srgb, var(--color-accent) 6%, transparent);
         border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
     }
@@ -1057,11 +1061,11 @@ html.studio-light {
     }
 
     .s-seg {
-        @apply flex h-8 items-center gap-0.5 rounded-lg border border-line bg-raised p-0.5;
+        @apply flex h-7 items-center gap-0.5 rounded-md bg-wash p-0.5;
     }
 
     .s-seg-btn {
-        @apply flex h-7 w-7.5 cursor-pointer items-center justify-center rounded-[6px] text-faint transition-all duration-150;
+        @apply flex h-6 w-7 cursor-pointer items-center justify-center rounded-[5px] text-faint transition-all duration-150;
     }
 
     .s-seg-btn:hover {
@@ -1069,8 +1073,14 @@ html.studio-light {
     }
 
     .s-seg-btn.is-active {
-        @apply bg-wash-strong text-ink;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+        @apply text-ink;
+        background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    html:not(.studio-light) .s-seg-btn.is-active {
+        background: var(--color-raised);
+        box-shadow: 0 0 0 1px var(--color-line-strong);
     }
 
     /* --- canvas ----------------------------------------------------- */
@@ -1079,8 +1089,6 @@ html.studio-light {
        edge, so the dots only show beside a narrow (tablet/mobile) preview */
     .s-canvas {
         background-color: var(--color-canvas);
-        background-image: radial-gradient(circle, var(--color-wash-strong) 1px, transparent 1px);
-        background-size: 22px 22px;
     }
 
     /* Square, flush frame for the preview and Code mode's editor */
@@ -1105,7 +1113,8 @@ html.studio-light {
     /* --- section list (layers) -------------------------------------- */
 
     .s-section-row {
-        @apply relative flex w-full cursor-pointer items-center gap-2 rounded-lg py-1.5 pr-1 pl-1.5 text-left transition-colors duration-100;
+        @apply relative flex w-full cursor-pointer items-center gap-2 rounded-md py-1 pr-1 pl-1.5 text-left transition-colors duration-100;
+        min-height: 28px;
     }
 
     .s-section-row:hover {
@@ -1113,8 +1122,7 @@ html.studio-light {
     }
 
     .s-section-row.is-active {
-        @apply bg-accent/14;
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent);
+        @apply bg-wash-strong;
     }
 
     .s-section-row .row-actions {
@@ -1136,7 +1144,7 @@ html.studio-light {
     }
 
     .s-drag-handle {
-        @apply flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-faint opacity-0 transition-opacity duration-100;
+        @apply flex h-5 w-3.5 shrink-0 cursor-grab items-center justify-center text-faint opacity-0 transition-opacity duration-100;
         touch-action: none;
     }
 
@@ -1169,8 +1177,8 @@ html.studio-light {
         align-items: center;
         gap: 9px;
         max-width: 420px;
-        padding: 9px 14px 9px 11px;
-        border-radius: 12px;
+        padding: 8px 12px 8px 10px;
+        border-radius: 8px;
         background: var(--color-overlay);
         border: 1px solid var(--color-line-strong);
         color: var(--color-ink);
@@ -1242,7 +1250,7 @@ html.studio-light {
     }
 
     .s-modal {
-        @apply relative z-[95] rounded-2xl border border-line-strong bg-panel;
+        @apply relative z-[95] rounded-xl border border-line-strong bg-panel;
         box-shadow:
             0 0 0 1px rgba(0, 0, 0, 0.5),
             0 32px 80px -16px rgba(0, 0, 0, 0.8);
@@ -1251,7 +1259,7 @@ html.studio-light {
     /* --- library preview cards --------------------------------------- */
 
     .s-preview-card {
-        @apply relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left transition-all duration-150;
+        @apply relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-line bg-raised text-left transition-all duration-150;
     }
 
     .s-preview-card:hover {
@@ -1303,7 +1311,8 @@ html.studio-light {
     }
 
     .s-chip {
-        @apply inline-flex items-center rounded-md border border-line bg-raised px-1.5 py-0.5 text-[10.5px] font-medium text-soft;
+        @apply inline-flex items-center rounded border border-line bg-raised px-1.5 text-[10.5px] font-medium text-soft;
+        line-height: 17px;
     }
 
     .s-status-dot {
@@ -1396,7 +1405,18 @@ html.studio-light {
 
 html.studio-light .s-pop {
     border-color: transparent;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 12px 32px -8px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 10px 28px -8px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+html.studio-light .s-modal {
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 24px 60px -16px rgba(0, 0, 0, 0.25);
+}
+
+html.studio-light .s-modal-backdrop {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
 }
 
 /* Buttons with a little depth: the primary is a black key with a lit top
@@ -1428,17 +1448,11 @@ html.studio-light .s-btn-outline:hover {
 }
 
 html.studio-light .s-input {
-    border-color: rgba(0, 0, 0, 0.16);
+    border-color: rgba(0, 0, 0, 0.12);
 }
 
 html.studio-light .s-input:hover {
-    border-color: rgba(0, 0, 0, 0.3);
-}
-
-/* The selected row is a quiet grey key, not a blue box */
-html.studio-light .s-section-row.is-active {
-    background: rgba(0, 0, 0, 0.07);
-    box-shadow: none;
+    border-color: rgba(0, 0, 0, 0.22);
 }
 
 }
