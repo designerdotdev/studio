@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 |   /template/{slug}                 its home page, rendered from the working tree
 |   /template/{slug}/{path}          any other page, including [collection.field] pages
 |   /template/{slug}/_files/{path}   its files/public
+|   /template/{slug}/_section/{name} one section alone, with its defaults (what `npm run templates -- blocks` captures)
 |
 */
 
@@ -25,6 +26,7 @@ Route::group([
 ], function () {
     Route::get('/', [Preview::class, 'index'])->name('index');
     Route::get('/{slug}/_files/{path}', [Preview::class, 'file'])->where(['slug' => '[a-z0-9-]+', 'path' => '.+'])->name('file');
+    Route::get('/{slug}/_section/{name}', [Preview::class, 'section'])->where(['slug' => '[a-z0-9-]+', 'name' => '[a-z0-9-]+'])->name('section');
     Route::get('/{slug}/_thumbnail', [Preview::class, 'thumbnail'])->where('slug', '[a-z0-9-]+')->name('thumbnail');
     Route::get('/{slug}/{path?}', [Preview::class, 'show'])->where(['slug' => '[a-z0-9-]+', 'path' => '.*'])->name('show');
 });
