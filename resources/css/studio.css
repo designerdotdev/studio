@@ -472,23 +472,45 @@ html.studio-light {
         margin: 0 6px;
     }
 
-    /* The brand mark: the menu button */
+    /* The menu button: the brand mark at rest, cross-fading to the
+       hamburger on hover and while the menu is open */
     .s-brand {
         @apply text-ink;
+        border-radius: 999px;
     }
 
-    .s-brand svg {
+    .s-brand > svg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        translate: -50% -50%;
+        transition: opacity 180ms ease, scale 180ms ease;
+    }
+
+    .s-brand .s-brand-logo {
         opacity: 0.85;
-        transition: opacity 120ms ease;
     }
 
-    .s-brand:hover svg,
-    .s-brand.is-open svg {
-        opacity: 1;
+    .s-brand .s-brand-menu {
+        opacity: 0;
+        scale: 0.72;
     }
 
+    .s-brand:hover,
     .s-brand.is-open {
-        @apply bg-wash;
+        @apply bg-wash-strong text-ink;
+    }
+
+    .s-brand:hover .s-brand-logo,
+    .s-brand.is-open .s-brand-logo {
+        opacity: 0;
+        scale: 0.72;
+    }
+
+    .s-brand:hover .s-brand-menu,
+    .s-brand.is-open .s-brand-menu {
+        opacity: 1;
+        scale: 1;
     }
 
     /* The page switcher: title, path, the save-status pip */
@@ -511,19 +533,17 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Edit | Preview | Code — a grey well with the active segment lifted */
+    /* Preview | Edit | Code — icon pills in a grey well, the active one lifted */
     .s-mode {
-        @apply flex shrink-0 rounded-[7px] bg-wash;
+        @apply flex shrink-0 rounded-full bg-wash;
         padding: 2px;
         gap: 1px;
     }
 
     .s-mode-btn {
-        @apply flex cursor-pointer items-center gap-1.5 rounded-[5px] text-soft;
+        @apply relative flex cursor-pointer items-center justify-center rounded-full text-soft;
+        width: 28px;
         height: 24px;
-        padding: 0 10px;
-        font-size: 12px;
-        font-weight: 500;
         transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
     }
 
@@ -553,13 +573,13 @@ html.studio-light {
 
     /* Canvas widths — three small icon radios in the same well */
     .s-widths {
-        @apply flex shrink-0 rounded-[7px] bg-wash;
+        @apply flex shrink-0 rounded-full bg-wash;
         padding: 2px;
         gap: 1px;
     }
 
     .s-widths-btn {
-        @apply flex cursor-pointer items-center justify-center rounded-[5px] text-faint;
+        @apply flex cursor-pointer items-center justify-center rounded-full text-faint;
         width: 28px;
         height: 24px;
         transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
@@ -582,9 +602,9 @@ html.studio-light {
 
     /* Publish, carrying the save-status pip */
     .s-publish {
-        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md font-medium;
+        @apply relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full font-medium;
         height: 28px;
-        padding: 0 11px;
+        padding: 0 12px 0 10px;
         margin-left: 4px;
         font-size: 12.5px;
         background: var(--color-ink);

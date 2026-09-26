@@ -329,10 +329,14 @@
                 @click="open = !open; if (open) refreshStatus()"
                 class="s-publish"
                 :class="open && 'is-open'"
+                x-data="{ state: 'idle' }"
+                @studio:status.window="state = $event.detail.state"
+                :title="state === 'saving' ? 'Saving…' : state === 'error' ? 'Offline — changes are not being saved' : 'All changes saved'"
                 aria-label="Publish"
                 aria-haspopup="dialog"
                 :aria-expanded="open"
             >
+                <span class="s-status-pip" :class="{ 'is-saving': state === 'saving', 'is-error': state === 'error' }"></span>
                 <span class="s-publish-label">Publish</span>
                 <span x-show="draftMode && status?.dirty" x-cloak x-transition.opacity class="s-dirty-pip"></span>
             </button>
@@ -464,8 +468,10 @@
             @click.outside="open = false"
             @keydown.escape.window="open = false"
         >
-            <button @click="open = !open" class="s-tb-btn s-brand s-tip" :class="open && 'is-open'" data-tip="Menu" aria-label="Menu" aria-haspopup="menu" :aria-expanded="open">
-                <svg class="h-[16px] w-auto" viewBox="0 0 72 75" fill="none" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
+            {{-- The brand mark at rest; the hamburger on hover and while the menu is open --}}
+            <button @click="open = !open" class="s-tb-btn s-brand" :class="open && 'is-open'" title="Menu" aria-label="Menu" aria-haspopup="menu" :aria-expanded="open">
+                <svg class="s-brand-logo h-[15px] w-auto" viewBox="0 0 72 75" fill="none" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/></svg>
+                <svg class="s-brand-menu h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
             </button>
 
             <div
