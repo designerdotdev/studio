@@ -239,6 +239,9 @@
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                 </button>
 
+                <button type="button" class="s-icon-btn" title="Hide the Assistant (⌘J)" aria-label="Hide the Assistant" @click="$store.studio.setAssistant(false)">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><path d="M12.25 3.25v13.5"/></svg>
+                </button>
             </div>
 
             @if(!$anyEngine)
