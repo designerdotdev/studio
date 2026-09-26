@@ -60,7 +60,7 @@ html.studio-light {
     --color-panel: #ffffff;
     --color-raised: #ffffff;
     --color-overlay: #ffffff;
-    --color-line: rgba(0, 0, 0, 0.08);
+    --color-line: rgba(0, 0, 0, 0.04);
     --color-line-strong: rgba(0, 0, 0, 0.14);
     --color-ink: #1f2023;
     --color-soft: #6b6f76;
@@ -435,7 +435,7 @@ html.studio-light {
     .s-app {
         --studio-topbar: 44px;
         --studio-gutter: 6px;
-        --studio-radius: 10px;
+        --studio-radius: 14px;
         padding: 0 var(--studio-gutter) var(--studio-gutter);
         background-color: var(--color-frame);
     }
@@ -501,7 +501,7 @@ html.studio-light {
     }
 
     .s-tb-btn.is-active {
-        @apply bg-wash-strong text-ink;
+        @apply bg-wash text-ink;
     }
 
     .s-tb-btn:active {
@@ -591,7 +591,7 @@ html.studio-light {
 
     .s-brand:hover,
     .s-brand.is-open {
-        @apply bg-wash-strong text-ink;
+        @apply bg-wash text-ink;
     }
 
     .s-brand:hover .s-brand-logo,
@@ -626,39 +626,64 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Edit | Preview | Code — a grey well with the active segment lifted */
+    /* Preview | Edit | Code — a grey well; the active segment is lifted
+       white and shows its label, the others collapse to their icon */
     .s-mode {
-        @apply flex shrink-0 rounded-[7px] bg-wash;
+        @apply flex shrink-0 rounded-lg bg-wash-strong;
         padding: 2px;
         gap: 1px;
     }
 
     .s-mode-btn {
-        @apply flex cursor-pointer items-center gap-1.5 rounded-[5px] text-soft;
+        @apply flex cursor-pointer items-center rounded-md text-ink;
         height: 24px;
-        padding: 0 10px;
+        padding: 0 7px;
         font-size: 12px;
         font-weight: 500;
-        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+        opacity: 0.72;
+        transition: background-color 150ms ease, opacity 150ms ease, box-shadow 150ms ease, padding 200ms ease;
     }
 
     .s-mode-btn:hover {
-        @apply text-ink;
+        opacity: 1;
     }
 
     .s-mode-btn.is-active {
-        @apply text-ink;
+        opacity: 1;
+        padding: 0 10px 0 8px;
         background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
     html:not(.studio-light) .s-mode-btn.is-active {
         background: var(--color-raised);
-        box-shadow: 0 0 0 1px var(--color-line-strong);
     }
 
     .s-mode-btn.is-active.is-code {
         color: var(--color-accent);
+    }
+
+    /* The label collapses to nothing when the segment is not active */
+    .s-mode-label {
+        display: grid;
+        grid-template-columns: 0fr;
+        opacity: 0;
+        transition: grid-template-columns 200ms ease, opacity 150ms ease;
+    }
+
+    .s-mode-label > span {
+        overflow: hidden;
+        white-space: nowrap;
+        padding-left: 0;
+        transition: padding-left 200ms ease;
+    }
+
+    .s-mode-btn.is-active .s-mode-label {
+        grid-template-columns: 1fr;
+        opacity: 1;
+    }
+
+    .s-mode-btn.is-active .s-mode-label > span {
+        padding-left: 6px;
     }
 
     .s-mode-btn:focus-visible {

@@ -1,12 +1,14 @@
 {{-- The top bar: the editor's one piece of chrome above the site. Left,
-     the brand mark (the menu), the sidebar toggle, the page switcher (a
-     dark dropdown) and the open-in-new-tab link; centre, Preview / Edit /
-     Code; right, the device button (one control cycling Desktop → Tablet
-     → Phone), the Assistant (developer mode) and Publish. The `menu` and
+     the brand mark (the menu), the sidebar toggle, Preview / Edit / Code;
+     centre, the page switcher (a dark dropdown); right, the device
+     button (one control cycling Desktop → Tablet → Phone), the Assistant
+     (developer mode), the open-in-new-tab link and Publish. The `menu` and
      `actions` slots come from home.blade.php. --}}
 <header class="s-topbar" aria-label="Editor">
     <div class="s-topbar-group is-start">
         {{ $menu ?? '' }}
+
+        <span class="s-tb-sep"></span>
 
         {{-- Sidebar toggle — the inner bar previews the action on hover --}}
         <button
@@ -26,7 +28,24 @@
 
         <span class="s-tb-sep"></span>
 
-        {{-- The page switcher --}}
+        <div class="s-mode" role="radiogroup" aria-label="Mode">
+            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'preview' && 'is-active'" @click="$store.studio.setMode('preview')" title="Preview — browse the site as a visitor" role="radio" :aria-checked="$store.studio.mode === 'preview'">
+                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                <span class="s-mode-label"><span>Preview</span></span>
+            </button>
+            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'edit' && 'is-active'" @click="$store.studio.setMode('edit')" title="Edit — click anything on the page to change it" role="radio" :aria-checked="$store.studio.mode === 'edit'">
+                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 3.5 19 11l-6.5 1.8L9 19 4 3.5Z"/></svg>
+                <span class="s-mode-label"><span>Edit</span></span>
+            </button>
+            <button x-show="$store.studio.codeAvailable" x-cloak type="button" class="s-mode-btn is-code" :class="$store.studio.mode === 'code' && 'is-active'" @click="$store.studio.setMode('code')" title="Code — edit the site's source files" role="radio" :aria-checked="$store.studio.mode === 'code'">
+                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
+                <span class="s-mode-label"><span>Code</span></span>
+            </button>
+        </div>
+    </div>
+
+    {{-- The page switcher --}}
+    <div class="s-topbar-group is-center">
         <div
             class="relative min-w-0"
             x-data="{
@@ -93,41 +112,6 @@
                 </button>
             </div>
         </div>
-
-        {{-- Open the draft (or live) page in a new tab --}}
-        @if($openUrl)
-        <a
-            href="{{ $openUrl }}"
-            target="_blank"
-            rel="noopener"
-            class="s-tb-btn s-tip"
-            data-tip="{{ $openLabel }}"
-            aria-label="{{ $openLabel }}"
-        >
-            <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 13.5v5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h5"/>
-                <path d="M14 4h6v6M20 4l-8.5 8.5"/>
-            </svg>
-        </a>
-        @endif
-    </div>
-
-    {{-- Edit / Preview / Code --}}
-    <div class="s-topbar-group is-center">
-        <div class="s-mode" role="radiogroup" aria-label="Mode">
-            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'preview' && 'is-active'" @click="$store.studio.setMode('preview')" title="Preview — browse the site as a visitor" role="radio" :aria-checked="$store.studio.mode === 'preview'">
-                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
-                Preview
-            </button>
-            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'edit' && 'is-active'" @click="$store.studio.setMode('edit')" title="Edit — click anything on the page to change it" role="radio" :aria-checked="$store.studio.mode === 'edit'">
-                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 3.5 19 11l-6.5 1.8L9 19 4 3.5Z"/></svg>
-                Edit
-            </button>
-            <button x-show="$store.studio.codeAvailable" x-cloak type="button" class="s-mode-btn is-code" :class="$store.studio.mode === 'code' && 'is-active'" @click="$store.studio.setMode('code')" title="Code — edit the site's source files" role="radio" :aria-checked="$store.studio.mode === 'code'">
-                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
-                Code
-            </button>
-        </div>
     </div>
 
     <div class="s-topbar-group is-end">
@@ -175,6 +159,23 @@
         >
             <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
         </button>
+
+        {{-- Open the draft (or live) page in a new tab --}}
+        @if($openUrl)
+        <a
+            href="{{ $openUrl }}"
+            target="_blank"
+            rel="noopener"
+            class="s-tb-btn s-tip"
+            data-tip="{{ $openLabel }}"
+            aria-label="{{ $openLabel }}"
+        >
+            <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13.5v5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h5"/>
+                <path d="M14 4h6v6M20 4l-8.5 8.5"/>
+            </svg>
+        </a>
+        @endif
 
         {{ $actions ?? '' }}
     </div>
