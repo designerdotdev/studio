@@ -476,7 +476,6 @@ html.studio-light {
        hamburger on hover and while the menu is open */
     .s-brand {
         @apply text-ink;
-        border-radius: 999px;
     }
 
     .s-brand > svg {
@@ -533,17 +532,19 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Preview | Edit | Code — icon pills in a grey well, the active one lifted */
+    /* Edit | Preview | Code — a grey well with the active segment lifted */
     .s-mode {
-        @apply flex shrink-0 rounded-full bg-wash;
+        @apply flex shrink-0 rounded-[7px] bg-wash;
         padding: 2px;
         gap: 1px;
     }
 
     .s-mode-btn {
-        @apply relative flex cursor-pointer items-center justify-center rounded-full text-soft;
-        width: 28px;
+        @apply flex cursor-pointer items-center gap-1.5 rounded-[5px] text-soft;
         height: 24px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 500;
         transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
     }
 

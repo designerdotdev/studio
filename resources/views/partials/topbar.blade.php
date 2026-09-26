@@ -1,10 +1,12 @@
 {{-- The top bar: the editor's one piece of chrome above the site. Left,
-     the sidebar toggle and the brand mark (the menu); centre, the page
-     switcher; right, the canvas widths, Preview / Edit / Code, the
-     open-in-new-tab link, the Assistant (developer mode) and Publish.
-     The `menu` and `actions` slots come from home.blade.php. --}}
+     the brand mark (the menu), the sidebar toggle and the page switcher;
+     centre, Edit / Preview / Code; right, the canvas widths, the Assistant
+     (developer mode) and Publish. The `menu` and `actions` slots come from
+     home.blade.php. --}}
 <header class="s-topbar" aria-label="Editor">
     <div class="s-topbar-group is-start">
+        {{ $menu ?? '' }}
+
         <button
             type="button"
             class="s-tb-btn s-tip"
@@ -17,11 +19,9 @@
             <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg>
         </button>
 
-        {{ $menu ?? '' }}
-    </div>
+        <span class="s-tb-sep"></span>
 
-    {{-- The page switcher, centred --}}
-    <div class="s-topbar-group is-center">
+        {{-- The page switcher --}}
         <div
             class="relative min-w-0"
             x-data="{
@@ -59,7 +59,7 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 -translate-y-1"
-                class="s-pop absolute left-1/2 top-full z-50 mt-1.5 w-64 -translate-x-1/2 p-1"
+                class="s-pop absolute left-0 top-full z-50 mt-1.5 w-64 p-1"
                 role="menu"
             >
                 <p class="s-microlabel px-2.5 pb-1 pt-1.5">Pages</p>
@@ -87,36 +87,6 @@
                 </button>
             </div>
         </div>
-    </div>
-
-    <div class="s-topbar-group is-end">
-        {{-- Canvas widths --}}
-        <div class="s-widths" role="radiogroup" aria-label="Canvas width" x-show="$store.studio.canvasVisible">
-            <button type="button" class="s-widths-btn" :class="$store.studio.device === 'desktop' && 'is-active'" @click="$store.studio.device = 'desktop'" title="Desktop (⌥1)" aria-label="Desktop width" role="radio" :aria-checked="$store.studio.device === 'desktop'">
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></svg>
-            </button>
-            <button type="button" class="s-widths-btn" :class="$store.studio.device === 'tablet' && 'is-active'" @click="$store.studio.device = 'tablet'" title="Tablet — 768px (⌥2)" aria-label="Tablet width" role="radio" :aria-checked="$store.studio.device === 'tablet'">
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
-            </button>
-            <button type="button" class="s-widths-btn" :class="$store.studio.device === 'mobile' && 'is-active'" @click="$store.studio.device = 'mobile'" title="Mobile — 390px (⌥3)" aria-label="Mobile width" role="radio" :aria-checked="$store.studio.device === 'mobile'">
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
-            </button>
-        </div>
-
-        <span class="s-tb-sep"></span>
-
-        {{-- Preview / Edit / Code --}}
-        <div class="s-mode" role="radiogroup" aria-label="Mode">
-            <button type="button" class="s-mode-btn s-tip" :class="$store.studio.mode === 'preview' && 'is-active'" @click="$store.studio.setMode('preview')" data-tip="Preview — browse the site as a visitor" aria-label="Preview mode" role="radio" :aria-checked="$store.studio.mode === 'preview'">
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M2.9 12h18.2M12 2.75c2.2 2.5 3.3 5.6 3.3 9.25S14.2 18.75 12 21.25C9.8 18.75 8.7 15.65 8.7 12S9.8 5.25 12 2.75Z"/></svg>
-            </button>
-            <button type="button" class="s-mode-btn s-tip" :class="$store.studio.mode === 'edit' && 'is-active'" @click="$store.studio.setMode('edit')" data-tip="Edit — click anything on the page to change it" aria-label="Edit mode" role="radio" :aria-checked="$store.studio.mode === 'edit'">
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 3.5 19 11l-6.5 1.8L9 19 4 3.5Z"/></svg>
-            </button>
-            <button x-show="$store.studio.codeAvailable" x-cloak type="button" class="s-mode-btn s-tip is-code" :class="$store.studio.mode === 'code' && 'is-active'" @click="$store.studio.setMode('code')" data-tip="Code — edit the site's source files" aria-label="Code mode" role="radio" :aria-checked="$store.studio.mode === 'code'">
-                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
-            </button>
-        </div>
 
         {{-- Open the draft (or live) page in a new tab --}}
         @if($openUrl)
@@ -134,6 +104,40 @@
             </svg>
         </a>
         @endif
+    </div>
+
+    {{-- Edit / Preview / Code --}}
+    <div class="s-topbar-group is-center">
+        <div class="s-mode" role="radiogroup" aria-label="Mode">
+            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'edit' && 'is-active'" @click="$store.studio.setMode('edit')" title="Edit — click anything on the page to change it" role="radio" :aria-checked="$store.studio.mode === 'edit'">
+                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 3.5 19 11l-6.5 1.8L9 19 4 3.5Z"/></svg>
+                Edit
+            </button>
+            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'preview' && 'is-active'" @click="$store.studio.setMode('preview')" title="Preview — browse the site as a visitor" role="radio" :aria-checked="$store.studio.mode === 'preview'">
+                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                Preview
+            </button>
+            <button x-show="$store.studio.codeAvailable" x-cloak type="button" class="s-mode-btn is-code" :class="$store.studio.mode === 'code' && 'is-active'" @click="$store.studio.setMode('code')" title="Code — edit the site's source files" role="radio" :aria-checked="$store.studio.mode === 'code'">
+                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
+                Code
+            </button>
+        </div>
+    </div>
+
+    <div class="s-topbar-group is-end">
+        {{-- Canvas widths --}}
+        <div class="s-widths" role="radiogroup" aria-label="Canvas width" x-show="$store.studio.canvasVisible">
+            <button type="button" class="s-widths-btn" :class="$store.studio.device === 'desktop' && 'is-active'" @click="$store.studio.device = 'desktop'" title="Desktop (⌥1)" aria-label="Desktop width" role="radio" :aria-checked="$store.studio.device === 'desktop'">
+                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></svg>
+            </button>
+            <button type="button" class="s-widths-btn" :class="$store.studio.device === 'tablet' && 'is-active'" @click="$store.studio.device = 'tablet'" title="Tablet — 768px (⌥2)" aria-label="Tablet width" role="radio" :aria-checked="$store.studio.device === 'tablet'">
+                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
+            </button>
+            <button type="button" class="s-widths-btn" :class="$store.studio.device === 'mobile' && 'is-active'" @click="$store.studio.device = 'mobile'" title="Mobile — 390px (⌥3)" aria-label="Mobile width" role="radio" :aria-checked="$store.studio.device === 'mobile'">
+                <svg class="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.25"/><path d="M11 17.75h2"/></svg>
+            </button>
+        </div>
+
 
         {{-- The Assistant — a column on the right, developer mode only --}}
         <button
