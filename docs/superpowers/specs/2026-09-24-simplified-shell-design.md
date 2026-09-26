@@ -102,9 +102,9 @@ then deselects (it no longer closes the sidebar) · ? shortcuts. ⌘. is gone wi
 
 ## 9. Theme
 
-Dark stays the default. The chrome is flat in both themes — hairlines between the top bar,
-the sidebar, the site and the Assistant column; no gutters, no rounded cards. Light is all
-white, the way the template previewer and Linear are; dark is neutral near-black. One
+Dark stays the default. The top bar sits on the frame (light `#efeff0`, dark near-black);
+the sidebar, the site and the Assistant column are rounded containers a 6px gutter apart —
+white in light, straight on the black in dark. One
 accent (`#4c7dfa`, the canvas's selection blue). Controls run one size smaller than before
 (28px bar buttons, inputs and buttons, 24px segments in a grey well with the active one
 lifted white, 28px rows, 6px radius). The main menu follows the theme too.

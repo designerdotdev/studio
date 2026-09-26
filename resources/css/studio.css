@@ -55,8 +55,8 @@
    ink, neutral greys, one blue for what is interactive, black for the
    primary action. */
 html.studio-light {
-    --color-frame: #ffffff;
-    --color-shell: #ffffff;
+    --color-frame: #efeff0;
+    --color-shell: #f7f7f8;
     --color-panel: #ffffff;
     --color-raised: #ffffff;
     --color-overlay: #ffffff;
@@ -72,9 +72,9 @@ html.studio-light {
     --color-ok: #29845a;
     --color-warn: #b98900;
     --color-danger: #e51c00;
-    --color-canvas: #f5f5f6;
-    --color-wash: rgba(0, 0, 0, 0.045);
-    --color-wash-strong: rgba(0, 0, 0, 0.075);
+    --color-canvas: #f3f3f4;
+    --color-wash: rgba(0, 0, 0, 0.05);
+    --color-wash-strong: rgba(0, 0, 0, 0.08);
     --color-wash-faint: rgba(0, 0, 0, 0.02);
     --color-scroll: rgba(0, 0, 0, 0.16);
     --color-scroll-hover: rgba(0, 0, 0, 0.28);
@@ -361,14 +361,28 @@ html.studio-light {
     /* The editor's ground: the top bar sits straight on it, and the site,
        the sidebar (light theme) and the Assistant column are rounded
        containers laid on it a gutter apart. */
+    /* The frame: the top bar sits straight on it, and the sidebar, the
+       site and the Assistant column are rounded containers laid on it a
+       gutter apart. Light, the frame is a soft grey and the containers
+       white; dark, the columns sit straight on the near-black and only
+       the site is a card. */
     .s-app {
         --studio-topbar: 44px;
+        --studio-gutter: 6px;
+        --studio-radius: 10px;
+        padding: 0 var(--studio-gutter) var(--studio-gutter);
         background-color: var(--color-frame);
+    }
+
+    .s-app-row {
+        gap: var(--studio-gutter);
     }
 
     /* The site is the screen: the stage fills what the columns leave */
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
+        border-radius: var(--studio-radius);
+        box-shadow: 0 0 0 1px var(--color-line);
     }
 
     /* Over everything (incl. the canvas iframe, which would otherwise
@@ -384,9 +398,9 @@ html.studio-light {
     /* --- the top bar --------------------------------------------------- */
 
     .s-topbar {
-        @apply flex shrink-0 items-center border-b border-line text-soft;
+        @apply flex shrink-0 items-center text-soft;
         height: var(--studio-topbar);
-        padding: 0 8px;
+        padding: 0 4px 0 2px;
         gap: 2px;
         user-select: none;
     }
@@ -701,27 +715,35 @@ html.studio-light {
         flex-direction: column;
         min-height: 0;
         overflow: hidden;
+        border-radius: var(--studio-radius);
         background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line);
         transition:
             width 240ms cubic-bezier(0.22, 1, 0.36, 1),
-            border-width 240ms step-end,
+            margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
             opacity 180ms ease;
     }
 
-    .s-sidebar {
-        border-right: 1px solid var(--color-line);
-    }
-
-    .s-assistant {
-        border-left: 1px solid var(--color-line);
+    html:not(.studio-light) .s-sidebar,
+    html:not(.studio-light) .s-assistant {
+        background: transparent;
+        box-shadow: none;
     }
 
     .s-sidebar.is-collapsed,
     .s-assistant.is-collapsed {
         width: 0 !important;
-        border-width: 0;
         opacity: 0;
         pointer-events: none;
+    }
+
+    /* The row's gap is the gutter; a collapsed column gives it back */
+    .s-sidebar.is-collapsed {
+        margin-right: calc(-1 * var(--studio-gutter));
+    }
+
+    .s-assistant.is-collapsed {
+        margin-left: calc(-1 * var(--studio-gutter));
     }
 
     /* Held at exactly the column's width so the panel slides, never reflows */
