@@ -25,10 +25,9 @@
                  Inline, so it holds from first paint; a timeout reveals
                  regardless, so nothing can stay hidden. --}}
             <style>
-                html.studio-booting .s-topbar,
+                html.studio-booting .s-rail,
                 html.studio-booting .s-sidebar,
-                html.studio-booting .s-assistant,
-                html.studio-booting .s-stage {
+                html.studio-booting .s-card {
                     visibility: hidden;
                     opacity: 0;
                     transition: none !important;
@@ -36,10 +35,9 @@
                     pointer-events: none;
                 }
 
-                html.studio-revealing .s-topbar,
+                html.studio-revealing .s-rail,
                 html.studio-revealing .s-sidebar,
-                html.studio-revealing .s-assistant,
-                html.studio-revealing .s-stage {
+                html.studio-revealing .s-card {
                     transition: opacity 180ms ease;
                 }
             </style>
@@ -124,104 +122,64 @@
             </button>
         </div>
 
-        {{-- The app root. In the editor it is the frame: the top bar sits on
-             it, and the sidebar, the site and the Assistant column are laid
-             on it a gutter apart. --}}
-        <div class="flex h-dvh flex-col @isset($sidebar) s-app @endisset" x-data>
+        {{-- The app root. In the editor it is the ground: the activity rail
+             and the sidebar sit straight on it, and the site lives in a
+             white content card with the header inside it. --}}
+        <div class="flex h-dvh @isset($sidebar) s-app @endisset" x-data>
             @isset($sidebar)
-                @include('studio::partials.topbar')
+                @include('studio::partials.rail')
 
-                <div class="s-app-row flex min-h-0 min-w-0 flex-1">
+                {{-- The sidebar: one panel at a time, chosen by the rail. It
+                     stays in the row open or shut so collapsing is one width
+                     transition; the panel inside is held at full width and
+                     slides under the rail. --}}
+                <aside
+                    class="s-sidebar"
+                    :class="{ 'is-collapsed': !$store.studio.sidebar }"
+                    :style="{ width: ($store.studio.sidebar ? $store.studio.panelWidth : 0) + 'px' }"
+                    :aria-hidden="!$store.studio.sidebar"
+                    :inert="!$store.studio.sidebar"
+                    @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
+                >
+                    <div class="s-sidebar-inner" :style="{ width: $store.studio.panelWidth + 'px', minWidth: $store.studio.panelWidth + 'px' }">
+                        {{ $sidebar }}
+                    </div>
 
-                    {{-- The sidebar: one panel at a time, chosen by the tab
-                         strip. It stays in the row open or shut so collapsing
-                         is one width transition. --}}
-                    <aside
-                        class="s-sidebar"
-                        :class="{ 'is-collapsed': !$store.studio.sidebar, 'is-narrow': $store.studio.panelWidth < 316 }"
-                        :style="{ width: ($store.studio.sidebar ? $store.studio.panelWidth : 0) + 'px' }"
-                        :aria-hidden="!$store.studio.sidebar"
-                        :inert="!$store.studio.sidebar"
-                        @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
-                    >
-                        <div class="s-sidebar-inner" :style="{ width: $store.studio.panelWidth + 'px', minWidth: $store.studio.panelWidth + 'px' }">
-                            {{ $sidebar }}
-                        </div>
+                    {{-- A drag seam on the inner edge sets the width. A
+                         shield covers the window while it is held so the
+                         canvas iframe can't swallow the pointer. --}}
+                    <div
+                        class="s-panel-seam"
+                        role="separator"
+                        aria-label="Resize the sidebar"
+                        @mousedown.prevent="
+                            const aside = $el.closest('aside');
+                            const shield = document.createElement('div');
+                            shield.className = 's-drag-shield';
+                            document.body.appendChild(shield);
+                            const move = (event) => $store.studio.setPanelWidth(event.clientX - aside.getBoundingClientRect().left);
+                            const stop = () => {
+                                shield.remove();
+                                document.removeEventListener('mousemove', move);
+                                document.removeEventListener('mouseup', stop);
+                                window.removeEventListener('blur', stop);
+                                document.body.classList.remove('select-none');
+                                window.dispatchEvent(new CustomEvent('studio:reflow'));
+                            };
+                            document.body.classList.add('select-none');
+                            document.addEventListener('mousemove', move);
+                            document.addEventListener('mouseup', stop);
+                            window.addEventListener('blur', stop);
+                        "
+                    ></div>
+                </aside>
 
-                        {{-- A drag seam on the inner edge sets the width. A
-                             shield covers the window while it is held so the
-                             canvas iframe can't swallow the pointer. --}}
-                        <div
-                            class="s-panel-seam"
-                            role="separator"
-                            aria-label="Resize the sidebar"
-                            @mousedown.prevent="
-                                const aside = $el.closest('aside');
-                                const shield = document.createElement('div');
-                                shield.className = 's-drag-shield';
-                                document.body.appendChild(shield);
-                                const move = (event) => $store.studio.setPanelWidth(event.clientX - aside.getBoundingClientRect().left);
-                                const stop = () => {
-                                    shield.remove();
-                                    document.removeEventListener('mousemove', move);
-                                    document.removeEventListener('mouseup', stop);
-                                    window.removeEventListener('blur', stop);
-                                    document.body.classList.remove('select-none');
-                                    window.dispatchEvent(new CustomEvent('studio:reflow'));
-                                };
-                                document.body.classList.add('select-none');
-                                document.addEventListener('mousemove', move);
-                                document.addEventListener('mouseup', stop);
-                                window.addEventListener('blur', stop);
-                            "
-                        ></div>
-                    </aside>
-
-                    {{-- The site is the screen: the stage fills what is left --}}
+                {{-- The content card: the header, then the site --}}
+                <div class="s-card">
+                    @include('studio::partials.topbar')
                     <main class="s-stage">
                         {{ $slot }}
                     </main>
-
-                    {{-- The Assistant: a column on the right, developer mode only --}}
-                    @isset($assistant)
-                        <aside
-                            class="s-assistant"
-                            :class="{ 'is-collapsed': !$store.studio.assistantOpen }"
-                            :style="{ width: ($store.studio.assistantOpen ? $store.studio.assistantWidth : 0) + 'px' }"
-                            :aria-hidden="!$store.studio.assistantOpen"
-                            :inert="!$store.studio.assistantOpen"
-                            x-show="$store.studio.chatAvailable || $store.studio.assistantOpen"
-                            @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
-                        >
-                            <div class="s-sidebar-inner" :style="{ width: $store.studio.assistantWidth + 'px', minWidth: $store.studio.assistantWidth + 'px' }">
-                                {{ $assistant }}
-                            </div>
-                            <div
-                                class="s-panel-seam"
-                                role="separator"
-                                aria-label="Resize the Assistant"
-                                @mousedown.prevent="
-                                    const aside = $el.closest('aside');
-                                    const shield = document.createElement('div');
-                                    shield.className = 's-drag-shield';
-                                    document.body.appendChild(shield);
-                                    const move = (event) => $store.studio.setAssistantWidth(aside.getBoundingClientRect().right - event.clientX);
-                                    const stop = () => {
-                                        shield.remove();
-                                        document.removeEventListener('mousemove', move);
-                                        document.removeEventListener('mouseup', stop);
-                                        window.removeEventListener('blur', stop);
-                                        document.body.classList.remove('select-none');
-                                        window.dispatchEvent(new CustomEvent('studio:reflow'));
-                                    };
-                                    document.body.classList.add('select-none');
-                                    document.addEventListener('mousemove', move);
-                                    document.addEventListener('mouseup', stop);
-                                    window.addEventListener('blur', stop);
-                                "
-                            ></div>
-                        </aside>
-                    @endisset
                 </div>
             @else
                 <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">

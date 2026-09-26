@@ -12,13 +12,18 @@
     /* The frame — the ground the whole editor sits on. The top bar sits
        straight on it; the site, the sidebar and the Assistant column are
        rounded containers laid on it a gutter apart. */
-    --color-frame: #111111;
+    --color-frame: #0f0f10;
 
     /* Surfaces (dark chrome: neutral near-blacks, no blue cast) */
-    --color-shell: #111111;
-    --color-panel: #161616;
-    --color-raised: #202020;
-    --color-overlay: #1f1f1f;
+    --color-shell: #0f0f10;
+    --color-panel: #1a1a1c;
+    --color-raised: #232326;
+    --color-overlay: #1a1a1c;
+
+    /* Wells — the pill controls' ground, and a segment lifted out of one */
+    --color-well: #232326;
+    --color-well-strong: #2e2e32;
+    --color-well-lift: #2e2e32;
 
     /* Hairlines */
     --color-line: rgba(255, 255, 255, 0.1);
@@ -39,7 +44,7 @@
     --color-danger: #ff6b5b;
 
     /* Canvas — the surface behind a narrow preview */
-    --color-canvas: #171717;
+    --color-canvas: #141416;
 
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
@@ -56,10 +61,13 @@
    primary action. */
 html.studio-light {
     --color-frame: #efeff0;
-    --color-shell: #f7f7f8;
+    --color-shell: #f4f4f5;
     --color-panel: #ffffff;
     --color-raised: #ffffff;
     --color-overlay: #ffffff;
+    --color-well: #ececee;
+    --color-well-strong: #e0e0e4;
+    --color-well-lift: #ffffff;
     --color-line: rgba(0, 0, 0, 0.08);
     --color-line-strong: rgba(0, 0, 0, 0.14);
     --color-ink: #1f2023;
@@ -248,7 +256,7 @@ html.studio-light {
     }
 
     .s-microlabel {
-        @apply text-[12px] font-medium text-soft;
+        @apply text-[11px] font-semibold uppercase tracking-wider text-faint;
     }
 
     .s-input {
@@ -334,55 +342,86 @@ html.studio-light {
 
     /* --- popovers / menus ------------------------------------------ */
 
+    /* Popovers and menus are always dark, whatever the chrome — the
+       tokens are retuned on the subtree so everything inside follows */
     .s-pop {
-        @apply rounded-lg border border-line-strong bg-overlay p-1 shadow-2xl;
-        box-shadow:
-            0 0 0 1px rgba(0, 0, 0, 0.4),
-            0 16px 40px -12px rgba(0, 0, 0, 0.7);
+        --color-shell: #0f0f10;
+        --color-panel: #1a1a1c;
+        --color-raised: #232326;
+        --color-overlay: #101012;
+        --color-line: rgba(255, 255, 255, 0.08);
+        --color-line-strong: rgba(255, 255, 255, 0.14);
+        --color-ink: #f0f0f0;
+        --color-soft: #d4d4d4;
+        --color-faint: #8a8a8a;
+        --color-wash: rgba(255, 255, 255, 0.07);
+        --color-wash-strong: rgba(255, 255, 255, 0.11);
+        --color-wash-faint: rgba(255, 255, 255, 0.03);
+        --color-well: #232326;
+        --color-well-strong: #2e2e32;
+        --color-well-lift: #2e2e32;
+        color-scheme: dark;
+        @apply rounded-xl p-1.5;
+        color: var(--color-ink);
+        background: var(--color-overlay);
+        border: 1px solid var(--color-line);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .s-pop-divider {
+        height: 1px;
+        margin: 4px 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
     }
 
     .s-menu-item {
-        @apply flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 text-left text-[12.5px] text-soft transition-colors duration-100;
-        min-height: 28px;
-        padding-top: 4px;
-        padding-bottom: 4px;
+        @apply flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] transition-colors duration-100;
+        min-height: 30px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        color: color-mix(in srgb, var(--color-ink) 90%, transparent);
+    }
+
+    .s-menu-item > svg:first-child {
+        color: var(--color-faint);
+        transition: color 100ms ease;
     }
 
     .s-menu-item:hover {
         @apply bg-wash text-ink;
     }
 
+    .s-menu-item:hover > svg:first-child {
+        color: var(--color-soft);
+    }
+
     .s-kbd {
         @apply inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-line-strong bg-raised px-1 font-mono text-[10px] text-faint;
     }
 
-    /* --- the frame ---------------------------------------------------- */
+    /* --- the ground ---------------------------------------------------- */
 
-    /* The editor's ground: the top bar sits straight on it, and the site,
-       the sidebar (light theme) and the Assistant column are rounded
-       containers laid on it a gutter apart. */
-    /* The frame: the top bar sits straight on it, and the sidebar, the
-       site and the Assistant column are rounded containers laid on it a
-       gutter apart. Light, the frame is a soft grey and the containers
-       white; dark, the columns sit straight on the near-black and only
-       the site is a card. */
+    /* The editor's ground: the activity rail and the sidebar sit straight
+       on it, and the site lives in a content card (the header inside it)
+       with rounded top corners and a hairline ring — the DevDojo builder's
+       shell. */
     .s-app {
-        --studio-topbar: 44px;
-        --studio-gutter: 6px;
-        --studio-radius: 10px;
-        padding: 0 var(--studio-gutter) var(--studio-gutter);
+        --studio-header: 44px;
+        padding: 8px 8px 0 0;
         background-color: var(--color-frame);
     }
 
-    .s-app-row {
-        gap: var(--studio-gutter);
+    /* The content card */
+    .s-card {
+        @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden;
+        background: var(--color-panel);
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 0 0 1px var(--color-line);
     }
 
-    /* The site is the screen: the stage fills what the columns leave */
+    /* The site is the screen: the stage fills the card under the header */
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
-        border-radius: var(--studio-radius);
-        box-shadow: 0 0 0 1px var(--color-line);
     }
 
     /* Over everything (incl. the canvas iframe, which would otherwise
@@ -395,59 +434,52 @@ html.studio-light {
         user-select: none;
     }
 
-    /* --- the top bar --------------------------------------------------- */
+    /* --- the activity rail --------------------------------------------- */
 
-    .s-topbar {
-        @apply flex shrink-0 items-center text-soft;
-        height: var(--studio-topbar);
-        padding: 0 4px 0 2px;
-        gap: 2px;
+    .s-rail {
+        @apply flex shrink-0 flex-col items-center;
+        width: 44px;
+        padding: 5px 0 12px;
+        gap: 4px;
         user-select: none;
     }
 
-    .s-topbar-group {
-        @apply flex min-w-0 items-center;
-        gap: 2px;
+    .s-rail-sep {
+        display: block;
+        width: 20px;
+        height: 1px;
+        margin: 4px 0;
+        background: var(--color-line);
     }
 
-    .s-topbar-group.is-start,
-    .s-topbar-group.is-end {
-        flex: 1 1 0;
+    .s-rail-btn {
+        @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint;
+        width: 30px;
+        height: 30px;
+        transition: background-color 150ms ease, color 150ms ease;
     }
 
-    .s-topbar-group.is-end {
-        justify-content: flex-end;
+    .s-rail-btn svg {
+        width: 16px;
+        height: 16px;
     }
 
-    .s-topbar-group.is-center {
-        flex: none;
+    .s-rail-btn:hover {
+        @apply text-ink;
+        background: var(--color-well);
     }
 
-    .s-tb-btn {
-        @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-md text-soft;
-        width: 28px;
-        height: 28px;
-        transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
+    .s-rail-btn.is-active {
+        @apply text-ink;
+        background: var(--color-well);
     }
 
-    .s-tb-btn:hover {
-        @apply bg-wash text-ink;
-    }
-
-    .s-tb-btn.is-active {
-        @apply bg-wash-strong text-ink;
-    }
-
-    .s-tb-btn:active {
-        transform: scale(0.94);
-    }
-
-    .s-tb-btn:focus-visible {
+    .s-rail-btn:focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 1px;
     }
 
-    .s-tb-btn.is-busy::before {
+    .s-rail-btn.is-busy::before {
         content: '';
         position: absolute;
         top: 4px;
@@ -456,20 +488,12 @@ html.studio-light {
         height: 6px;
         border-radius: 999px;
         background: var(--color-accent);
-        box-shadow: 0 0 0 2px var(--color-frame);
         animation: s-busy 1.2s ease-in-out infinite;
     }
 
     @keyframes s-busy {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.35; }
-    }
-
-    .s-tb-sep {
-        @apply shrink-0 bg-line;
-        width: 1px;
-        height: 16px;
-        margin: 0 6px;
     }
 
     /* The menu button: the brand mark at rest, cross-fading to the
@@ -483,27 +507,23 @@ html.studio-light {
         top: 50%;
         left: 50%;
         translate: -50% -50%;
-        transition: opacity 180ms ease, scale 180ms ease;
-    }
-
-    .s-brand .s-brand-logo {
-        opacity: 0.85;
+        transition: opacity 150ms ease, scale 150ms ease;
     }
 
     .s-brand .s-brand-menu {
         opacity: 0;
-        scale: 0.72;
+        scale: 0.8;
     }
 
     .s-brand:hover,
     .s-brand.is-open {
-        @apply bg-wash-strong text-ink;
+        background: var(--color-well);
     }
 
     .s-brand:hover .s-brand-logo,
     .s-brand.is-open .s-brand-logo {
         opacity: 0;
-        scale: 0.72;
+        scale: 0.8;
     }
 
     .s-brand:hover .s-brand-menu,
@@ -512,40 +532,222 @@ html.studio-light {
         scale: 1;
     }
 
-    /* The page switcher: title, path, the save-status pip */
-    .s-page-btn {
-        @apply flex min-w-0 cursor-pointer items-center gap-2 rounded-md;
+    /* --- the sidebar (on the ground, beside the rail) ------------------- */
+
+    .s-sidebar {
+        position: relative;
+        display: flex;
+        flex: none;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        transition:
+            width 250ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 250ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 180ms ease;
+        margin-right: 8px;
+    }
+
+    .s-sidebar.is-collapsed {
+        width: 0 !important;
+        margin-right: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Held at exactly the column's width so the panel slides, never reflows */
+    .s-sidebar-inner {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        margin-left: auto;
+    }
+
+    /* While the seam is dragged the width follows the pointer, not a curve */
+    body.select-none .s-sidebar {
+        transition: none;
+    }
+
+    /* The resize seam: a 6px grab strip on the sidebar's inner edge */
+    .s-panel-seam {
+        position: absolute;
+        top: 10px;
+        bottom: 10px;
+        right: 0;
+        width: 6px;
+        z-index: 5;
+        cursor: col-resize;
+    }
+
+    .s-panel-seam::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 2px;
+        border-radius: 2px;
+        background: transparent;
+        transition: background-color 150ms ease;
+    }
+
+    .s-panel-seam:hover::after,
+    .s-panel-seam:active::after {
+        background: var(--color-accent);
+    }
+
+    /* A panel's top row: a title, actions at the end */
+    .s-panel-head {
+        @apply flex shrink-0 items-center gap-1;
+        height: var(--studio-header);
+        padding: 0 8px 0 14px;
+    }
+
+    /* The Getting-started card on first run */
+    .s-tipcard {
+        @apply relative mx-2 mt-1 rounded-lg border border-line p-2.5;
+        background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+        border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
+    }
+
+    .s-tipcard ol {
+        @apply mt-2 space-y-1.5 text-[12px] leading-snug text-soft;
+        counter-reset: tip;
+    }
+
+    .s-tipcard li {
+        @apply flex items-start gap-2;
+    }
+
+    .s-tipcard li::before {
+        counter-increment: tip;
+        content: counter(tip);
+        @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold;
+        background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+        color: var(--color-accent);
+        margin-top: 1px;
+    }
+
+    /* --- the card's header --------------------------------------------- */
+
+    .s-topbar {
+        @apply relative z-40 flex shrink-0 items-center border-b border-line text-soft;
+        height: var(--studio-header);
+        padding: 0 8px 0 6px;
+        gap: 6px;
+        user-select: none;
+    }
+
+    /* The page pill, centred over the whole bar */
+    .s-topbar-center {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 10;
+        translate: -50% -50%;
+    }
+
+    .s-tb-btn {
+        @apply relative flex shrink-0 cursor-pointer items-center justify-center rounded-full text-faint;
+        width: 28px;
         height: 28px;
-        padding: 0 6px 0 8px;
-        max-width: min(360px, 34vw);
-        font-size: 12.5px;
-        transition: background-color 120ms ease;
+        transition: background-color 150ms ease, color 150ms ease, transform 120ms ease;
     }
 
-    .s-page-btn:hover,
-    .s-page-btn.is-open {
-        @apply bg-wash;
+    .s-tb-btn:hover {
+        @apply text-ink;
+        background: var(--color-well);
     }
 
-    .s-page-btn:focus-visible {
+    .s-tb-btn.is-active {
+        @apply text-ink;
+        background: var(--color-well);
+    }
+
+    .s-tb-btn.is-accent {
+        color: var(--color-accent);
+    }
+
+    .s-tb-btn:active {
+        transform: scale(0.94);
+    }
+
+    .s-tb-btn:focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 1px;
     }
 
-    /* Edit | Preview | Code — a grey well with the active segment lifted */
+    /* The sidebar toggle's inner bar previews the action: it narrows on
+       hover to collapse, widens to expand (DevDojo's shared glyph) */
+    .sidebar-toggle-bar {
+        transition: width 0.2s ease-out, x 0.2s ease-out;
+    }
+
+    .tgl-expand .sidebar-toggle-bar {
+        width: 2px;
+    }
+
+    .tgl-expand:hover .sidebar-toggle-bar,
+    .tgl-expand:focus-visible .sidebar-toggle-bar {
+        width: 4.5px;
+    }
+
+    .tgl-collapse .sidebar-toggle-bar {
+        width: 4.5px;
+    }
+
+    .tgl-collapse:hover .sidebar-toggle-bar,
+    .tgl-collapse:focus-visible .sidebar-toggle-bar {
+        width: 2px;
+    }
+
+    /* Preview | Edit | Code — a pill well; only the active segment shows
+       its label, the others collapse to icons behind hairlines that fade
+       beside the active pill */
     .s-mode {
-        @apply flex shrink-0 rounded-[7px] bg-wash;
+        @apply flex shrink-0 items-center rounded-full;
         padding: 2px;
-        gap: 1px;
+        background: var(--color-well);
+    }
+
+    .s-mode-sep {
+        display: block;
+        width: 1px;
+        height: 14px;
+        margin: 0 2px;
+        flex: none;
+        background: var(--color-line-strong);
+        transition: opacity 200ms ease;
+    }
+
+    .s-mode-sep.is-hidden {
+        opacity: 0;
     }
 
     .s-mode-btn {
-        @apply flex cursor-pointer items-center gap-1.5 rounded-[5px] text-soft;
-        height: 24px;
-        padding: 0 10px;
+        @apply flex cursor-pointer items-center rounded-full text-faint;
+        height: 26px;
+        padding: 0 4px;
+        gap: 0;
         font-size: 12px;
         font-weight: 500;
-        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+        white-space: nowrap;
+        transition: background-color 200ms ease, color 200ms ease, padding 200ms ease, box-shadow 200ms ease;
+    }
+
+    .s-mode-btn:not(.is-active):first-child {
+        padding-left: 8px;
+    }
+
+    .s-mode-btn:not(.is-active):last-child {
+        padding-right: 8px;
+    }
+
+    .s-mode-btn svg {
+        width: 14px;
+        height: 14px;
+        flex: none;
     }
 
     .s-mode-btn:hover {
@@ -553,18 +755,15 @@ html.studio-light {
     }
 
     .s-mode-btn.is-active {
-        @apply text-ink;
-        background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
+        gap: 4px;
+        padding: 0 10px 0 8px;
+        color: var(--color-accent);
+        background: var(--color-well-lift);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
     }
 
     html:not(.studio-light) .s-mode-btn.is-active {
-        background: var(--color-raised);
-        box-shadow: 0 0 0 1px var(--color-line-strong);
-    }
-
-    .s-mode-btn.is-active.is-code {
-        color: var(--color-accent);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     }
 
     .s-mode-btn:focus-visible {
@@ -572,33 +771,75 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Canvas widths — three small icon radios in the same well */
-    .s-widths {
-        @apply flex shrink-0 rounded-full bg-wash;
-        padding: 2px;
-        gap: 1px;
+    /* The page pill: [ ⟳ | page ▾ ] */
+    .s-page-pill {
+        @apply flex items-center rounded-full;
+        height: 30px;
+        width: 256px;
+        padding: 0 4px;
+        background: var(--color-well);
+        transition: background-color 150ms ease;
     }
 
-    .s-widths-btn {
-        @apply flex cursor-pointer items-center justify-center rounded-full text-faint;
-        width: 28px;
+    .s-page-pill:hover,
+    .s-page-pill.is-open {
+        background: var(--color-well-strong);
+    }
+
+    .s-page-pill-refresh {
+        @apply flex shrink-0 cursor-pointer items-center justify-center rounded-full text-faint;
+        width: 24px;
         height: 24px;
-        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+        transition: background-color 150ms ease, color 150ms ease;
     }
 
-    .s-widths-btn:hover {
+    .s-page-pill-refresh:hover {
         @apply text-ink;
+        background: var(--color-wash-strong);
     }
 
-    .s-widths-btn.is-active {
+    .s-page-pill-trigger {
+        @apply flex h-full min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 text-ink;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .s-page-pill-trigger svg {
+        color: var(--color-faint);
+    }
+
+    /* Rows in the page dropdown: check · title · path, actions on hover */
+    .s-page-row {
+        @apply flex w-full items-center gap-1 rounded-lg px-1 py-0.5 text-[13px];
+        color: var(--color-ink);
+        transition: background-color 100ms ease;
+    }
+
+    .s-page-row:hover {
+        background: var(--color-wash);
+    }
+
+    .s-page-row.is-current {
+        background: var(--color-wash-strong);
+    }
+
+    .s-page-row-main {
+        @apply flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-1.5 py-1.5 text-left;
+    }
+
+    .s-page-row-action {
+        @apply hidden shrink-0 cursor-pointer items-center justify-center rounded text-faint;
+        width: 24px;
+        height: 24px;
+    }
+
+    .s-page-row-action:hover {
         @apply text-ink;
-        background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
+        background: var(--color-wash-strong);
     }
 
-    html:not(.studio-light) .s-widths-btn.is-active {
-        background: var(--color-raised);
-        box-shadow: 0 0 0 1px var(--color-line-strong);
+    .s-page-row:hover .s-page-row-action {
+        display: flex;
     }
 
     /* Publish, carrying the save-status pip */
@@ -607,7 +848,7 @@ html.studio-light {
         height: 28px;
         padding: 0 12px 0 10px;
         margin-left: 4px;
-        font-size: 12.5px;
+        font-size: 13px;
         background: var(--color-ink);
         color: var(--color-shell);
         transition: filter 150ms ease, transform 120ms ease;
@@ -646,7 +887,7 @@ html.studio-light {
 
     .s-publish .s-dirty-pip {
         @apply absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent;
-        box-shadow: 0 0 0 2px var(--color-frame);
+        box-shadow: 0 0 0 2px var(--color-panel);
     }
 
     /* A small switch, drawn from state (the developer-mode row) */
@@ -686,7 +927,8 @@ html.studio-light {
         opacity: 1;
     }
 
-    /* Tooltips — a label under (or over) any control that carries data-tip */
+    /* Tooltips — a label under any control that carries data-tip; to the
+       right of a rail button */
     .s-tip {
         position: relative;
     }
@@ -711,6 +953,12 @@ html.studio-light {
         transition: opacity 120ms ease;
     }
 
+    .s-tip.s-tip-right[data-tip]::after {
+        top: 50%;
+        left: calc(100% + 8px);
+        translate: 0 -50%;
+    }
+
     .s-tip[data-tip]:hover::after {
         opacity: 1;
         transition-delay: 500ms;
@@ -721,188 +969,17 @@ html.studio-light {
         display: none;
     }
 
-    /* --- the sidebar --------------------------------------------------- */
-
-    /* A column beside the site. Dark, it sits straight on the frame —
-       only the site is a card; light, it is a white container like the
-       site. It stays in the row open or shut, so collapsing is one width +
-       margin transition with the panel held at full width sliding out
-       under the outer edge. */
-    .s-sidebar,
-    .s-assistant {
-        position: relative;
-        display: flex;
-        flex: none;
-        flex-direction: column;
-        min-height: 0;
-        overflow: hidden;
-        border-radius: var(--studio-radius);
-        background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line);
-        transition:
-            width 240ms cubic-bezier(0.22, 1, 0.36, 1),
-            margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 180ms ease;
+    @media (prefers-reduced-motion: reduce) {
+        .s-sidebar,
+        .sidebar-toggle-bar,
+        .s-mode-btn {
+            transition: none;
+        }
     }
 
-    html:not(.studio-light) .s-sidebar,
-    html:not(.studio-light) .s-assistant {
-        background: transparent;
-        box-shadow: none;
-    }
-
-    .s-sidebar.is-collapsed,
-    .s-assistant.is-collapsed {
-        width: 0 !important;
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    /* The row's gap is the gutter; a collapsed column gives it back */
-    .s-sidebar.is-collapsed {
-        margin-right: calc(-1 * var(--studio-gutter));
-    }
-
-    .s-assistant.is-collapsed {
-        margin-left: calc(-1 * var(--studio-gutter));
-    }
-
-    /* Held at exactly the column's width so the panel slides, never reflows */
-    .s-sidebar-inner {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-        margin-left: auto;
-    }
-
-    .s-assistant .s-sidebar-inner {
-        margin-left: 0;
-        margin-right: auto;
-    }
-
-    /* While a seam is dragged the width follows the pointer, not a curve */
-    body.select-none .s-sidebar,
-    body.select-none .s-assistant {
-        transition: none;
-    }
-
-    /* The resize seam: a 6px grab strip on the column's inner edge */
-    .s-panel-seam {
-        position: absolute;
-        top: 10px;
-        bottom: 10px;
-        right: 0;
-        width: 6px;
-        z-index: 5;
-        cursor: col-resize;
-    }
-
-    .s-panel-seam::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        right: 0;
-        width: 2px;
-        border-radius: 2px;
-        background: transparent;
-        transition: background-color 150ms ease;
-    }
-
-    .s-panel-seam:hover::after,
-    .s-panel-seam:active::after {
-        background: var(--color-accent);
-    }
-
-    .s-assistant .s-panel-seam {
-        right: auto;
-        left: 0;
-    }
-
-    .s-assistant .s-panel-seam::after {
-        right: auto;
-        left: 0;
-    }
-
-    /* The sidebar's tab strip: Sections · Pages · Content · Media */
-    .s-tabs {
-        @apply flex shrink-0 items-center border-b border-line;
-        height: 40px;
-        padding: 0 8px;
-        gap: 2px;
-    }
-
-    .s-tab {
-        @apply flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-soft;
-        height: 26px;
-        min-width: 0;
-        padding: 0 4px;
-        font-size: 12px;
-        font-weight: 500;
-        white-space: nowrap;
-        transition: background-color 120ms ease, color 120ms ease;
-    }
-
-    .s-tab:hover {
-        @apply text-ink bg-wash;
-    }
-
-    .s-tab.is-active {
-        @apply bg-wash-strong text-ink;
-    }
-
-    .s-tab:focus-visible {
-        outline: 2px solid var(--color-accent);
-        outline-offset: -2px;
-    }
-
-    .s-tab svg {
-        width: 14px;
-        height: 14px;
-        flex: none;
-    }
-
-    /* Narrow sidebar: icons only */
-    .s-sidebar.is-narrow .s-tab span {
-        display: none;
-    }
-
-    /* The composer's pick button: an icon in the column, its label lives in the tooltip */
+    /* The composer's pick button: an icon in the sidebar, its label lives in the tooltip */
     .s-chat-tool-label {
         display: none;
-    }
-
-    /* A panel's top row: a title, actions at the end */
-    .s-panel-head {
-        @apply flex shrink-0 items-center gap-1 border-b border-line;
-        height: 40px;
-        padding: 0 8px 0 12px;
-    }
-
-    /* The Getting-started card on first run */
-    .s-tipcard {
-        @apply relative mx-2 mt-2 rounded-lg border border-line p-2.5;
-        background: color-mix(in srgb, var(--color-accent) 6%, transparent);
-        border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-    }
-
-    .s-tipcard ol {
-        @apply mt-2 space-y-1.5 text-[12px] leading-snug text-soft;
-        counter-reset: tip;
-    }
-
-    .s-tipcard li {
-        @apply flex items-start gap-2;
-    }
-
-    .s-tipcard li::before {
-        counter-increment: tip;
-        content: counter(tip);
-        @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold;
-        background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-        color: var(--color-accent);
-        margin-top: 1px;
     }
 
     /* Code mode's file tree column, inside the code pane */
@@ -911,12 +988,7 @@ html.studio-light {
         width: 260px;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-        .s-sidebar,
-        .s-assistant {
-            transition: none;
-        }
-    }
+
 
     /* --- the Assistant's pick tool, armed ------------------------------
        A violet pill over the canvas: the next click adds an element to the
@@ -1445,11 +1517,6 @@ html.studio-light {
 /* ------------------------------------------------------------------ */
 
 @layer components {
-
-html.studio-light .s-pop {
-    border-color: transparent;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 10px 28px -8px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.05);
-}
 
 html.studio-light .s-modal {
     border-color: transparent;

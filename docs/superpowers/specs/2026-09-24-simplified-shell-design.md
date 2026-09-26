@@ -102,9 +102,9 @@ then deselects (it no longer closes the sidebar) · ? shortcuts. ⌘. is gone wi
 
 ## 9. Theme
 
-Dark stays the default. The top bar sits on the frame (light `#efeff0`, dark near-black);
-the sidebar, the site and the Assistant column are rounded containers a 6px gutter apart —
-white in light, straight on the black in dark. One
+Dark stays the default. The shell is the DevDojo builder's: an activity rail and the sidebar
+on the ground (light `#efeff0`, dark near-black), and the site in a white content card with
+the header inside it. Every popover is dark in both themes, with DevDojo's enter curve. One
 accent (`#4c7dfa`, the canvas's selection blue). Controls run one size smaller than before
 (28px bar buttons, inputs and buttons, 24px segments in a grey well with the active one
 lifted white, 28px rows, 6px radius). The main menu follows the theme too.
