@@ -10,7 +10,11 @@ Everything below ships in the first public release.
 
 ### Editor
 
-- Visual editor at `/studio`: browser-style topbar, full-width URL bar that doubles as the page switcher, live canvas with per-section chrome, collapsible left panel (Sections / Layout / Page tabs), device preview widths, keyboard shortcuts.
+- **One layout.** A 44px top bar (menu, sidebar toggle, page switcher with a dark dropdown, Preview / Edit / Code in the centre, a device button that cycles Desktop → Tablet → Phone, Assistant, Publish), a resizable sidebar on the left with a tab strip — Sections · Pages · Content · Media — over one panel, the site in the middle, and (developer mode) the Assistant as a resizable column on the right. Every dropdown is dark, with DevDojo's enter curve. The floating/pinnable dock, its View switches, the five Workspace presets, the joined composer, the floating chat, and the popover/sheet panel frames are gone; nothing about where the chrome sits is a setting any more.
+- First run opens in **Edit** mode on the Sections panel with a dismissible Getting-started card; the sidebar's Sections panel is the list and the inspector only. **Page settings** (title, URL, layout, search listing, social sharing, advanced, duplicate, delete) are their own view, reached from the page switcher, the panel's gear, the Pages panel, ⌘, or the menu.
+- The menu is six rows: New page… / Duplicate / Page settings… / New layout… (developer), the **Developer mode** switch with a one-line description, Appearance (Dark / Light), Keyboard shortcuts (`?`), View live site, Documentation. The ⌘K palette lists pages ("Go to …"), sections, modes, panels, Publish, widths, appearance and developer mode.
+- Linear-scale chrome: the top bar on a soft grey frame (`#efeff0` in light) with the sidebar, the site and the Assistant column as rounded white containers; controls one size smaller (28px buttons and inputs, 24px segmented controls with the active segment lifted white, 28px rows, 6px radius).
+- Visual editor at `/studio`: live canvas with per-section chrome, device preview widths, keyboard shortcuts.
 - Section library with live previews and search — every section in the installed site (any component with a `.yml` of fields).
 - Confirm-free section deletion with **Undo** from the toast; irreversible actions (page, layout, block-everywhere) keep confirmations.
 - Concurrent-edit detection: writes are blocked with a reload prompt when the page or layout changed in another tab.

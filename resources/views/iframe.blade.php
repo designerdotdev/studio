@@ -69,7 +69,8 @@
                 inset: 0;
                 pointer-events: none;
                 z-index: 2147483000;
-                transition: box-shadow 120ms ease;
+                background-color: transparent;
+                transition: box-shadow 120ms ease, background-color 220ms ease;
             }
 
             .studio-section:hover::after,
@@ -105,29 +106,156 @@
                 margin-top: calc(var(--studio-rail-h) * -1);
             }
 
-            /* Name chip */
+            /* ---- Focus: one section is being edited ----
+               The page steps aside. Every other section (and the regions and
+               add pills) leaves the layout, and the section being edited
+               becomes one card on a quiet dotted canvas — its own page
+               background kept inside the card (--studio-site-bg, read from
+               the body by setFocus()), a hairline ring and a soft shadow
+               around it. `overflow: clip`, never hidden: clip does not make
+               a scroll container, so the sticky rail still parks at the top
+               of the viewport while a tall card scrolls. Done, Esc or a click
+               on the canvas around the card brings the page back. */
+            html.studio-focus,
+            html.studio-focus body {
+                background: #ececee !important;
+            }
+
+            html.studio-focus body {
+                background-image: radial-gradient(rgba(0, 0, 0, 0.13) 1px, transparent 1.2px) !important;
+                background-size: 22px 22px !important;
+                background-position: 11px 11px !important;
+                min-height: 100vh;
+            }
+
+            html.studio-focus .studio-section:not(.is-editing),
+            html.studio-focus .studio-region,
+            html.studio-focus .studio-insert,
+            html.studio-focus .studio-tb-btn.is-move,
+            html.studio-focus .studio-tb-sep.is-move {
+                display: none !important;
+            }
+
+            html.studio-focus .studio-section.is-editing {
+                margin: 32px auto 0;
+                width: calc(100% - 64px);
+                max-width: 1440px;
+                border-radius: 14px;
+                overflow: clip;
+                background: var(--studio-site-bg, #fff);
+                box-shadow:
+                    0 0 0 1px rgba(0, 0, 0, 0.07),
+                    0 1px 2px rgba(0, 0, 0, 0.05),
+                    0 40px 80px -32px rgba(0, 0, 0, 0.35);
+                animation: studio-lift 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            html.studio-focus .studio-section.is-editing::after {
+                box-shadow: none;
+            }
+
+            /* The rail stops overlapping: it becomes the card's header — a
+               50px strip the content no longer takes back, carrying the
+               chip and the toolbar, sticky at the top of the viewport while
+               a tall card scrolls (a translucent bar over the content then) */
+            html.studio-focus .studio-section.is-editing .studio-rail {
+                background: color-mix(in srgb, var(--studio-site-bg, #fff) 88%, transparent);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+            }
+
+            html.studio-focus .studio-section.is-editing .studio-rail + [data-section-content] {
+                margin-top: 0;
+            }
+
+            html.studio-focus .studio-section.is-editing .studio-chip,
+            html.studio-focus .studio-section.is-editing .studio-hidden-badge {
+                left: 13px;
+                top: 13px;
+            }
+
+            html.studio-focus .studio-section.is-editing .studio-toolbar {
+                right: 9px;
+                top: 9px;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 8px 24px -12px rgba(0, 0, 0, 0.4);
+            }
+
+            /* The way back, written under the card */
+            html.studio-focus body::after {
+                content: 'Editing this section on its own\00a0\00a0\00b7\00a0\00a0 Done or Esc brings the page back';
+                display: block;
+                padding: 18px 0 40px;
+                text-align: center;
+                font-family: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
+                font-size: 12px;
+                letter-spacing: -0.005em;
+                color: rgba(60, 60, 67, 0.55);
+                animation: studio-fade 480ms ease both;
+            }
+
+            @keyframes studio-lift {
+                from { opacity: 0; transform: translateY(10px) scale(0.985); }
+                to { opacity: 1; transform: none; }
+            }
+
+            @keyframes studio-fade {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                html.studio-focus .studio-section.is-editing,
+                html.studio-focus body::after { animation: none; }
+            }
+
+            /* Name chip — a small dark pill with the scope as a dot */
             .studio-chip {
                 position: absolute;
-                top: 0;
-                left: 0;
+                top: 10px;
+                left: 10px;
                 z-index: 2147483002;
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                padding: 3px 9px 4px;
-                border-radius: 0 0 8px 0;
-                background: #4c7dfa;
-                color: #fff;
-                font-family: ui-sans-serif, system-ui, sans-serif;
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: -0.01em;
-                line-height: 1.4;
+                height: 24px;
+                padding: 0 9px 0 8px;
+                border-radius: 7px;
+                background: rgba(17, 17, 19, 0.92);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 8px 24px -10px rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                color: rgba(255, 255, 255, 0.92);
+                font-family: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
+                font-size: 11.5px;
+                font-weight: 500;
+                letter-spacing: -0.005em;
+                line-height: 1;
                 opacity: 0;
-                transform: translateY(-2px);
-                transition: opacity 120ms ease, transform 120ms ease;
+                transform: translateY(-3px);
+                transition: opacity 130ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
                 pointer-events: none;
                 white-space: nowrap;
+            }
+
+            .studio-chip::before {
+                content: '';
+                width: 6px;
+                height: 6px;
+                border-radius: 999px;
+                background: #4c7dfa;
+                box-shadow: 0 0 0 2px rgba(76, 125, 250, 0.22);
+            }
+
+            .studio-section.is-layout .studio-chip::before {
+                background: #8b5cf6;
+                box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.22);
+            }
+
+            .studio-section.is-block .studio-chip::before {
+                background: #14b8a6;
+                box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.22);
             }
 
             .studio-section:hover .studio-chip,
@@ -768,25 +896,32 @@
                 opacity: 0 !important;
             }
 
-            /* Floating toolbar — always wins pointer events over insert zones */
+            /* ---- Section toolbar ----
+               One dark glass bar at the top-right of a hovered or selected
+               section: ··· (more), ↑ ↓ (only where there is somewhere to
+               go), Ask AI (developer mode), Edit — the one filled button,
+               in the section's scope colour. Always wins pointer events
+               over insert zones. */
             .studio-toolbar {
                 position: absolute;
-                top: 8px;
-                right: 8px;
+                top: 10px;
+                right: 10px;
                 z-index: 2147483005;
                 display: flex;
                 align-items: center;
                 gap: 2px;
+                height: 32px;
                 padding: 3px;
-                border-radius: 10px;
-                background: rgba(12, 12, 14, 0.92);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
+                border-radius: 9px;
+                background: rgba(17, 17, 19, 0.92);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+                backdrop-filter: blur(12px) saturate(1.3);
+                -webkit-backdrop-filter: blur(12px) saturate(1.3);
+                font-family: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
                 opacity: 0;
-                transform: translateY(-4px);
-                transition: opacity 130ms ease, transform 130ms ease;
+                transform: translateY(-3px);
+                transition: opacity 130ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
                 pointer-events: none;
             }
 
@@ -797,107 +932,161 @@
                 pointer-events: auto;
             }
 
-            .studio-toolbar button {
+            .studio-tb-btn {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 26px;
-                height: 26px;
+                gap: 6px;
+                height: 24px;
+                min-width: 24px;
+                padding: 0 6px;
                 border: 0;
-                border-radius: 7px;
+                border-radius: 6px;
                 background: transparent;
-                color: rgba(255, 255, 255, 0.65);
+                color: rgba(255, 255, 255, 0.72);
+                font: inherit;
+                font-size: 12px;
+                font-weight: 500;
+                letter-spacing: -0.005em;
+                line-height: 1;
+                white-space: nowrap;
                 cursor: pointer;
-                transition: background 100ms ease, color 100ms ease;
-                padding: 0;
+                transition: background-color 100ms ease, color 100ms ease, transform 100ms ease;
             }
 
-            .studio-toolbar button:hover {
+            .studio-tb-btn:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+            }
+
+            .studio-tb-btn:active {
+                transform: scale(0.96);
+            }
+
+            .studio-tb-btn svg {
+                width: 14px;
+                height: 14px;
+                flex: none;
+            }
+
+            .studio-tb-btn.is-more.is-open {
                 background: rgba(255, 255, 255, 0.12);
                 color: #fff;
             }
 
-            /* Edit fields — the one accented button: it opens the inspector */
-            .studio-toolbar button.studio-toolbar-primary {
-                background: rgba(76, 125, 250, 0.22);
-                color: #b7c8ff;
+            /* Ask AI — violet, the Assistant's colour everywhere in Studio */
+            .studio-tb-btn.is-ai {
+                padding: 0 9px 0 7px;
+                color: #c4b5fd;
             }
 
-            .studio-toolbar button.studio-toolbar-primary:hover {
-                background: rgba(76, 125, 250, 0.4);
+            .studio-tb-btn.is-ai:hover {
+                background: rgba(139, 92, 246, 0.24);
+                color: #ede9fe;
+            }
+
+            /* Edit — filled, in the section's scope colour */
+            .studio-tb-btn.is-edit {
+                padding: 0 10px 0 8px;
+                background: #4c7dfa;
                 color: #fff;
+                font-weight: 600;
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
             }
 
-            .studio-toolbar button.studio-danger:hover {
-                background: rgba(243, 114, 114, 0.18);
-                color: #f37272;
+            .studio-tb-btn.is-edit:hover {
+                background: #3d6cea;
             }
 
-            .studio-toolbar button:disabled {
-                opacity: 0.3;
-                pointer-events: none;
+            .studio-section.is-layout .studio-tb-btn.is-edit { background: #8b5cf6; }
+            .studio-section.is-layout .studio-tb-btn.is-edit:hover { background: #7c4ddf; }
+            .studio-section.is-block .studio-tb-btn.is-edit { background: #14b8a6; }
+            .studio-section.is-block .studio-tb-btn.is-edit:hover { background: #0f9b8e; }
+
+            /* A short section (a nav bar) has no room for chrome over its own
+               controls: the chip and the toolbar hang just under its bottom
+               edge instead. `is-short` + --studio-h are set from JS on hover. */
+            .studio-section.is-short .studio-toolbar,
+            .studio-section.is-short .studio-chip,
+            .studio-section.is-short .studio-hidden-badge {
+                top: calc(var(--studio-h, 60px) + 8px);
             }
 
-            .studio-toolbar svg {
-                width: 14px;
-                height: 14px;
-            }
+            .studio-tb-btn.is-done { display: none; }
+            .studio-section.is-editing .studio-tb-btn.is-done { display: flex; }
+            .studio-section.is-editing .studio-tb-btn.is-edit:not(.is-done) { display: none; }
 
-            .studio-toolbar .studio-toolbar-sep {
+            .studio-tb-sep {
                 width: 1px;
                 height: 14px;
-                margin: 0 2px;
-                background: rgba(255, 255, 255, 0.14);
+                margin: 0 3px;
+                background: rgba(255, 255, 255, 0.12);
+                flex: none;
             }
 
-            /* Insert affordance between sections */
+            /* Dev-mode-only members of the bar hide as a unit */
+            .studio-tb-sep.studio-devmode-only { display: none !important; }
+            html.studio-devmode .studio-tb-sep.studio-devmode-only { display: block !important; }
+
+            /* ---- Add section ----
+               A pill on the bottom edge of the hovered (or selected)
+               section, and on the top edge of the first. At rest the zone
+               takes no pointer events, so hovering the seam from the next
+               section down is honest about which section is hovered. */
             .studio-insert {
                 position: absolute;
                 left: 0;
                 right: 0;
-                height: 28px;
+                height: 32px;
                 z-index: 2147483004;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                gap: 6px;
                 opacity: 0;
+                pointer-events: none;
                 transition: opacity 130ms ease;
             }
 
-            .studio-insert:hover {
+            .studio-insert--bottom { bottom: -16px; }
+
+            .studio-section:hover .studio-insert--bottom,
+            .studio-section.is-selected .studio-insert--bottom {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            /* Only the first section has a top pill. It is a quiet band on the
+               page's top edge that shows its pill when the pointer reaches
+               it — a short first section (a nav) would otherwise wear a
+               chip, a toolbar and two pills at once. */
+            .studio-insert--top {
+                top: 0;
+                height: 22px;
+                align-items: flex-start;
+                padding-top: 8px;
+                pointer-events: auto;
+            }
+
+            .studio-insert--top::before {
+                display: none;
+            }
+
+            .studio-insert--top:hover {
                 opacity: 1;
             }
 
-            .studio-insert--top { top: -14px; }
-            .studio-insert--bottom { bottom: -14px; }
-
-            /* The very first insert zone sits flush against the top edge and
-               stops short of the toolbar so both stay easy to hit */
-            .studio-section:first-of-type .studio-insert--top {
-                top: 0;
-                height: 22px;
-            }
-
-            .studio-section:first-of-type .studio-insert--top::before {
-                top: 1px;
-                margin-top: 0;
-            }
-
-            .studio-section:first-of-type .studio-insert--top button {
-                margin-top: -4px;
-            }
-
+            /* The seam itself: a hairline in the scope colour */
             .studio-insert::before {
                 content: '';
                 position: absolute;
-                left: 12px;
-                right: 12px;
+                left: 0;
+                right: 0;
                 top: 50%;
                 height: 2px;
                 margin-top: -1px;
-                border-radius: 2px;
                 background: #4c7dfa;
-                box-shadow: 0 0 12px rgba(76, 125, 250, 0.55);
+                opacity: 0.9;
             }
 
             .studio-insert button {
@@ -906,21 +1095,22 @@
                 align-items: center;
                 gap: 5px;
                 height: 26px;
-                padding: 0 12px;
+                padding: 0 11px 0 9px;
                 border: 0;
                 border-radius: 999px;
                 background: #4c7dfa;
                 color: #fff;
-                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-family: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
                 font-size: 11.5px;
                 font-weight: 600;
+                letter-spacing: -0.005em;
                 cursor: pointer;
-                box-shadow: 0 4px 16px -2px rgba(76, 125, 250, 0.55);
-                transition: transform 120ms ease, background 120ms ease;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 6px 18px -6px rgba(76, 125, 250, 0.7);
+                transition: transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1), background 120ms ease;
             }
 
             .studio-insert button:hover {
-                background: #3d6ef2;
+                background: #3d6cea;
                 transform: scale(1.04);
             }
 
@@ -971,12 +1161,11 @@
 
             .studio-insert--layout::before {
                 background: #8b5cf6;
-                box-shadow: 0 0 12px rgba(139, 92, 246, 0.55);
             }
 
             .studio-insert button.studio-add-layout {
                 background: #8b5cf6;
-                box-shadow: 0 4px 16px -2px rgba(139, 92, 246, 0.55);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 6px 18px -6px rgba(139, 92, 246, 0.7);
             }
 
             .studio-insert button.studio-add-layout:hover {
@@ -984,13 +1173,8 @@
             }
 
             /* Boundary between the layout and the page — offers both targets */
-            .studio-insert--boundary {
-                gap: 6px;
-            }
-
             .studio-insert--boundary::before {
                 background: linear-gradient(90deg, #8b5cf6, #4c7dfa);
-                box-shadow: 0 0 12px rgba(103, 108, 248, 0.5);
             }
 
             /* Empty layout/content region placeholders */
@@ -1212,6 +1396,19 @@
                 opacity: 1;
             }
 
+            .studio-menu-item .studio-menu-hint {
+                margin-left: auto;
+                padding-left: 14px;
+                font-size: 11px;
+                font-weight: 400;
+                color: rgba(255, 255, 255, 0.36);
+            }
+
+            .studio-menu-item .studio-menu-hint + .studio-menu-kbd {
+                margin-left: 0;
+                padding-left: 8px;
+            }
+
             .studio-menu-item .studio-menu-kbd {
                 margin-left: auto;
                 padding-left: 18px;
@@ -1255,8 +1452,9 @@
 
             .studio-hidden-badge {
                 position: absolute;
-                top: 8px;
-                left: 8px;
+                top: 10px;
+                left: 10px;
+                height: 24px;
                 z-index: 2147483002;
                 display: flex;
                 align-items: center;
@@ -1434,30 +1632,19 @@
                     $layoutLabel = fn ($docIndex) => $docIndex <= $layoutBeforeCount ? 'Add to header' : 'Add to footer';
                 @endphp
 
-                {{-- Insert above (into this section's own document; boundaries offer both) --}}
-                @if($layout && $loop->index === $firstPageIdx && $renderedBefore > 0)
-                    <div class="studio-insert studio-insert--top studio-insert--boundary">
-                        <button type="button" class="studio-add-layout" onclick="Studio.preview.addAt('layout', {{ $layoutBeforeCount }}, event)">
-                            {!! $plus !!} Add to header
-                        </button>
-                        <button type="button" onclick="Studio.preview.addAt('page', 0, event)">
-                            {!! $plus !!} Add section
-                        </button>
-                    </div>
-                @elseif($layout && $loop->index === $firstFooterIdx)
-                    <div class="studio-insert studio-insert--top studio-insert--boundary">
-                        <button type="button" onclick="Studio.preview.addAt('page', {{ $pageSectionCount }}, event)">
-                            {!! $plus !!} Add section
-                        </button>
-                        <button type="button" class="studio-add-layout" onclick="Studio.preview.addAt('layout', {{ $section['docIndex'] }}, event)">
-                            {!! $plus !!} Add to footer
-                        </button>
-                    </div>
-                @else
+                @php
+                    $next = $sections[$loop->index + 1] ?? null;
+                    $isHeader = $isLayout && $section['docIndex'] < $layoutBeforeCount;
+                    $nextIsPage = $next && $next['scope'] === 'page';
+                    $nextIsFooter = $next && $next['scope'] === 'layout' && $next['docIndex'] > $layoutBeforeCount;
+                    $scopeLabel = fn ($scope, $docIndex) => $scope === 'layout' ? $layoutLabel($docIndex) : 'Add section';
+                @endphp
+
+                {{-- Add above — the first section only; every other seam is the section above's bottom pill --}}
+                @if($loop->first)
                     <div class="studio-insert studio-insert--top {{ $isLayout ? 'studio-insert--layout' : '' }}">
                         <button type="button" class="{{ $isLayout ? 'studio-add-layout' : '' }}" onclick="Studio.preview.addAt('{{ $section['scope'] }}', {{ $section['docIndex'] }}, event)">
-                            {!! $plus !!}
-                            {{ $isLayout ? $layoutLabel($section['docIndex']) : 'Add section' }}
+                            {!! $plus !!} {{ $scopeLabel($section['scope'], $section['docIndex']) }}
                         </button>
                     </div>
                 @endif
@@ -1465,65 +1652,63 @@
                 {{-- Section chrome — chip, state badge and toolbar, in one sticky rail --}}
                 <div class="studio-rail">
 
-                    {{-- Name chip --}}
-                    <span class="studio-chip">
-                        {{ $section['title'] }}
-                        @if($isBlock)
-                            <span class="studio-chip-scope">Global</span>
-                        @elseif($isLayout)
-                            <span class="studio-chip-scope">Layout</span>
-                        @endif
-                        @if($section['fixed'])
-                            <span class="studio-chip-scope studio-chip-fixed" title="Position: fixed on the live site — shown in place here so the page stays easy to work on">
-                                <svg viewBox="0 0 20 20" fill="currentColor" style="width:9px;height:9px"><path d="M10 2a1 1 0 0 1 1 1v5.586l2.293 2.293A1 1 0 0 1 12.586 13H10.75v4.25a.75.75 0 0 1-1.5 0V13H7.414a1 1 0 0 1-.707-1.707L9 9.586V3a1 1 0 0 1 1-1Z"/></svg>
-                                Fixed
-                            </span>
-                        @endif
-                    </span>
-
                     @if($section['hidden'])
                         <span class="studio-hidden-badge">
                             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
                             Hidden
                         </span>
+                    @else
+                        {{-- Name chip --}}
+                        <span class="studio-chip">
+                            {{ $section['title'] }}
+                            @if($isBlock)
+                                <span class="studio-chip-scope">Global</span>
+                            @elseif($isLayout)
+                                <span class="studio-chip-scope">Layout</span>
+                            @endif
+                            @if($section['fixed'])
+                                <span class="studio-chip-scope studio-chip-fixed" title="Position: fixed on the live site — shown in place here so the page stays easy to work on">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" style="width:9px;height:9px"><path d="M10 2a1 1 0 0 1 1 1v5.586l2.293 2.293A1 1 0 0 1 12.586 13H10.75v4.25a.75.75 0 0 1-1.5 0V13H7.414a1 1 0 0 1-.707-1.707L9 9.586V3a1 1 0 0 1 1-1Z"/></svg>
+                                    Fixed
+                                </span>
+                            @endif
+                        </span>
                     @endif
 
-                    {{-- Toolbar --}}
+                    {{-- Toolbar: ··· · ↑ ↓ · Ask AI · Edit --}}
                     <div class="studio-toolbar" onclick="event.stopPropagation()">
-                        <button type="button" class="studio-toolbar-primary" onclick="Studio.preview.openInspector('{{ $section['id'] }}', event)" title="Edit fields (E)">
-                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h9M15 6h2M3 14h2M8 14h9"/><circle cx="13" cy="6" r="2"/><circle cx="6" cy="14" r="2"/></svg>
+                        <button type="button" class="studio-tb-btn is-more" onclick="Studio.preview.moreMenu('{{ $section['id'] }}', event)" title="More" aria-label="More actions" aria-haspopup="menu">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg>
                         </button>
-                        <span class="studio-toolbar-sep"></span>
-                        <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-up', event)" title="Move up" {{ $section['docFirst'] ? 'disabled' : '' }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25Z" clip-rule="evenodd"/></svg>
-                        </button>
-                        <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-down', event)" title="Move down" {{ $section['docLast'] ? 'disabled' : '' }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.53 13.53a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 1.06-1.06L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25Z" clip-rule="evenodd"/></svg>
-                        </button>
-                        <span class="studio-toolbar-sep"></span>
-                        @if(!$isBlock && !$isLayout)
-                            <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'make-global', event)" title="Make global — reuse this section on any page">
-                                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.196 12.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 12.87Z"/><path d="M3.196 8.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 8.87Z"/><path d="M10.38 1.103a.75.75 0 0 0-.76 0l-7.25 4.25a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .76 0l7.25-4.25a.75.75 0 0 0 0-1.294l-7.25-4.25Z"/></svg>
-                            </button>
+                        @if(!$section['docFirst'] || !$section['docLast'])
+                            <span class="studio-tb-sep is-move"></span>
+                            @unless($section['docFirst'])
+                                <button type="button" class="studio-tb-btn is-move" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-up', event)" title="Move up (⌘↑)" aria-label="Move up">
+                                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15.5v-11M5.5 9 10 4.5 14.5 9"/></svg>
+                                </button>
+                            @endunless
+                            @unless($section['docLast'])
+                                <button type="button" class="studio-tb-btn is-move" onclick="Studio.preview.action('{{ $section['id'] }}', 'move-down', event)" title="Move down (⌘↓)" aria-label="Move down">
+                                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4.5v11M5.5 11l4.5 4.5 4.5-4.5"/></svg>
+                                </button>
+                            @endunless
                         @endif
-                        <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'duplicate', event)" title="Duplicate (⌘D)">
-                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
-                        </button>
                         @if(\Designer\Studio\Support\DevMode::enabled())
-                            <button type="button" class="studio-devmode-only" onclick="Studio.preview.openCode('{{ $section['ref'] }}', '{{ $section['title'] }}', event)" title="Edit source code — .blade.php + .yml (dev mode)">
-                                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                            <span class="studio-tb-sep studio-devmode-only"></span>
+                            <button type="button" class="studio-tb-btn is-ai studio-devmode-only" onclick="Studio.preview.askAi('{{ $section['id'] }}', event)" title="Ask the Assistant about this section (A)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
+                                Ask AI
                             </button>
                         @endif
-                        <button type="button" onclick="Studio.preview.action('{{ $section['id'] }}', 'toggle-hidden', event)" title="{{ $section['hidden'] ? 'Show' : 'Hide' }}">
-                            @if($section['hidden'])
-                                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
-                            @else
-                                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
-                            @endif
+                        <span class="studio-tb-sep"></span>
+                        <button type="button" class="studio-tb-btn is-edit" onclick="Studio.preview.openInspector('{{ $section['id'] }}', event)" title="Edit this section (E)">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h9M15 6h2M3 14h2M8 14h9"/><circle cx="13" cy="6" r="2"/><circle cx="6" cy="14" r="2"/></svg>
+                            Edit
                         </button>
-                        <span class="studio-toolbar-sep"></span>
-                        <button type="button" class="studio-danger" onclick="Studio.preview.action('{{ $section['id'] }}', 'delete', event)" title="Delete (⌫)">
-                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>
+                        {{-- While this section is being edited, Edit reads Done --}}
+                        <button type="button" class="studio-tb-btn is-edit is-done" onclick="Studio.preview.exitFocus(event)" title="Done editing (Esc)">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg>
+                            Done
                         </button>
                     </div>
 
@@ -1532,12 +1717,29 @@
                 {{-- Rendered section --}}
                 <div data-section-content>{!! $rendered !!}</div>
 
-                {{-- Insert below (last section only — other boundaries use the next section's top zone) --}}
-                @if($loop->last)
+                {{-- Add below — this section's own seam; a layout/page boundary offers both targets --}}
+                @if($isHeader && $nextIsPage)
+                    <div class="studio-insert studio-insert--bottom studio-insert--boundary">
+                        <button type="button" class="studio-add-layout" onclick="Studio.preview.addAt('layout', {{ $layoutBeforeCount }}, event)">
+                            {!! $plus !!} Add to header
+                        </button>
+                        <button type="button" onclick="Studio.preview.addAt('page', 0, event)">
+                            {!! $plus !!} Add section
+                        </button>
+                    </div>
+                @elseif($section['scope'] === 'page' && $nextIsFooter)
+                    <div class="studio-insert studio-insert--bottom studio-insert--boundary">
+                        <button type="button" onclick="Studio.preview.addAt('page', {{ $pageSectionCount }}, event)">
+                            {!! $plus !!} Add section
+                        </button>
+                        <button type="button" class="studio-add-layout" onclick="Studio.preview.addAt('layout', {{ $next['docIndex'] }}, event)">
+                            {!! $plus !!} Add to footer
+                        </button>
+                    </div>
+                @else
                     <div class="studio-insert studio-insert--bottom {{ $isLayout ? 'studio-insert--layout' : '' }}">
                         <button type="button" class="{{ $isLayout ? 'studio-add-layout' : '' }}" onclick="Studio.preview.addAt('{{ $section['scope'] }}', {{ $section['docIndex'] + 1 }}, event)">
-                            {!! $plus !!}
-                            {{ $isLayout ? $layoutLabel($section['docIndex'] + 1) : 'Add section' }}
+                            {!! $plus !!} {{ $scopeLabel($section['scope'], $section['docIndex'] + 1) }}
                         </button>
                     </div>
                 @endif

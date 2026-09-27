@@ -1,3 +1,12 @@
+> **Switched off since 2026-09-26.** The focused editor (see
+> `docs/superpowers/specs/2026-09-26-focused-editor-design.md`) edits a section in
+> the inspector slide-over, so every canvas affordance described here — halos,
+> chips, the type cursor, the link/select/colour control, the collection card,
+> repeater item controls, typing in place — is gated behind `StudioPreview.inline`
+> (`false` in `studio.js`). The sentinels still render and `studio:inline:verify`
+> still guards them; only the pointer-driven UI stands down. Flip the flag to bring
+> it back.
+
 # Inline editing on the canvas
 
 Hover a heading in the editor canvas and it tells you which field produced it. Click it and

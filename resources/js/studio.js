@@ -105,11 +105,17 @@ const StudioEditor = {
                 case 'studio:open-inspector':
                     this.selectedId = data.sectionId;
                     window.Livewire?.dispatch('studio:select-section', { id: data.sectionId });
-                    window.Alpine?.store('studio')?.openInspector?.();
+                    window.Alpine?.store('studio')?.openInspector?.(data.sectionId);
                     break;
 
-                case 'studio:canvas-pointerdown':
-                    window.Alpine?.store('studio')?.dismissFloating?.();
+                case 'studio:focus-exit':
+                    // The canvas scrim was clicked — the edit is over
+                    window.Alpine?.store('studio')?.closeInspector?.();
+                    break;
+
+                case 'studio:ask-ai':
+                    this.selectedId = data.sectionId;
+                    window.Alpine?.store('studio')?.askAi?.(data.sectionId);
                     break;
 
                 case 'studio:deselected':
@@ -310,7 +316,8 @@ const StudioEditor = {
             try {
                 this.iframe.contentWindow.scrollTo(0, scrollY);
                 if (this.selectedId) {
-                    this.send('studio:select', { sectionId: this.selectedId, scroll: false });
+                    const focus = window.Alpine?.store('studio')?.inspector === 'section';
+                    this.send('studio:select', { sectionId: this.selectedId, scroll: false, focus });
                 }
             } catch (e) { /* ignore */ }
             this.iframe.classList.remove('is-loading');
@@ -355,17 +362,17 @@ const StudioEditor = {
             return;
         }
 
-        // Cmd/Ctrl+J — the chat, wherever it lives, with the caret in it
+        // Cmd/Ctrl+J — the Assistant column, with the caret in the composer
         if (meta && (key === 'j' || key === 'J')) {
             preventDefault();
             window.Alpine?.store('studio')?.focusChat?.();
             return;
         }
 
-        // Cmd/Ctrl+. — hide or show the dock (the site, and nothing else)
-        if (meta && key === '.') {
+        // Cmd/Ctrl+, — page settings
+        if (meta && key === ',') {
             preventDefault();
-            window.Alpine?.store('studio')?.toggleDock?.();
+            window.Alpine?.store('studio')?.openPageSettings?.();
             return;
         }
 
@@ -388,21 +395,24 @@ const StudioEditor = {
             return;
         }
 
+        // ? — the keyboard shortcuts sheet
+        if (!meta && !alt && key === '?') {
+            preventDefault();
+            window.dispatchEvent(new CustomEvent('studio:open-shortcuts'));
+            return;
+        }
+
         if (key === 'Escape') {
             // The Assistant's pick tool stands down before anything else
             if (window.Studio?.picking) {
                 window.dispatchEvent(new CustomEvent('studio:pick-cancel'));
                 return;
             }
-            // The floating chat's conversation folds, then an open panel
-            // closes, then the next Escape deselects
-            const studio = window.Alpine?.store('studio');
-            if (studio?.chatFloating && studio.chatOpen) {
-                studio.setChatOpen(false);
-                return;
-            }
-            if (studio?.sidebar) {
-                studio.closePanel();
+            // Then an open editor (section fields or page settings) closes
+            const store = window.Alpine?.store('studio');
+            if (store?.inspector) {
+                if (store.inspector === 'section') this.selectedId = null;
+                store.closeInspector();
                 return;
             }
             if (this.selectedId) {
@@ -415,11 +425,18 @@ const StudioEditor = {
 
         if (!this.selectedId) return;
 
-        // E — the inspector for the selected section
+        // E — edit the selected section
         if (!meta && (key === 'e' || key === 'E')) {
             preventDefault();
             window.Livewire?.dispatch('studio:select-section', { id: this.selectedId });
-            window.Alpine?.store('studio')?.openInspector?.();
+            window.Alpine?.store('studio')?.openInspector?.(this.selectedId);
+            return;
+        }
+
+        // A — ask the Assistant about the selected section
+        if (!meta && (key === 'a' || key === 'A')) {
+            preventDefault();
+            window.Alpine?.store('studio')?.askAi?.(this.selectedId);
             return;
         }
 
@@ -1065,8 +1082,16 @@ const StudioPreview = {
 
     // 'preview' | 'edit' | 'code' — mirrors $store.studio.mode in the editor
     // window. The canvas document is rebuilt on every refresh, so the mode is
-    // read straight from localStorage at boot rather than waited on.
+    // read straight from localStorage at boot rather than waited on. Since
+    // the focused editor there is no Preview segment any more; the value
+    // stays so the canvas still knows how to stand down if it is ever sent.
     mode: 'edit',
+
+    // Inline editing — field halos, the type cursor, the link/select/colour
+    // control, the collection card and repeater item controls. Off: the
+    // canvas is a list of sections, and a section is edited in the
+    // inspector. The machinery stays behind this one flag.
+    inline: false,
 
     setMode(mode) {
         this.mode = mode;
@@ -1096,11 +1121,10 @@ const StudioPreview = {
             localStorage.getItem('studio.devmode') !== '0'
         );
 
-        // Preview is the default, matching the editor window's own fallback.
+        // Edit is the default, matching the editor window's own fallback.
         // Code mode hides the canvas, so as far as this document is concerned
         // it behaves exactly like Edit.
-        const savedMode = localStorage.getItem('studio.mode');
-        this.setMode(savedMode === 'preview' || savedMode === null ? 'preview' : 'edit');
+        this.setMode(localStorage.getItem('studio.mode') === 'preview' ? 'preview' : 'edit');
 
         this.setupContextMenu();
 
@@ -1127,6 +1151,11 @@ const StudioPreview = {
 
                 case 'studio:select':
                     this.applySelection(data.sectionId, data.scroll !== false);
+                    if (data.focus !== undefined) this.setFocus(data.sectionId, !!data.focus);
+                    break;
+
+                case 'studio:focus':
+                    this.setFocus(data.sectionId || this.selectedId, !!data.on);
                     break;
 
                 case 'studio:hover':
@@ -1209,11 +1238,22 @@ const StudioPreview = {
         }, true);
 
         document.addEventListener('mousemove', (event) => {
+            if (!this.inline) return;
             this.cursor.track(event);
             this.hoverAt(event);
         }, { passive: true });
 
         document.addEventListener('mouseleave', () => this.clearHover());
+
+        // A short section (a nav bar) hangs its chip and toolbar below its
+        // own bottom edge rather than over its controls — measured on
+        // entry, so a re-rendered section is re-measured the next time.
+        document.addEventListener('mouseover', (event) => {
+            const wrapper = event.target.closest?.('[data-section]');
+            if (!wrapper || wrapper === this.measured) return;
+            this.measured = wrapper;
+            this.measureShort(wrapper);
+        }, { passive: true });
 
         // Click on empty canvas space deselects (and closes the context menu).
         // A click inside the floating control (its input/select isn't a
@@ -1229,6 +1269,12 @@ const StudioPreview = {
             // redraws the card before the click gets here, so the target
             // is already detached and has no card above it to find
             if (event.composedPath().some((node) => node.id === 'studio-collection' || node.id === 'studio-toasts')) return;
+
+            // Around the card while a section is being edited: the way back
+            if (document.documentElement.classList.contains('studio-focus')) {
+                this.exitFocus();
+                return;
+            }
 
             this.collection.close();
             this.closeMenu();
@@ -1262,8 +1308,8 @@ const StudioPreview = {
             const relevant = event.key === 'Escape'
                 || event.key === 'Backspace'
                 || event.key === 'Delete'
-                // E opens the inspector for the selection (outside a field)
-                || (!(event.metaKey || event.ctrlKey) && (event.key === 'e' || event.key === 'E') && !isTyping(document))
+                // E edits the selection, A asks the Assistant about it (outside a field)
+                || (!(event.metaKey || event.ctrlKey) && ['e', 'E', 'a', 'A'].includes(event.key) && !isTyping(document))
                 || ((event.metaKey || event.ctrlKey) && ['b', 'B', 'd', 'D', 's', 'S', 'k', 'K', 'ArrowUp', 'ArrowDown'].includes(event.key));
 
             if (!relevant) return;
@@ -2187,6 +2233,17 @@ const StudioPreview = {
         // inline onclick handlers must not reach past it.
         if (this.mode === 'preview') return;
 
+        // While a section is being edited every other section is dimmed and
+        // a click on one of them ends the edit — it never selects.
+        if (document.documentElement.classList.contains('studio-focus')) {
+            const editing = document.querySelector('.studio-section.is-editing');
+
+            if (!editing || editing.dataset.section !== clickedSectionId) {
+                this.exitFocus(event);
+                return;
+            }
+        }
+
         // Every fresh click starts from a closed control — the branch
         // below reopens it when the new hit warrants one, so a click that
         // lands on a different field (or a text/image field, or the
@@ -2202,8 +2259,9 @@ const StudioPreview = {
         let hitSectionId = clickedSectionId;
 
         // A click resolves to the deepest tier under the pointer; only a
-        // click on section chrome selects the section itself.
-        if (event) {
+        // click on section chrome selects the section itself. With inline
+        // editing off there are no tiers: a click selects the section.
+        if (event && this.inline) {
             let hit = this.tierAt(clickedSectionId, event.clientX, event.clientY);
 
             // Mirror resolveHover()'s cross-section fallback: the DOM
@@ -2459,6 +2517,7 @@ const StudioPreview = {
 
     /** Paint the hover halo + chip for whatever is under the pointer. */
     hoverAt(event) {
+        if (!this.inline) return;
         if (this.mode === 'preview') return this.clearHover();
         // A drag in progress owns the halo/chip write queue itself
         // (dragItemMove) — the normal hover resolution must stand down for
@@ -2480,6 +2539,7 @@ const StudioPreview = {
      * tracking whatever field is now under it.
      */
     rehover() {
+        if (!this.inline) return;
         if (this.mode === 'preview') return;
         if (!this.lastPointer) return;
 
@@ -3596,6 +3656,132 @@ const StudioPreview = {
         return false;   // already at section tier — the editor deselects
     },
 
+    /* --- short sections ---------------------------------------------- */
+
+    measured: null,
+
+    measureShort(wrapper) {
+        const content = wrapper.querySelector('[data-section-content]');
+        const height = content ? content.offsetHeight : wrapper.offsetHeight;
+        const short = height > 0 && height < 120;
+
+        wrapper.classList.toggle('is-short', short);
+        if (short) wrapper.style.setProperty('--studio-h', `${height}px`);
+        else wrapper.style.removeProperty('--studio-h');
+    },
+
+    /* --- focus: one section is being edited ------------------------ */
+
+    /**
+     * html.studio-focus + .is-editing on the section: the scrim rises above
+     * every other section and this one keeps its chrome. Driven by the
+     * editor (studio:focus), which owns the inspector's state.
+     */
+    setFocus(sectionId, on) {
+        const current = document.querySelector('.studio-section.is-editing');
+        const el = on && sectionId ? document.querySelector(`[data-section="${sectionId}"]`) : null;
+
+        if (el && el === current) return;
+
+        current?.classList.remove('is-editing');
+
+        if (el) {
+            // The card keeps the page's own background so a section with a
+            // transparent one still reads as it does on the site
+            if (!current) this.focusScroll = window.scrollY;
+            el.style.setProperty('--studio-site-bg', this.pageBackground());
+            el.classList.add('is-editing');
+            document.documentElement.classList.add('studio-focus');
+            this.closeMenu();
+            // Instant: the card's own entrance is the motion, and the site
+            // may set scroll-behavior: smooth on the root
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            return;
+        }
+
+        if (document.documentElement.classList.contains('studio-focus')) {
+            document.documentElement.classList.remove('studio-focus');
+            // The page is back — and so is where the reader was on it
+            window.scrollTo({ top: this.focusScroll || 0, behavior: 'instant' });
+            this.focusScroll = 0;
+        }
+    },
+
+    focusScroll: 0,
+
+    /** The site's page background: the body's, else the root's, else white. */
+    pageBackground() {
+        const opaque = (color) => color && color !== 'transparent' && !/rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\)/.test(color);
+        // Read before html.studio-focus overrides them
+        const was = document.documentElement.classList.contains('studio-focus');
+        document.documentElement.classList.remove('studio-focus');
+        const body = getComputedStyle(document.body).backgroundColor;
+        const root = getComputedStyle(document.documentElement).backgroundColor;
+        if (was) document.documentElement.classList.add('studio-focus');
+
+        return opaque(body) ? body : opaque(root) ? root : '#ffffff';
+    },
+
+    /** Done, or a click on the canvas around the card — the editor closes the inspector and deselects. */
+    exitFocus(event) {
+        if (event) event.stopPropagation();
+        this.post('studio:focus-exit');
+    },
+
+    /** The toolbar's Ask AI: the section becomes the chat's context. */
+    askAi(sectionId, event) {
+        if (event) event.stopPropagation();
+        if (this.mode === 'preview' || !sectionId) return;
+        this.applySelection(sectionId, false);
+        this.post('studio:ask-ai', { sectionId });
+    },
+
+    /** The toolbar's ··· — the section's less-frequent actions, anchored under the button. */
+    moreMenu(sectionId, event) {
+        if (event) event.stopPropagation();
+
+        const wrapper = document.querySelector(`[data-section="${sectionId}"]`);
+        const button = event?.currentTarget || null;
+
+        if (!wrapper) return;
+
+        // Pressing it again closes the menu it opened
+        if (this.menu && this.menuOwner === button) {
+            this.closeMenu();
+            return;
+        }
+
+        this.closeMenu(true);
+        this.applySelection(sectionId, false);
+        this.post('studio:section-selected', { sectionId });
+
+        const d = wrapper.dataset;
+        const isBlock = d.block === '1';
+        const isLayout = (d.scope || 'page') === 'layout';
+        const hidden = d.hidden === '1';
+        const devMode = document.documentElement.classList.contains('studio-devmode');
+        const items = [];
+
+        if (!isBlock && !isLayout) {
+            items.push({ label: 'Make global', icon: 'global', hint: 'Reuse on any page', onClick: () => this.action(sectionId, 'make-global') });
+        }
+
+        items.push({ label: 'Duplicate', icon: 'duplicate', kbd: '⌘D', onClick: () => this.action(sectionId, 'duplicate') });
+        items.push({ label: hidden ? 'Show' : 'Hide', icon: hidden ? 'show' : 'hide', onClick: () => this.action(sectionId, 'toggle-hidden') });
+
+        if (devMode) {
+            items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.ref, d.title) });
+        }
+
+        items.push('sep', { label: 'Delete', icon: 'trash', kbd: '⌫', danger: true, onClick: () => this.action(sectionId, 'delete') });
+
+        const rect = button?.getBoundingClientRect();
+        const x = rect ? rect.right : event.clientX;
+        const y = rect ? rect.bottom + 6 : event.clientY;
+
+        this.openMenu(x, y, items, { align: 'right', owner: button });
+    },
+
     /* --- section actions (overlay buttons) ------------------------ */
 
     action(sectionId, action, event) {
@@ -3621,6 +3807,8 @@ const StudioPreview = {
     openInspector(sectionId, event) {
         if (event) event.stopPropagation();
         if (this.mode === 'preview' || !sectionId) return;
+        this.closeMenu(true);
+        this.applySelection(sectionId, false);
         this.post('studio:open-inspector', { sectionId });
     },
 
@@ -3672,6 +3860,9 @@ const StudioPreview = {
 
             const wrapper = event.target.closest ? event.target.closest('[data-section]') : null;
 
+            // A dimmed section (another one is being edited) offers nothing
+            if (wrapper && document.documentElement.classList.contains('studio-focus') && !wrapper.classList.contains('is-editing')) return;
+
             if (wrapper) {
                 this.select(wrapper.dataset.section);
                 this.openMenu(event.clientX, event.clientY, this.sectionMenuItems(wrapper, event));
@@ -3714,7 +3905,14 @@ const StudioPreview = {
 
         const items = [
             { header: `${d.title} — ${scopeTag}` },
-            { label: 'Edit fields', icon: 'fields', kbd: 'E', onClick: () => this.openInspector(id) },
+            { label: 'Edit', icon: 'fields', kbd: 'E', onClick: () => this.openInspector(id) },
+        ];
+
+        if (devMode) {
+            items.push({ label: 'Ask AI', icon: 'assistant', kbd: 'A', onClick: () => this.askAi(id) });
+        }
+
+        items.push(
             'sep',
             { label: 'Move up', icon: 'up', kbd: '⌘↑', disabled: d.docFirst === '1', onClick: () => this.action(id, 'move-up') },
             { label: 'Move down', icon: 'down', kbd: '⌘↓', disabled: d.docLast === '1', onClick: () => this.action(id, 'move-down') },
@@ -3723,7 +3921,7 @@ const StudioPreview = {
             { label: isLayout ? 'Add to layout below' : 'Add section below', icon: 'plusBelow', onClick: () => this.addAt(scope, docIndex + 1) },
             'sep',
             { label: 'Duplicate', icon: 'duplicate', kbd: '⌘D', onClick: () => this.action(id, 'duplicate') },
-        ];
+        );
 
         if (!isBlock && !isLayout) {
             items.push({ label: 'Make global', icon: 'global', onClick: () => this.action(id, 'make-global') });
@@ -3737,7 +3935,7 @@ const StudioPreview = {
         // same payload the pick tool reports, without arming it
         if (devMode && event?.target?.closest?.('[data-section-content]')) {
             const target = event.target, x = event.clientX, y = event.clientY;
-            items.push({ label: 'Ask the assistant…', icon: 'assistant', onClick: () => this.post('studio:element-selected', this.describeElement(target, x, y)) });
+            items.push({ label: 'Ask about this element…', icon: 'assistant', onClick: () => this.post('studio:element-selected', this.describeElement(target, x, y)) });
         }
 
         items.push(
@@ -3749,11 +3947,17 @@ const StudioPreview = {
         return items;
     },
 
-    openMenu(x, y, items) {
+    // The button a menu is anchored to (the toolbar's ···), so a second
+    // press closes it and the button can read as open
+    menuOwner: null,
+
+    openMenu(x, y, items, { align = 'left', owner = null } = {}) {
         clearTimeout(this.menuCloseTimer);
 
         const menu = document.createElement('div');
         menu.className = 'studio-menu';
+        this.menuOwner = owner;
+        owner?.classList.add('is-open');
 
         for (const item of items) {
             if (item === 'sep') {
@@ -3777,6 +3981,7 @@ const StudioPreview = {
             button.disabled = !!item.disabled;
             button.innerHTML = (this.MENU_ICONS[item.icon] || '')
                 + `<span>${item.label}</span>`
+                + (item.hint ? `<span class="studio-menu-hint">${item.hint}</span>` : '')
                 + (item.kbd ? `<span class="studio-menu-kbd">${item.kbd}</span>` : '');
             button.addEventListener('click', (event) => {
                 event.stopPropagation();
@@ -3793,14 +3998,16 @@ const StudioPreview = {
         // elastic transform origin) when the pointer is near an edge
         const rect = menu.getBoundingClientRect();
         const pad = 8;
-        const flipX = x + rect.width + pad > window.innerWidth;
+        // Right-aligned: x is the edge the menu's right side sits on
+        const flipX = align === 'right' ? x - rect.width < pad : x + rect.width + pad > window.innerWidth;
         const flipY = y + rect.height + pad > window.innerHeight;
-        const left = flipX ? Math.max(pad, x - rect.width) : x;
+        const rightAligned = align === 'right' ? !flipX : flipX;
+        const left = rightAligned ? Math.max(pad, x - rect.width) : Math.min(x, window.innerWidth - rect.width - pad);
         const top = flipY ? Math.max(pad, y - rect.height) : y;
 
         menu.style.left = `${left}px`;
         menu.style.top = `${top}px`;
-        menu.style.transformOrigin = `${flipX ? 'right' : 'left'} ${flipY ? 'bottom' : 'top'}`;
+        menu.style.transformOrigin = `${rightAligned ? 'right' : 'left'} ${flipY ? 'bottom' : 'top'}`;
 
         requestAnimationFrame(() => menu.classList.add('is-open'));
     },
@@ -3810,6 +4017,8 @@ const StudioPreview = {
 
         const menu = this.menu;
         this.menu = null;
+        this.menuOwner?.classList.remove('is-open');
+        this.menuOwner = null;
 
         if (instant) {
             menu.remove();

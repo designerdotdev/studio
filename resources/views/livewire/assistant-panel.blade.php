@@ -1,29 +1,18 @@
-{{-- The Assistant, in either of its two homes. In the rail it is a panel
-     like the others: header, transcript, composer. Floating
-     ($store.studio.chatFloating) the same markup becomes the chat card over
-     the bottom of the site: the composer is always there, and the
-     conversation (with the header) folds upward out of it
-     ($store.studio.chatOpen). The wrapper in home.blade.php does the
-     positioning; this file only changes shape. --}}
+{{-- The Assistant: the first tab of the sidebar (developer mode), ⌘J.
+     Header, transcript, composer. A section's Ask AI button lands here
+     with that section as the context chip. --}}
 @php
     $engines = $this->engines;
     $thread = $this->thread;
     $messages = $thread['messages'] ?? [];
     $anyEngine = collect($engines)->contains(fn ($e) => $e['ok']);
-    // The folded card's one-line status shows the last reply
-    $lastReply = collect($messages)->last(fn ($m) => ($m['role'] ?? '') !== 'user');
-    $lastReplyText = $lastReply ? trim(preg_replace('/\s+/', ' ', (string) ($lastReply['text'] ?? ''))) : '';
 @endphp
 <div
     class="s-chat flex h-full min-h-0 flex-col"
     :class="{
-        'is-floating': $store.studio.chatFloating,
-        'is-open': !$store.studio.chatFloating || $store.studio.chatOpen,
+        'is-open': true,
         'is-picking': picking,
         'is-busy': busy,
-        'is-joined': $store.studio.joined,
-        'is-row-out': $store.studio.joinedOut,
-        'is-bar-hidden': $store.studio.joined && $store.studio.dockHidden,
     }"
     x-data="{
         urls: {
@@ -48,22 +37,18 @@
         attaching: false,
         count: @js(count($messages)),
 
-        get floating() { return $store.studio.chatFloating },
-        get open() { return !this.floating || $store.studio.chatOpen },
 
         init() {
             window.addEventListener('studio:element-selected', (e) => {
                 this.element = e.detail;
                 this.setPicking(false);
-                // In the rail the panel opens; floating, the composer is
-                // already on screen — just put the caret in it
-                if (!this.floating) $store.studio.setRail('assistant', true);
+                $store.studio.setAssistant(true);
                 this.$nextTick(() => this.$refs.composer?.focus());
             });
             // Esc (in the editor or the canvas) and the banner's Cancel
             window.addEventListener('studio:pick-cancel', () => { if (this.picking) this.setPicking(false) });
             this.$watch('busy', () => this.$nextTick(() => this.scrollToEnd()));
-            this.$watch('open', (open) => { if (open) this.$nextTick(() => this.scrollToEnd()) });
+            this.$watch('$store.studio.assistantOpen', (open) => { if (open) this.$nextTick(() => { this.scrollToEnd(); this.grow(); }) });
             this.$nextTick(() => { this.scrollToEnd(); this.grow(); });
         },
 
@@ -113,7 +98,6 @@
 
         onEscape() {
             if (this.picking) { this.setPicking(false); return; }
-            if (this.floating && $store.studio.chatOpen) { $store.studio.setChatOpen(false); return; }
             this.$refs.composer?.blur();
         },
 
@@ -138,7 +122,6 @@
 
             this.busy = true;
             $store.studio.chatBusy = true;
-            if (this.floating) $store.studio.setChatOpen(true);
             this.live = { text: '', activity: 'Starting…', files: [] };
             this.prompt = '';
             this.$nextTick(() => this.grow());
@@ -222,19 +205,14 @@
         },
     }"
     @studio:focus-chat.window="$nextTick(() => $refs.composer?.focus())"
-    x-effect="$store.studio.chatFloating; $store.studio.chatOpen; $store.studio.rail; $store.studio.sidebar; $nextTick(() => grow())"
-    {{-- Joined, this is the unit's other half: pointing at it brings the
-         toolbar out from behind it, exactly as pointing at the strip does --}}
-    @mouseenter="$store.studio.joinIn()"
-    @mouseleave="$store.studio.joinOut()"
+    x-effect="$store.studio.assistantOpen; $nextTick(() => grow())"
 >
-    {{-- The conversation: the header and the transcript. In the rail it
-         fills the panel; floating, it folds out of the composer. --}}
-    <div class="s-chat-thread" :inert="floating && !$store.studio.chatOpen" :aria-hidden="floating && !$store.studio.chatOpen">
+    {{-- The conversation: the header and the transcript --}}
+    <div class="s-chat-thread">
         <div class="s-chat-thread-inner">
             {{-- Header --}}
             <div class="s-chat-head">
-                <p class="s-microlabel flex-1" x-text="floating ? 'Conversation' : 'Assistant'">Assistant</p>
+                <p class="s-microlabel flex-1">Assistant</p>
                 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                     <button type="button" class="s-icon-btn" title="Conversation history" aria-label="Conversation history" @click="open = !open">
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd"/></svg>
@@ -262,18 +240,9 @@
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                 </button>
 
-                {{-- Where the chat lives: float it over the site, or dock it back as a panel --}}
-                <button type="button" class="s-icon-btn" x-show="!floating" title="Float the chat over the site" aria-label="Float the chat over the site" @click="$store.studio.setChatFloating(true)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="5.5" y="11.25" width="9" height="3" rx="1.5" fill="currentColor" stroke="none"/></svg>
+                <button type="button" class="s-icon-btn" title="Hide the sidebar (⌘B)" aria-label="Hide the sidebar" @click="$store.studio.setAssistant(false)">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><path d="M12.25 3.25v13.5"/></svg>
                 </button>
-                <button type="button" class="s-icon-btn" x-show="floating" x-cloak title="Dock the chat as a panel" aria-label="Dock the chat as a panel" @click="$store.studio.setChatFloating(false); $store.studio.setRail('assistant', true)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><rect x="2.75" y="3.25" width="5.5" height="13.5" rx="2.5" fill="currentColor" stroke="none"/></svg>
-                </button>
-
-                <button type="button" class="s-close" x-show="floating" x-cloak title="Fold the conversation (Esc)" aria-label="Fold the conversation" @click="$store.studio.setChatOpen(false)">
-                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6.5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
-                <span x-show="!floating">@include('studio::partials.float-close')</span>
             </div>
 
             @if(!$anyEngine)
@@ -294,7 +263,7 @@
                     @if(empty($messages) && !$thread)
                         <div class="px-1 py-6 text-center">
                             <p class="text-[13px] text-ink">What should change on this page?</p>
-                            <p class="mt-1 text-[11.5px] leading-relaxed text-faint">Describe an edit in plain words. To point at something, select a section first, or use <span class="text-soft">Select on page</span> and click the exact element. Ask answers questions; Build makes the change.</p>
+                            <p class="mt-1 text-[11.5px] leading-relaxed text-faint">Describe an edit in plain words. Hover a section and press <span class="text-soft">Ask AI</span> to talk about that one, or <span class="text-soft">Select on page</span> to point at an exact element. Ask answers questions; Build makes the change.</p>
                         </div>
                     @endif
 
@@ -370,34 +339,19 @@
     </div>
 
     @if($anyEngine)
-        {{-- Everything the folded card shows: the status strip + the composer --}}
         <div class="s-chat-fold">
-            {{-- Folded: one line of what is happening or what was last said, a press away from the conversation --}}
-            <button
-                type="button"
-                class="s-chat-status"
-                x-show="floating && !$store.studio.chatOpen && (busy || @js($lastReplyText !== ''))"
-                x-cloak
-                @click="$store.studio.setChatOpen(true)"
-                title="Open the conversation"
-            >
-                <span class="s-chat-status-dot" :class="busy && 'is-live'"></span>
-                <span class="min-w-0 flex-1 truncate" x-text="busy ? (live.text || live.activity || 'Working…') : @js($lastReplyText)"></span>
-                <svg class="h-3.5 w-3.5 shrink-0 text-faint" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 9.5l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
 
             {{-- Composer --}}
             <div class="s-chat-composer">
                 {{-- Context chips: the selected section (server-rendered), a picked element, attached images --}}
-                <div class="s-chat-chips" x-show="@js((bool) $selected) || element || attachments.length" data-context-chips>
-                    <span class="s-chat-chip" x-show="@js((bool) $selected) || element" data-context-chip>
+                {{-- $wire.selected is reactive, so the chip follows the canvas
+                     selection (Ask AI, a click) without waiting on a morph --}}
+                <div class="s-chat-chips" x-show="$wire.selected || element || attachments.length" data-context-chips>
+                    <span class="s-chat-chip" x-show="$wire.selected || element" data-context-chip>
                         <svg class="h-2.5 w-2.5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5a.75.75 0 0 1 1.14-.64l12 7a.75.75 0 0 1-.09 1.33l-4.2 1.72-1.72 4.2a.75.75 0 0 1-1.33.09l-7-12A.75.75 0 0 1 3 3.5Z"/></svg>
-                        @if($selected)
-                            <span class="truncate">{{ $selected['title'] }}<span x-show="element" x-text="element ? ' › ' + element.path : ''"></span></span>
-                        @else
-                            <span class="truncate" x-text="element?.path || ''"></span>
-                        @endif
+                        <span class="truncate" x-text="($wire.selected?.title || '') + (element ? ($wire.selected ? ' › ' : '') + element.path : '')"></span>
                         <button type="button" class="s-chat-chip-x" x-show="element" @click="element = null" title="Clear element" aria-label="Clear element">×</button>
+                        <button type="button" class="s-chat-chip-x" x-show="!element && $wire.selected" @click="$wire.clearSelection()" title="Clear section" aria-label="Clear section">×</button>
                     </span>
                     <template x-for="(url, i) in attachments" :key="url">
                         <span class="s-chat-chip is-image" :title="url">
@@ -414,7 +368,7 @@
                         x-model="prompt"
                         rows="1"
                         class="s-chat-input"
-                        :placeholder="mode === 'ask' ? 'Ask about this page…' : 'Describe a change…'"
+                        :placeholder="$wire.selected ? (mode === 'ask' ? 'Ask about ' + $wire.selected.title + '…' : 'Change ' + $wire.selected.title + '…') : (mode === 'ask' ? 'Ask about this page…' : 'Describe a change…')"
                         @input="grow()"
                         @keydown.enter.prevent="if (!$event.shiftKey) send(); else { prompt += '\n'; $nextTick(() => grow()) }"
                         @keydown.escape.stop="onEscape()"
@@ -466,19 +420,6 @@
 
                         <span class="flex-1"></span>
 
-                        {{-- Floating: fold / unfold the conversation --}}
-                        <button
-                            type="button"
-                            class="s-chat-tool"
-                            x-show="floating"
-                            x-cloak
-                            :title="$store.studio.chatOpen ? 'Fold the conversation (Esc)' : 'Open the conversation'"
-                            :aria-expanded="$store.studio.chatOpen"
-                            @click="$store.studio.toggleChat()"
-                        >
-                            <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="$store.studio.chatOpen && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 9.5l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            <span class="s-chat-count" x-show="count && !$store.studio.chatOpen" x-text="count"></span>
-                        </button>
 
                         <button type="button" x-show="busy" x-cloak class="s-btn-ghost !h-7 !px-2 !text-[11px]" @click="stop()">Stop</button>
                         <button type="button" x-show="!busy" class="s-chat-send" :disabled="!prompt.trim()" @click="send()" :title="'Send (Enter) — ' + (mode === 'ask' ? 'Ask' : 'Build')" aria-label="Send">

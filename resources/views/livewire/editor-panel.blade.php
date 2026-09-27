@@ -1,3 +1,6 @@
+{{-- The inspector: a slide-over on the right of the site. It shows the
+     fields of the section being edited, or the page's settings — never a
+     list: the page itself is the list of sections. --}}
 <div
     class="flex h-full min-h-0 flex-col"
     x-data="{
@@ -11,71 +14,7 @@
                 detail: { type: 'studio:hover', sectionId, on }
             }));
         },
-
-        focusToken: 0,
-        pendingFocusKey: null,
-        focusFallbackTimer: null,
-
-        // Registered once, when this component's Alpine root initializes —
-        // not per click. Every focus request is applied from here, after
-        // this panel's own morph has settled (see focusField/applyPendingFocus).
-        init() {
-            window.Livewire.hook('morphed', ({ component }) => {
-                if (component.name !== 'studio::editor-panel') return;
-                this.applyPendingFocus();
-            });
-        },
-
-        /**
-         * The canvas selected a field — bring the matching input into view
-         * and flash it, so clicking text on the page and reading its
-         * settings are the same gesture.
-         *
-         * A canvas field click always selects the section too, which is a
-         * Livewire commit that morphs this panel's DOM — whether or not the
-         * row already exists. Applying the flash right away races that
-         * morph: if the row already existed, the morph's server-rendered
-         * `class` attribute overwrites it before it can be seen; if it
-         * didn't exist yet, it isn't there to flash at all. So we never
-         * touch the DOM here — we only arm the pending key/token, and let
-         * the `morphed` hook in init() apply it once this panel's morph has
-         * actually settled, either way. The 600ms fallback covers the rare
-         * case where a focus request has nothing to re-render (no commit
-         * follows at all), so the flash still happens rather than hanging.
-         */
-        focusField(detail) {
-            this.pendingFocusKey = detail.key;
-            const token = ++this.focusToken;
-
-            clearTimeout(this.focusFallbackTimer);
-            this.focusFallbackTimer = setTimeout(() => {
-                this.focusFallbackTimer = null;
-                if (token === this.focusToken) this.applyPendingFocus();
-            }, 600);
-        },
-
-        applyPendingFocus() {
-            if (this.focusFallbackTimer) {
-                clearTimeout(this.focusFallbackTimer);
-                this.focusFallbackTimer = null;
-            }
-
-            const key = this.pendingFocusKey;
-            this.pendingFocusKey = null;
-
-            if (key === null) return;
-
-            const row = this.$root.querySelector(`[data-field-key='${key}']`);
-
-            if (!row) return;
-
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            row.classList.remove('s-field-flash');
-            void row.offsetWidth;              // restart the animation
-            row.classList.add('s-field-flash');
-        }
     }"
-    x-on:studio:field-focus.window="focusField($event.detail)"
 >
     @php $selected = $this->selectedSection; @endphp
 
@@ -84,16 +23,20 @@
         {{-- Inspector — edit the selected section                     --}}
         {{-- ======================================================== --}}
         <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="inspector-{{ $selectedId }}">
-            {{-- Inspector header --}}
-            <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
-                <button wire:click="closeInspector" class="s-icon-btn" title="Back to sections (Esc)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
+            {{-- Inspector header: what is being edited, and the way out --}}
+            <div class="s-panel-head s-inspector-head">
                 <div class="min-w-0 flex-1">
+                    <p class="s-microlabel !text-[10.5px] uppercase tracking-[0.06em] text-faint">Editing</p>
                     <p class="truncate text-[13px] font-semibold text-ink">{{ $selected['title'] }}</p>
                 </div>
+                @if(!empty($selected['block']))
+                    <span class="s-chip !border-block/40 !text-block">Global</span>
+                @elseif(($selected['scope'] ?? 'page') === 'layout')
+                    <span class="s-chip !border-layout/40 !text-layout">Layout</span>
+                @endif
+                @if($selected['hidden'])
+                    <span class="s-chip !text-warn">Hidden</span>
+                @endif
                 @if(\Designer\Studio\Support\DevMode::enabled())
                     <button
                         x-data
@@ -101,29 +44,14 @@
                         x-cloak
                         @click="window.dispatchEvent(new CustomEvent('studio:open-code-editor', { detail: { ref: @js($selected['ref']), title: @js($selected['title']) } }))"
                         class="s-icon-btn"
-                        title="Edit source code — .blade.php + .yml (dev mode)"
+                        title="Edit source code — .blade.php + .yml (developer mode)"
                     >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
                     </button>
                 @endif
-                @if(!empty($selected['block']))
-                    <span class="s-chip !border-block/40 !text-block">Global</span>
-                @elseif(($selected['scope'] ?? 'page') === 'page')
-                    <button
-                        wire:click="makeGlobal('{{ $selectedId }}')"
-                        class="s-icon-btn"
-                        title="Make global — reuse this section on any page"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3.196 12.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 12.87Z"/><path d="M3.196 8.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 8.87Z"/><path d="M10.38 1.103a.75.75 0 0 0-.76 0l-7.25 4.25a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .76 0l7.25-4.25a.75.75 0 0 0 0-1.294l-7.25-4.25Z"/></svg>
-                    </button>
-                @endif
-                @if(($selected['scope'] ?? 'page') === 'layout')
-                    <span class="s-chip !border-layout/40 !text-layout">Layout</span>
-                @endif
-                @if($selected['hidden'])
-                    <span class="s-chip !text-warn">Hidden</span>
-                @endif
-                @include('studio::partials.float-close')
+                <button wire:click="closeInspector" class="s-icon-btn" title="Done (Esc)" aria-label="Close the editor">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+                </button>
             </div>
 
             @if(!empty($selected['block']))
@@ -233,236 +161,24 @@
                 @endforelse
             </div>
 
-            {{-- Inspector footer actions --}}
-            <div class="flex shrink-0 items-center gap-1 border-t border-line p-2">
-                <button
-                    wire:click="duplicateSection('{{ $selectedId }}')"
-                    class="s-btn-ghost flex-1 !justify-center"
-                    title="Duplicate section (⌘D)"
-                >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
-                    Duplicate
-                </button>
-                <button
-                    wire:click="toggleHidden('{{ $selectedId }}')"
-                    class="s-btn-ghost flex-1 !justify-center"
-                    title="{{ $selected['hidden'] ? 'Show section' : 'Hide section' }}"
-                >
-                    @if($selected['hidden'])
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
-                        Show
-                    @else
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
-                        Hide
-                    @endif
-                </button>
-                <button
-                    wire:click="removeSection('{{ $selectedId }}')"
-                    class="s-btn-ghost flex-1 !justify-center !text-danger hover:!bg-danger/10"
-                    title="Delete section (⌫)"
-                >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>
-                    Delete
-                </button>
-            </div>
         </div>
     @else
         {{-- ======================================================== --}}
-        {{-- Tabs — Sections list / Page settings                      --}}
+        {{-- The list, or page settings                                --}}
         {{-- ======================================================== --}}
-        <div class="s-panel-enter-back flex h-full min-h-0 flex-col" wire:key="panel-tabs">
-            <div class="flex h-11 shrink-0 items-center gap-1.5 border-b border-line px-2">
-                <div class="grid min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-lg border border-line bg-shell p-0.5">
-                    <button
-                        wire:click="$set('tab', 'sections')"
-                        class="flex h-7 cursor-pointer items-center justify-center rounded-[7px] text-[13px] font-medium transition-all duration-150 {{ $tab === 'sections' ? 'bg-raised text-ink shadow-sm' : 'text-faint hover:text-soft' }}"
-                    >
-                        Sections
-                    </button>
-                    <button
-                        wire:click="$set('tab', 'layout')"
-                        class="flex h-7 cursor-pointer items-center justify-center rounded-[7px] text-[13px] font-medium transition-all duration-150 {{ $tab === 'layout' ? 'bg-raised text-ink shadow-sm' : 'text-faint hover:text-soft' }}"
-                    >
-                        Layout
-                    </button>
-                    <button
-                        wire:click="$set('tab', 'page')"
-                        class="flex h-7 cursor-pointer items-center justify-center rounded-[7px] text-[13px] font-medium transition-all duration-150 {{ $tab === 'page' ? 'bg-raised text-ink shadow-sm' : 'text-faint hover:text-soft' }}"
-                    >
-                        Page
-                    </button>
-                </div>
-                @include('studio::partials.float-close')
-            </div>
-
-            @if($tab === 'sections')
-                {{-- Sections list --}}
-                <div class="min-h-0 flex-1 overflow-y-auto p-2">
-                    @if(count($sections))
-                        <div
-                            wire:key="sections-sortable"
-                            x-init="window.Studio.sortable($el, '.s-drag-handle', ids => $wire.reorderSections(ids))"
-                            class="space-y-0.5"
-                        >
-                            @foreach($sections as $section)
-                                <div
-                                    wire:key="row-{{ $section['id'] }}"
-                                    data-section-id="{{ $section['id'] }}"
-                                    class="s-section-row group {{ $selectedId === $section['id'] ? 'is-active' : '' }}"
-                                    wire:click="selectFromList('{{ $section['id'] }}')"
-                                    @mouseenter="hint('{{ $section['id'] }}', true)"
-                                    @mouseleave="hint('{{ $section['id'] }}', false)"
-                                >
-                                    <span class="s-drag-handle" @click.stop title="Drag to reorder">
-                                        <svg class="h-3 w-3" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3.5" r="1.2"/><circle cx="11" cy="3.5" r="1.2"/><circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="5" cy="12.5" r="1.2"/><circle cx="11" cy="12.5" r="1.2"/></svg>
-                                    </span>
-
-                                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-raised {{ !empty($section['block']) ? 'border-block/40 text-block' : 'border-line ' . ($section['hidden'] ? 'text-faint' : 'text-soft') }}">
-                                        @include('studio::partials.category-icon', ['category' => $section['category']])
-                                    </span>
-
-                                    <span class="min-w-0 flex-1 truncate text-[13px] {{ $section['hidden'] ? 'text-faint line-through decoration-line-strong' : 'text-ink' }}">
-                                        {{ $section['title'] }}
-                                    </span>
-
-                                    <span class="row-actions" @click.stop>
-                                        <button
-                                            wire:click="toggleHidden('{{ $section['id'] }}')"
-                                            class="s-icon-btn !h-6 !w-6"
-                                            title="{{ $section['hidden'] ? 'Show section' : 'Hide section' }}"
-                                        >
-                                            @if($section['hidden'])
-                                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
-                                            @else
-                                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
-                                            @endif
-                                        </button>
-                                        <button
-                                            wire:click="duplicateSection('{{ $section['id'] }}')"
-                                            class="s-icon-btn !h-6 !w-6"
-                                            title="Duplicate section"
-                                        >
-                                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
-                                        </button>
-                                        <button
-                                            wire:click="removeSection('{{ $section['id'] }}')"
-                                            class="s-icon-btn !h-6 !w-6 hover:!text-danger"
-                                            title="Delete section"
-                                        >
-                                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>
-                                        </button>
-                                    </span>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <button
-                            type="button"
-                            class="s-empty-tile mt-1"
-                            @click="window.dispatchEvent(new CustomEvent('studio:open-library', { detail: { index: null } }))"
-                        >
-                            <span class="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-raised text-soft">
-                                <svg class="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                            </span>
-                            <span class="text-[13px] font-medium text-ink">Add your first section</span>
-                            <span class="text-xs leading-relaxed text-faint">Pick from {{ count($fieldsByRef) ?: 'dozens of' }} pre-built designs<br>in the section library.</span>
-                        </button>
-                    @endif
-                </div>
-
-                {{-- Add section footer --}}
-                <div class="shrink-0 border-t border-line p-2.5">
-                    <button
-                        type="button"
-                        class="s-btn-accent w-full"
-                        @click="window.dispatchEvent(new CustomEvent('studio:open-library', { detail: { index: null } }))"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                        Add section
-                    </button>
-                </div>
-            @elseif($tab === 'layout')
-                {{-- Layout — shared header/footer sections around the page --}}
-                <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3.5">
-                    <div>
-                        <label for="page-layout" class="s-label">Page layout</label>
-                        <select id="page-layout" class="s-input" wire:change="assignLayout($event.target.value)">
-                            @if(!$layoutSlug)
-                                <option value="" selected>None</option>
-                            @endif
-                            @foreach($layouts as $slug => $name)
-                                <option value="{{ $slug }}" @selected($layoutSlug === $slug)>{{ $name }}</option>
-                            @endforeach
-                        </select>
-                        <p class="mt-1.5 text-[11px] leading-relaxed text-faint">The layout is the page's document: its head — fonts, styles, scripts — and the sections every page shares, like the header and footer.</p>
+        <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="panel-tabs">
+            @if($tab === 'page' || $tab === 'layout')
+                {{-- Page settings header --}}
+                <div class="s-panel-head s-inspector-head">
+                    <div class="min-w-0 flex-1">
+                        <p class="s-microlabel !text-[10.5px] uppercase tracking-[0.06em] text-faint">Page</p>
+                        <p class="truncate text-[13px] font-semibold text-ink">{{ $page['title'] ?? 'Settings' }}</p>
                     </div>
-
-                    @if($layoutSlug)
-                        <div class="s-divider"></div>
-
-                        <div>
-                            <label for="layout-name" class="s-label">Layout name</label>
-                            <input id="layout-name" type="text" class="s-input" wire:model.blur="layoutName">
-                            <p class="mt-1.5 text-[11px] leading-relaxed text-faint">
-                                Used by {{ $this->layoutUsageCount }} {{ \Illuminate\Support\Str::plural('page', $this->layoutUsageCount) }}.
-                            </p>
-                        </div>
-
-                        <div class="flex items-start gap-2.5 rounded-lg border border-layout/25 bg-layout/8 p-3">
-                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-layout" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
-                            <p class="text-xs leading-relaxed text-soft">
-                                The <span class="font-medium text-layout">violet sections</span> on the canvas belong to this layout.
-                                Click one to edit it, or use the add buttons above and below your page content —
-                                changes apply to every page using it.
-                            </p>
-                        </div>
-
-                        <div class="s-divider"></div>
-
-                        @if(count($layouts) > 1)
-                            <button
-                                wire:click="deleteLayout"
-                                wire:confirm="Delete “{{ $layoutName }}”? The {{ $this->layoutUsageCount }} {{ \Illuminate\Support\Str::plural('page', $this->layoutUsageCount) }} using it will move to another layout. This cannot be undone."
-                                class="s-btn-danger w-full"
-                            >
-                                Delete layout
-                            </button>
-                        @else
-                            <p class="text-[11px] leading-relaxed text-faint">This is the site's only layout, so it can't be deleted — every page is written inside one.</p>
-                        @endif
-                    @endif
-
-                    @if(!$layoutSlug || $showCreateLayout)
-                        <div class="s-divider"></div>
-
-                        <div wire:key="create-layout-form">
-                            <label for="new-layout-name" class="s-label">New layout</label>
-                            <div class="flex gap-1.5">
-                                <input
-                                    id="new-layout-name"
-                                    type="text"
-                                    class="s-input"
-                                    placeholder="Main"
-                                    wire:model="newLayoutName"
-                                    wire:keydown.enter="createLayout"
-                                    @if($showCreateLayout) x-init="$el.focus()" @endif
-                                >
-                                <button wire:click="createLayout" class="s-btn-outline shrink-0">Create</button>
-                            </div>
-                            <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Starts from the main layout's head with no shared sections, and applies it to this page — then add its sections right on the canvas.</p>
-                        </div>
-                    @elseif($layoutSlug)
-                        <button
-                            wire:click="$set('showCreateLayout', true)"
-                            class="s-btn-ghost w-full !justify-center"
-                        >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                            New layout
-                        </button>
-                    @endif
+                    <button wire:click="closePageSettings" class="s-icon-btn" title="Done (Esc)" aria-label="Close page settings">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+                    </button>
                 </div>
-            @else
-                {{-- Page settings --}}
+
                 <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3.5">
                     <div>
                         <label for="page-title" class="s-label">Page title</label>
@@ -479,6 +195,103 @@
                     </div>
 
                     <div class="s-divider"></div>
+
+                    {{-- ============ Layout (group) ============ --}}
+                    <div x-data="{ open: @js($showCreateLayout) }" class="s-group" :class="open && 'is-open'" wire:key="group-layout">
+                        <button type="button" @click="open = !open" class="s-group-head">
+                            <span class="s-group-icon">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="s-group-title">Layout</span>
+                                <span class="s-group-sub">{{ $layoutSlug ? ($layouts[$layoutSlug] ?? $layoutSlug) . ' — the shared header and footer' : 'No layout' }}</span>
+                            </span>
+                            <svg class="s-group-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                        </button>
+
+                        <div x-show="open" x-collapse>
+                            <div class="s-group-body">
+                            <div>
+                                <label for="page-layout" class="s-label">Page layout</label>
+                                <select id="page-layout" class="s-input" wire:change="assignLayout($event.target.value)">
+                                    @if(!$layoutSlug)
+                                        <option value="" selected>None</option>
+                                    @endif
+                                    @foreach($layouts as $slug => $name)
+                                        <option value="{{ $slug }}" @selected($layoutSlug === $slug)>{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-[11px] leading-relaxed text-faint">The layout is the page's document: its head — fonts, styles, scripts — and the sections every page shares, like the header and footer.</p>
+                            </div>
+
+                            @if($layoutSlug)
+                                <div class="s-divider" x-data x-show="$store.studio.developer" x-cloak></div>
+
+                                <div x-data x-show="$store.studio.developer" x-cloak>
+                                    <label for="layout-name" class="s-label">Layout name</label>
+                                    <input id="layout-name" type="text" class="s-input" wire:model.blur="layoutName">
+                                    <p class="mt-1.5 text-[11px] leading-relaxed text-faint">
+                                        Used by {{ $this->layoutUsageCount }} {{ \Illuminate\Support\Str::plural('page', $this->layoutUsageCount) }}.
+                                    </p>
+                                </div>
+
+                                <div class="flex items-start gap-2.5 rounded-lg border border-layout/25 bg-layout/8 p-3">
+                                    <svg class="mt-0.5 h-4 w-4 shrink-0 text-layout" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.25A2.25 2.25 0 0 1 4.25 2h11.5A2.25 2.25 0 0 1 18 4.25v11.5A2.25 2.25 0 0 1 15.75 18H4.25A2.25 2.25 0 0 1 2 15.75V4.25Zm1.5 2.75v8.75c0 .414.336.75.75.75h11.5a.75.75 0 0 0 .75-.75V7H3.5Z" clip-rule="evenodd"/></svg>
+                                    <p class="text-xs leading-relaxed text-soft">
+                                        The <span class="font-medium text-layout">violet sections</span> on the canvas belong to this layout.
+                                        Click one to edit it, or use the add buttons above and below your page content —
+                                        changes apply to every page using it.
+                                    </p>
+                                </div>
+
+                                <div class="s-divider" x-data x-show="$store.studio.developer" x-cloak></div>
+
+                                @if(count($layouts) > 1)
+                                    <button
+                                        x-data x-show="$store.studio.developer" x-cloak
+                                        wire:click="deleteLayout"
+                                        wire:confirm="Delete “{{ $layoutName }}”? The {{ $this->layoutUsageCount }} {{ \Illuminate\Support\Str::plural('page', $this->layoutUsageCount) }} using it will move to another layout. This cannot be undone."
+                                        class="s-btn-danger w-full"
+                                    >
+                                        Delete layout
+                                    </button>
+                                @else
+                                    <p class="text-[11px] leading-relaxed text-faint" x-data x-show="$store.studio.developer" x-cloak>This is the site's only layout, so it can't be deleted — every page is written inside one.</p>
+                                @endif
+                            @endif
+
+                            @if(!$layoutSlug || $showCreateLayout)
+                                <div class="s-divider" x-data x-show="$store.studio.developer" x-cloak></div>
+
+                                <div wire:key="create-layout-form" x-data x-show="$store.studio.developer" x-cloak>
+                                    <label for="new-layout-name" class="s-label">New layout</label>
+                                    <div class="flex gap-1.5">
+                                        <input
+                                            id="new-layout-name"
+                                            type="text"
+                                            class="s-input"
+                                            placeholder="Main"
+                                            wire:model="newLayoutName"
+                                            wire:keydown.enter="createLayout"
+                                            @if($showCreateLayout) x-init="$el.focus()" @endif
+                                        >
+                                        <button wire:click="createLayout" class="s-btn-outline shrink-0">Create</button>
+                                    </div>
+                                    <p class="mt-1.5 text-[11px] leading-relaxed text-faint">Starts from the main layout's head with no shared sections, and applies it to this page — then add its sections right on the canvas.</p>
+                                </div>
+                            @elseif($layoutSlug)
+                                <button
+                                    x-data x-show="$store.studio.developer" x-cloak
+                                    wire:click="$set('showCreateLayout', true)"
+                                    class="s-btn-ghost w-full !justify-center"
+                                >
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
+                                    New layout
+                                </button>
+                            @endif
+                            </div>
+                        </div>
+                    </div>
 
                     {{-- ============ Search engine listing (group) ============ --}}
                     <div x-data="{ open: true }" class="s-group" :class="open && 'is-open'" wire:key="group-seo">
@@ -725,6 +538,11 @@
                             Delete page
                         </button>
                     </div>
+                </div>
+            @else
+                {{-- Nothing open: the column is collapsed, this is never seen --}}
+                <div class="flex flex-1 items-center justify-center p-6 text-center text-[12.5px] text-faint">
+                    Hover a section on the page and press Edit.
                 </div>
             @endif
         </div>

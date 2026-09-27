@@ -23,8 +23,10 @@
         uploading: 0,
         dragOver: false,
 
-        // picker mode: the id of the field waiting for an image
+        // picker mode: the id of the field waiting for an image, and the
+        // sidebar tab it was on
         picker: null,
+        pickerFrom: null,
 
         // per-item UI
         menu: null,          // { item, x, y }
@@ -52,6 +54,8 @@
             window.addEventListener('studio:rail', (e) => { if (e.detail.name === 'media' && !this.loaded) this.load(this.dir); });
             window.addEventListener('studio:media-pick', (e) => {
                 this.picker = e.detail.id;
+                // Remember where the field lives so the pick lands back there
+                this.pickerFrom = Alpine.store('studio').rail;
                 Alpine.store('studio').setRail('media', true);
                 if (!this.loaded) this.load(this.dir);
             });
@@ -175,7 +179,7 @@
             if (this.picker) {
                 window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: item.url } }));
                 this.picker = null;
-                Alpine.store('studio').setRail('sections', true);
+                Alpine.store('studio').setRail(this.pickerFrom || 'sections', true);
                 return;
             }
             this.lightbox = this.visibleFiles.indexOf(item);
@@ -183,6 +187,7 @@
         cancelPick() {
             window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: null } }));
             this.picker = null;
+            Alpine.store('studio').setRail(this.pickerFrom || 'sections', true);
         },
         size(bytes) {
             if (bytes < 1024) return bytes + ' B';
@@ -196,7 +201,7 @@
     @click.window="menu = null"
 >
     {{-- Header --}}
-    <div class="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3">
+    <div class="s-panel-head">
         <p class="s-microlabel flex-1">Media</p>
         <button type="button" class="s-icon-btn" title="New folder" aria-label="New folder" :disabled="readonly" @click.stop="newFolderOpen = !newFolderOpen; $nextTick(() => $refs.newFolder?.focus())">
             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3.75 3A1.75 1.75 0 0 0 2 4.75v3.26a3.235 3.235 0 0 1 1.75-.51h12.5c.644 0 1.245.188 1.75.51V6.75A1.75 1.75 0 0 0 16.25 5h-4.836a.25.25 0 0 1-.177-.073L9.823 3.513A1.75 1.75 0 0 0 8.586 3H3.75ZM3.75 9A1.75 1.75 0 0 0 2 10.75v4.5c0 .966.784 1.75 1.75 1.75h12.5A1.75 1.75 0 0 0 18 15.25v-4.5A1.75 1.75 0 0 0 16.25 9H3.75Z"/></svg>
