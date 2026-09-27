@@ -626,71 +626,6 @@ html.studio-light {
         outline-offset: 1px;
     }
 
-    /* Preview | Edit | Code — a grey well; the active segment is lifted
-       white and shows its label, the others collapse to their icon */
-    .s-mode {
-        @apply flex shrink-0 rounded-lg bg-wash-strong;
-        padding: 2px;
-        gap: 1px;
-    }
-
-    .s-mode-btn {
-        @apply flex cursor-pointer items-center rounded-md text-ink;
-        height: 24px;
-        padding: 0 7px;
-        font-size: 12px;
-        font-weight: 500;
-        opacity: 0.72;
-        transition: background-color 150ms ease, opacity 150ms ease, box-shadow 150ms ease, padding 200ms ease;
-    }
-
-    .s-mode-btn:hover {
-        opacity: 1;
-    }
-
-    .s-mode-btn.is-active {
-        opacity: 1;
-        padding: 0 10px 0 8px;
-        background: var(--color-panel);
-    }
-
-    html:not(.studio-light) .s-mode-btn.is-active {
-        background: var(--color-raised);
-    }
-
-    .s-mode-btn.is-active.is-code {
-        color: var(--color-accent);
-    }
-
-    /* The label collapses to nothing when the segment is not active */
-    .s-mode-label {
-        display: grid;
-        grid-template-columns: 0fr;
-        opacity: 0;
-        transition: grid-template-columns 200ms ease, opacity 150ms ease;
-    }
-
-    .s-mode-label > span {
-        overflow: hidden;
-        white-space: nowrap;
-        padding-left: 0;
-        transition: padding-left 200ms ease;
-    }
-
-    .s-mode-btn.is-active .s-mode-label {
-        grid-template-columns: 1fr;
-        opacity: 1;
-    }
-
-    .s-mode-btn.is-active .s-mode-label > span {
-        padding-left: 6px;
-    }
-
-    .s-mode-btn:focus-visible {
-        outline: 2px solid var(--color-accent);
-        outline-offset: 1px;
-    }
-
     /* Publish, carrying the save-status pip */
     .s-publish {
         @apply relative inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full font-medium;
@@ -813,13 +748,13 @@ html.studio-light {
 
     /* --- the sidebar --------------------------------------------------- */
 
-    /* A column beside the site. Dark, it sits straight on the frame —
-       only the site is a card; light, it is a white container like the
-       site. It stays in the row open or shut, so collapsing is one width +
-       margin transition with the panel held at full width sliding out
-       under the outer edge. */
+    /* A column beside the site — the sidebar on the left, the inspector
+       on the right. Dark, it sits straight on the frame — only the site is
+       a card; light, it is a white container like the site. It stays in
+       the row open or shut, so collapsing is one width + margin transition
+       with the panel held at full width sliding out under the outer edge. */
     .s-sidebar,
-    .s-assistant {
+    .s-inspector {
         position: relative;
         display: flex;
         flex: none;
@@ -836,13 +771,13 @@ html.studio-light {
     }
 
     html:not(.studio-light) .s-sidebar,
-    html:not(.studio-light) .s-assistant {
+    html:not(.studio-light) .s-inspector {
         background: transparent;
         box-shadow: none;
     }
 
     .s-sidebar.is-collapsed,
-    .s-assistant.is-collapsed {
+    .s-inspector.is-collapsed {
         width: 0 !important;
         opacity: 0;
         pointer-events: none;
@@ -853,7 +788,7 @@ html.studio-light {
         margin-right: calc(-1 * var(--studio-gutter));
     }
 
-    .s-assistant.is-collapsed {
+    .s-inspector.is-collapsed {
         margin-left: calc(-1 * var(--studio-gutter));
     }
 
@@ -866,14 +801,30 @@ html.studio-light {
         margin-left: auto;
     }
 
-    .s-assistant .s-sidebar-inner {
+    .s-inspector .s-sidebar-inner {
         margin-left: 0;
         margin-right: auto;
     }
 
+    /* The inspector slides in a beat faster than the sidebar slides away,
+       so the site never seems to jump twice */
+    .s-inspector {
+        transition:
+            width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 200ms ease;
+    }
+
+    /* Dark, the inspector reads as a card too — it is the thing you are
+       working in while the site steps back */
+    html:not(.studio-light) .s-inspector {
+        background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line);
+    }
+
     /* While a seam is dragged the width follows the pointer, not a curve */
     body.select-none .s-sidebar,
-    body.select-none .s-assistant {
+    body.select-none .s-inspector {
         transition: none;
     }
 
@@ -905,17 +856,23 @@ html.studio-light {
         background: var(--color-accent);
     }
 
-    .s-assistant .s-panel-seam {
+    .s-inspector .s-panel-seam {
         right: auto;
         left: 0;
     }
 
-    .s-assistant .s-panel-seam::after {
+    .s-inspector .s-panel-seam::after {
         right: auto;
         left: 0;
     }
 
-    /* The sidebar's tab strip: Sections · Pages · Content · Media */
+    /* The inspector's header: an eyebrow over the name, the close at the end */
+    .s-inspector-head {
+        height: 52px;
+        padding-left: 14px;
+    }
+
+    /* The sidebar's tab strip: Assistant · Pages · Content · Media */
     .s-tabs {
         @apply flex shrink-0 items-center border-b border-line;
         height: 40px;
@@ -958,6 +915,24 @@ html.studio-light {
         display: none;
     }
 
+    /* The Assistant tab carries a live dot while a turn streams */
+    .s-tab.is-chat {
+        position: relative;
+    }
+
+    .s-tab.is-chat.is-busy::after {
+        content: '';
+        position: absolute;
+        top: 4px;
+        right: 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-accent);
+        box-shadow: 0 0 0 2px var(--color-panel);
+        animation: s-busy 1.2s ease-in-out infinite;
+    }
+
     /* The composer's pick button: an icon in the column, its label lives in the tooltip */
     .s-chat-tool-label {
         display: none;
@@ -970,31 +945,6 @@ html.studio-light {
         padding: 0 8px 0 12px;
     }
 
-    /* The Getting-started card on first run */
-    .s-tipcard {
-        @apply relative mx-2 mt-2 rounded-lg border border-line p-2.5;
-        background: color-mix(in srgb, var(--color-accent) 6%, transparent);
-        border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-    }
-
-    .s-tipcard ol {
-        @apply mt-2 space-y-1.5 text-[12px] leading-snug text-soft;
-        counter-reset: tip;
-    }
-
-    .s-tipcard li {
-        @apply flex items-start gap-2;
-    }
-
-    .s-tipcard li::before {
-        counter-increment: tip;
-        content: counter(tip);
-        @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold;
-        background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-        color: var(--color-accent);
-        margin-top: 1px;
-    }
-
     /* Code mode's file tree column, inside the code pane */
     .s-code-files {
         @apply flex shrink-0 flex-col border-r border-line bg-panel;
@@ -1003,7 +953,7 @@ html.studio-light {
 
     @media (prefers-reduced-motion: reduce) {
         .s-sidebar,
-        .s-assistant {
+        .s-inspector {
             transition: none;
         }
     }

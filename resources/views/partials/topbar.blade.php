@@ -1,9 +1,9 @@
 {{-- The top bar: the editor's one piece of chrome above the site. Left,
-     the brand mark (the menu), the sidebar toggle, Preview / Edit / Code;
-     centre, the page switcher (a dark dropdown); right, the device
-     button (one control cycling Desktop → Tablet → Phone), the Assistant
-     (developer mode), the open-in-new-tab link and Publish. The `menu` and
-     `actions` slots come from home.blade.php. --}}
+     the brand mark (the menu) and the sidebar toggle; centre, the page
+     switcher (a dark dropdown); right, the device button (one control
+     cycling Desktop → Tablet → Phone), the Code toggle (developer mode),
+     the open-in-new-tab link and Publish. There is one mode: the page is
+     always editable. The `menu` and `actions` slots come from home.blade.php. --}}
 <header class="s-topbar" aria-label="Editor">
     <div class="s-topbar-group is-start">
         {{ $menu ?? '' }}
@@ -26,22 +26,6 @@
             </svg>
         </button>
 
-        <span class="s-tb-sep"></span>
-
-        <div class="s-mode" role="radiogroup" aria-label="Mode">
-            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'preview' && 'is-active'" @click="$store.studio.setMode('preview')" title="Preview — browse the site as a visitor" role="radio" :aria-checked="$store.studio.mode === 'preview'">
-                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
-                <span class="s-mode-label"><span>Preview</span></span>
-            </button>
-            <button type="button" class="s-mode-btn" :class="$store.studio.mode === 'edit' && 'is-active'" @click="$store.studio.setMode('edit')" title="Edit — click anything on the page to change it" role="radio" :aria-checked="$store.studio.mode === 'edit'">
-                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 3.5 19 11l-6.5 1.8L9 19 4 3.5Z"/></svg>
-                <span class="s-mode-label"><span>Edit</span></span>
-            </button>
-            <button x-show="$store.studio.codeAvailable" x-cloak type="button" class="s-mode-btn is-code" :class="$store.studio.mode === 'code' && 'is-active'" @click="$store.studio.setMode('code')" title="Code — edit the site's source files" role="radio" :aria-checked="$store.studio.mode === 'code'">
-                <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
-                <span class="s-mode-label"><span>Code</span></span>
-            </button>
-        </div>
     </div>
 
     {{-- The page switcher --}}
@@ -131,6 +115,22 @@
             <svg x-show="$store.studio.device === 'mobile'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3"/></svg>
         </button>
 
+        {{-- Code mode — the site's source files, developer mode only. One
+             toggle in place of the old Preview / Edit / Code control. --}}
+        <button
+            type="button"
+            class="s-tb-btn s-tip"
+            x-show="$store.studio.codeAvailable"
+            x-cloak
+            :class="$store.studio.mode === 'code' && 'is-active is-accent'"
+            :data-tip="$store.studio.mode === 'code' ? 'Back to the page' : 'Code — edit the site\'s files'"
+            aria-label="Toggle Code mode"
+            :aria-pressed="$store.studio.mode === 'code'"
+            @click="$store.studio.toggleCode()"
+        >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
+        </button>
+
         {{-- Code mode: bring the live preview back beside the editor --}}
         <button
             type="button"
@@ -143,21 +143,6 @@
             @click="$store.studio.toggleCodeSplit()"
         >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path stroke-linecap="round" d="M3 9h18M6.2 6.75h.01M8.7 6.75h.01M11.2 6.75h.01"/></svg>
-        </button>
-
-        {{-- The Assistant — a column on the right, developer mode only --}}
-        <button
-            type="button"
-            class="s-tb-btn s-tip"
-            x-show="$store.studio.chatAvailable"
-            x-cloak
-            :class="{ 'is-active': $store.studio.assistantOpen, 'is-busy': $store.studio.chatBusy }"
-            data-tip="Assistant  ⌘J"
-            aria-label="Toggle the Assistant"
-            :aria-pressed="$store.studio.assistantOpen"
-            @click="$store.studio.toggleAssistant()"
-        >
-            <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
         </button>
 
         {{-- Open the draft (or live) page in a new tab --}}

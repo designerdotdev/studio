@@ -27,7 +27,7 @@
             <style>
                 html.studio-booting .s-topbar,
                 html.studio-booting .s-sidebar,
-                html.studio-booting .s-assistant,
+                html.studio-booting .s-inspector,
                 html.studio-booting .s-stage {
                     visibility: hidden;
                     opacity: 0;
@@ -38,7 +38,7 @@
 
                 html.studio-revealing .s-topbar,
                 html.studio-revealing .s-sidebar,
-                html.studio-revealing .s-assistant,
+                html.studio-revealing .s-inspector,
                 html.studio-revealing .s-stage {
                     transition: opacity 180ms ease;
                 }
@@ -125,7 +125,7 @@
         </div>
 
         {{-- The app root. In the editor it is the frame: the top bar sits on
-             it, and the sidebar, the site and the Assistant column are laid
+             it, and the sidebar, the site and the inspector column are laid
              on it a gutter apart. --}}
         <div class="flex h-dvh flex-col @isset($sidebar) s-app @endisset" x-data>
             @isset($sidebar)
@@ -182,30 +182,31 @@
                         {{ $slot }}
                     </main>
 
-                    {{-- The Assistant: a column on the right, developer mode only --}}
-                    @isset($assistant)
+                    {{-- The inspector: a slide-over on the right for the section
+                         being edited, or the page's settings. Same column
+                         mechanics as the sidebar, mirrored. --}}
+                    @isset($inspector)
                         <aside
-                            class="s-assistant"
-                            :class="{ 'is-collapsed': !$store.studio.assistantOpen }"
-                            :style="{ width: ($store.studio.assistantOpen ? $store.studio.assistantWidth : 0) + 'px' }"
-                            :aria-hidden="!$store.studio.assistantOpen"
-                            :inert="!$store.studio.assistantOpen"
-                            x-show="$store.studio.chatAvailable || $store.studio.assistantOpen"
+                            class="s-inspector"
+                            :class="{ 'is-collapsed': !$store.studio.inspector }"
+                            :style="{ width: ($store.studio.inspector ? $store.studio.inspectorWidth : 0) + 'px' }"
+                            :aria-hidden="!$store.studio.inspector"
+                            :inert="!$store.studio.inspector"
                             @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
                         >
-                            <div class="s-sidebar-inner" :style="{ width: $store.studio.assistantWidth + 'px', minWidth: $store.studio.assistantWidth + 'px' }">
-                                {{ $assistant }}
+                            <div class="s-sidebar-inner" :style="{ width: $store.studio.inspectorWidth + 'px', minWidth: $store.studio.inspectorWidth + 'px' }">
+                                {{ $inspector }}
                             </div>
                             <div
                                 class="s-panel-seam"
                                 role="separator"
-                                aria-label="Resize the Assistant"
+                                aria-label="Resize the inspector"
                                 @mousedown.prevent="
                                     const aside = $el.closest('aside');
                                     const shield = document.createElement('div');
                                     shield.className = 's-drag-shield';
                                     document.body.appendChild(shield);
-                                    const move = (event) => $store.studio.setAssistantWidth(aside.getBoundingClientRect().right - event.clientX);
+                                    const move = (event) => $store.studio.setInspectorWidth(aside.getBoundingClientRect().right - event.clientX);
                                     const stop = () => {
                                         shield.remove();
                                         document.removeEventListener('mousemove', move);

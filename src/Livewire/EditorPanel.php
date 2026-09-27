@@ -91,10 +91,13 @@ class EditorPanel extends Component
         $this->dispatch('studio:selection-changed', id: null);
     }
 
+    #[On('studio:close-page-settings')]
     public function closePageSettings(): void
     {
         $this->tab = 'sections';
         $this->showCreateLayout = false;
+        // The inspector column (home.blade.php's store) closes with it
+        $this->dispatch('studio:page-settings-closed');
     }
 
     /**

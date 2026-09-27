@@ -1,3 +1,6 @@
+{{-- The inspector: a slide-over on the right of the site. It shows the
+     fields of the section being edited, or the page's settings — never a
+     list: the page itself is the list of sections. --}}
 <div
     class="flex h-full min-h-0 flex-col"
     x-data="{
@@ -11,71 +14,7 @@
                 detail: { type: 'studio:hover', sectionId, on }
             }));
         },
-
-        focusToken: 0,
-        pendingFocusKey: null,
-        focusFallbackTimer: null,
-
-        // Registered once, when this component's Alpine root initializes —
-        // not per click. Every focus request is applied from here, after
-        // this panel's own morph has settled (see focusField/applyPendingFocus).
-        init() {
-            window.Livewire.hook('morphed', ({ component }) => {
-                if (component.name !== 'studio::editor-panel') return;
-                this.applyPendingFocus();
-            });
-        },
-
-        /**
-         * The canvas selected a field — bring the matching input into view
-         * and flash it, so clicking text on the page and reading its
-         * settings are the same gesture.
-         *
-         * A canvas field click always selects the section too, which is a
-         * Livewire commit that morphs this panel's DOM — whether or not the
-         * row already exists. Applying the flash right away races that
-         * morph: if the row already existed, the morph's server-rendered
-         * `class` attribute overwrites it before it can be seen; if it
-         * didn't exist yet, it isn't there to flash at all. So we never
-         * touch the DOM here — we only arm the pending key/token, and let
-         * the `morphed` hook in init() apply it once this panel's morph has
-         * actually settled, either way. The 600ms fallback covers the rare
-         * case where a focus request has nothing to re-render (no commit
-         * follows at all), so the flash still happens rather than hanging.
-         */
-        focusField(detail) {
-            this.pendingFocusKey = detail.key;
-            const token = ++this.focusToken;
-
-            clearTimeout(this.focusFallbackTimer);
-            this.focusFallbackTimer = setTimeout(() => {
-                this.focusFallbackTimer = null;
-                if (token === this.focusToken) this.applyPendingFocus();
-            }, 600);
-        },
-
-        applyPendingFocus() {
-            if (this.focusFallbackTimer) {
-                clearTimeout(this.focusFallbackTimer);
-                this.focusFallbackTimer = null;
-            }
-
-            const key = this.pendingFocusKey;
-            this.pendingFocusKey = null;
-
-            if (key === null) return;
-
-            const row = this.$root.querySelector(`[data-field-key='${key}']`);
-
-            if (!row) return;
-
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            row.classList.remove('s-field-flash');
-            void row.offsetWidth;              // restart the animation
-            row.classList.add('s-field-flash');
-        }
     }"
-    x-on:studio:field-focus.window="focusField($event.detail)"
 >
     @php $selected = $this->selectedSection; @endphp
 
@@ -84,16 +23,20 @@
         {{-- Inspector — edit the selected section                     --}}
         {{-- ======================================================== --}}
         <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="inspector-{{ $selectedId }}">
-            {{-- Inspector header --}}
-            <div class="s-panel-head !pl-2">
-                <button wire:click="closeInspector" class="s-icon-btn" title="Back to sections (Esc)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
-                    </svg>
-                </button>
+            {{-- Inspector header: what is being edited, and the way out --}}
+            <div class="s-panel-head s-inspector-head">
                 <div class="min-w-0 flex-1">
+                    <p class="s-microlabel !text-[10.5px] uppercase tracking-[0.06em] text-faint">Editing</p>
                     <p class="truncate text-[13px] font-semibold text-ink">{{ $selected['title'] }}</p>
                 </div>
+                @if(!empty($selected['block']))
+                    <span class="s-chip !border-block/40 !text-block">Global</span>
+                @elseif(($selected['scope'] ?? 'page') === 'layout')
+                    <span class="s-chip !border-layout/40 !text-layout">Layout</span>
+                @endif
+                @if($selected['hidden'])
+                    <span class="s-chip !text-warn">Hidden</span>
+                @endif
                 @if(\Designer\Studio\Support\DevMode::enabled())
                     <button
                         x-data
@@ -101,29 +44,14 @@
                         x-cloak
                         @click="window.dispatchEvent(new CustomEvent('studio:open-code-editor', { detail: { ref: @js($selected['ref']), title: @js($selected['title']) } }))"
                         class="s-icon-btn"
-                        title="Edit source code — .blade.php + .yml (dev mode)"
+                        title="Edit source code — .blade.php + .yml (developer mode)"
                     >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
                     </button>
                 @endif
-                @if(!empty($selected['block']))
-                    <span class="s-chip !border-block/40 !text-block">Global</span>
-                @elseif(($selected['scope'] ?? 'page') === 'page')
-                    <button
-                        wire:click="makeGlobal('{{ $selectedId }}')"
-                        class="s-icon-btn"
-                        title="Make global — reuse this section on any page"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3.196 12.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 12.87Z"/><path d="M3.196 8.87l-.825.483a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .758 0l7.25-4.25a.75.75 0 0 0 0-1.294l-.825-.484-5.666 3.322a2.25 2.25 0 0 1-2.276 0L3.196 8.87Z"/><path d="M10.38 1.103a.75.75 0 0 0-.76 0l-7.25 4.25a.75.75 0 0 0 0 1.294l7.25 4.25a.75.75 0 0 0 .76 0l7.25-4.25a.75.75 0 0 0 0-1.294l-7.25-4.25Z"/></svg>
-                    </button>
-                @endif
-                @if(($selected['scope'] ?? 'page') === 'layout')
-                    <span class="s-chip !border-layout/40 !text-layout">Layout</span>
-                @endif
-                @if($selected['hidden'])
-                    <span class="s-chip !text-warn">Hidden</span>
-                @endif
-                @include('studio::partials.float-close')
+                <button wire:click="closeInspector" class="s-icon-btn" title="Done (Esc)" aria-label="Close the editor">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+                </button>
             </div>
 
             @if(!empty($selected['block']))
@@ -233,53 +161,22 @@
                 @endforelse
             </div>
 
-            {{-- Inspector footer actions --}}
-            <div class="flex shrink-0 items-center gap-1 border-t border-line p-2">
-                <button
-                    wire:click="duplicateSection('{{ $selectedId }}')"
-                    class="s-btn-ghost flex-1 !justify-center"
-                    title="Duplicate section (⌘D)"
-                >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
-                    Duplicate
-                </button>
-                <button
-                    wire:click="toggleHidden('{{ $selectedId }}')"
-                    class="s-btn-ghost flex-1 !justify-center"
-                    title="{{ $selected['hidden'] ? 'Show section' : 'Hide section' }}"
-                >
-                    @if($selected['hidden'])
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
-                        Show
-                    @else
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
-                        Hide
-                    @endif
-                </button>
-                <button
-                    wire:click="removeSection('{{ $selectedId }}')"
-                    class="s-btn-ghost flex-1 !justify-center !text-danger hover:!bg-danger/10"
-                    title="Delete section (⌫)"
-                >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>
-                    Delete
-                </button>
-            </div>
         </div>
     @else
         {{-- ======================================================== --}}
         {{-- The list, or page settings                                --}}
         {{-- ======================================================== --}}
-        <div class="s-panel-enter-back flex h-full min-h-0 flex-col" wire:key="panel-tabs">
+        <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="panel-tabs">
             @if($tab === 'page' || $tab === 'layout')
                 {{-- Page settings header --}}
-                <div class="s-panel-head !pl-2">
-                    <button wire:click="closePageSettings" class="s-icon-btn" title="Back to sections" aria-label="Back to sections">
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 0 1 0 1.06L9.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
-                        </svg>
+                <div class="s-panel-head s-inspector-head">
+                    <div class="min-w-0 flex-1">
+                        <p class="s-microlabel !text-[10.5px] uppercase tracking-[0.06em] text-faint">Page</p>
+                        <p class="truncate text-[13px] font-semibold text-ink">{{ $page['title'] ?? 'Settings' }}</p>
+                    </div>
+                    <button wire:click="closePageSettings" class="s-icon-btn" title="Done (Esc)" aria-label="Close page settings">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
                     </button>
-                    <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">Page settings</p>
                 </div>
 
                 <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3.5">
@@ -643,131 +540,9 @@
                     </div>
                 </div>
             @else
-                {{-- Sections header --}}
-                <div class="s-panel-head">
-                    <p class="s-microlabel flex-1">Sections</p>
-                    <button
-                        type="button"
-                        class="s-icon-btn"
-                        title="Add a section"
-                        aria-label="Add a section"
-                        @click="window.dispatchEvent(new CustomEvent('studio:open-library', { detail: { index: null } }))"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                    </button>
-                    <button
-                        type="button"
-                        class="s-icon-btn"
-                        title="Page settings (⌘,)"
-                        aria-label="Page settings"
-                        wire:click="openPageSettings"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg>
-                    </button>
-                </div>
-
-                {{-- First run: three things worth knowing, then never again --}}
-                <div
-                    x-data="{ show: localStorage.getItem('studio.tip.start') !== '1' }"
-                    x-show="show"
-                    x-cloak
-                    class="s-tipcard shrink-0"
-                >
-                    <div class="flex items-start gap-2">
-                        <p class="flex-1 text-[12.5px] font-medium text-ink">Getting started</p>
-                        <button type="button" class="s-icon-btn !-mr-1 !-mt-1 !h-6 !w-6" title="Dismiss" aria-label="Dismiss" @click="show = false; localStorage.setItem('studio.tip.start', '1')">
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
-                        </button>
-                    </div>
-                    <ol>
-                        <li><span>Click any text or image on the page to change it.</span></li>
-                        <li><span>Drag sections in this list to reorder them; hover one to hide, duplicate or delete it.</span></li>
-                        <li><span>Nothing is live until you press <span class="font-medium text-ink">Publish</span>.</span></li>
-                    </ol>
-                </div>
-                <div class="min-h-0 flex-1 overflow-y-auto p-2">
-                    @if(count($sections))
-                        <div
-                            wire:key="sections-sortable"
-                            x-init="window.Studio.sortable($el, '.s-drag-handle', ids => $wire.reorderSections(ids))"
-                            class="space-y-0.5"
-                        >
-                            @foreach($sections as $section)
-                                <div
-                                    wire:key="row-{{ $section['id'] }}"
-                                    data-section-id="{{ $section['id'] }}"
-                                    class="s-section-row group {{ $selectedId === $section['id'] ? 'is-active' : '' }}"
-                                    wire:click="selectFromList('{{ $section['id'] }}')"
-                                    @mouseenter="hint('{{ $section['id'] }}', true)"
-                                    @mouseleave="hint('{{ $section['id'] }}', false)"
-                                >
-                                    <span class="s-drag-handle" @click.stop title="Drag to reorder">
-                                        <svg class="h-3 w-3" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3.5" r="1.2"/><circle cx="11" cy="3.5" r="1.2"/><circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="5" cy="12.5" r="1.2"/><circle cx="11" cy="12.5" r="1.2"/></svg>
-                                    </span>
-
-                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center {{ !empty($section['block']) ? 'text-block' : ($section['hidden'] ? 'text-faint' : 'text-soft') }}">
-                                        @include('studio::partials.category-icon', ['category' => $section['category']])
-                                    </span>
-
-                                    <span class="min-w-0 flex-1 truncate text-[12.5px] {{ $section['hidden'] ? 'text-faint line-through decoration-line-strong' : 'text-ink' }}">
-                                        {{ $section['title'] }}
-                                    </span>
-
-                                    <span class="row-actions" @click.stop>
-                                        <button
-                                            wire:click="toggleHidden('{{ $section['id'] }}')"
-                                            class="s-icon-btn !h-6 !w-6"
-                                            title="{{ $section['hidden'] ? 'Show section' : 'Hide section' }}"
-                                        >
-                                            @if($section['hidden'])
-                                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
-                                            @else
-                                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>
-                                            @endif
-                                        </button>
-                                        <button
-                                            wire:click="duplicateSection('{{ $section['id'] }}')"
-                                            class="s-icon-btn !h-6 !w-6"
-                                            title="Duplicate section"
-                                        >
-                                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/><path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/></svg>
-                                        </button>
-                                        <button
-                                            wire:click="removeSection('{{ $section['id'] }}')"
-                                            class="s-icon-btn !h-6 !w-6 hover:!text-danger"
-                                            title="Delete section"
-                                        >
-                                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>
-                                        </button>
-                                    </span>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <button
-                            type="button"
-                            class="s-empty-tile mt-1"
-                            @click="window.dispatchEvent(new CustomEvent('studio:open-library', { detail: { index: null } }))"
-                        >
-                            <span class="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-raised text-soft">
-                                <svg class="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                            </span>
-                            <span class="text-[13px] font-medium text-ink">Add your first section</span>
-                            <span class="text-xs leading-relaxed text-faint">Pick from {{ count($fieldsByRef) ?: 'dozens of' }} pre-built designs<br>in the section library.</span>
-                        </button>
-                    @endif
-                </div>
-
-                {{-- Add section footer --}}
-                <div class="shrink-0 border-t border-line p-2.5">
-                    <button
-                        type="button"
-                        class="s-btn-accent w-full"
-                        @click="window.dispatchEvent(new CustomEvent('studio:open-library', { detail: { index: null } }))"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
-                        Add section
-                    </button>
+                {{-- Nothing open: the column is collapsed, this is never seen --}}
+                <div class="flex flex-1 items-center justify-center p-6 text-center text-[12.5px] text-faint">
+                    Hover a section on the page and press Edit.
                 </div>
             @endif
         </div>
