@@ -1,9 +1,9 @@
-{{-- Code mode's editor pane: the file tree as a column on the left, then
-     open files as tabs above one Monaco instance whose model is swapped per
-     tab, so each file keeps its own undo history and cursor. Full-width by
-     default; the split hands half back to the live preview. All state lives
-     in $store.code (see the dev-mode script block in home.blade.php); the
-     tree column toggles with $store.studio.filesOpen (the dock's Files). --}}
+{{-- Code mode's editor pane: open files as tabs above one Monaco instance
+     whose model is swapped per tab, so each file keeps its own undo history
+     and cursor. The file tree is not here — it is the sidebar's Code tab
+     (partials/file-tree). Full-width by default; the split hands half back
+     to the live preview. All state lives in $store.code (see the dev-mode
+     script block in home.blade.php). --}}
 <div
     x-show="$store.studio.mode === 'code'"
     x-cloak
@@ -21,29 +21,8 @@
     "
     @keydown.window="if ($store.studio.mode === 'code' && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S') && !window.Studio.codeModalOpen) { $event.preventDefault(); $store.code.save() }"
 >
-    <div class="flex min-h-0 flex-1">
-        {{-- File tree column --}}
-        <div x-show="$store.studio.filesOpen" class="s-code-files">
-            @include('studio::partials.file-tree')
-        </div>
-
-        <div class="flex min-w-0 flex-1 flex-col">
     {{-- Tab strip --}}
     <div class="flex h-9 shrink-0 items-stretch gap-px overflow-x-auto border-b border-line bg-raised/50">
-        {{-- The file tree column, toggled from where it lives --}}
-        <div class="flex shrink-0 items-center border-r border-line px-1.5">
-            <button
-                type="button"
-                class="s-icon-btn"
-                :class="$store.studio.filesOpen && '!bg-wash-strong !text-ink'"
-                @click="$store.studio.toggleFiles()"
-                :title="$store.studio.filesOpen ? 'Hide the files' : 'Show the files'"
-                :aria-label="$store.studio.filesOpen ? 'Hide the files' : 'Show the files'"
-                :aria-pressed="$store.studio.filesOpen"
-            >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M9 4.75v14.5M5.75 8.5h1.5M5.75 11h1.5M5.75 13.5h1.5"/></svg>
-            </button>
-        </div>
         <template x-for="tab in $store.code.tabs" :key="tab.path">
             <div
                 class="group flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-3 text-[11.5px] transition-colors"
@@ -102,13 +81,22 @@
             <p class="max-w-xs text-[12px] leading-relaxed text-faint">
                 The site lives in resources/designer and public/designer — pages, sections, layouts, data, and CSS. A saved file is live at once, and the editor picks it up.
             </p>
+            {{-- The files are a tab of the sidebar: offer the way there
+                 whenever they are not on screen --}}
+            <button
+                type="button"
+                class="s-btn-outline mt-2"
+                x-show="!$store.studio.sidebar || $store.studio.rail !== 'code'"
+                x-cloak
+                @click="$store.studio.setRail('code')"
+            >
+                Show the files
+            </button>
         </div>
 
         {{-- The error line sits over the editor so a failed save can't be missed --}}
         <div x-show="$store.code.error" x-cloak class="absolute inset-x-0 bottom-0 border-t border-danger/40 bg-danger/15 px-3 py-2">
             <p class="text-[11.5px] leading-snug text-ink/90" x-text="$store.code.error"></p>
-        </div>
-    </div>
         </div>
     </div>
 </div>

@@ -1265,9 +1265,9 @@ const StudioPreview = {
             this.pointerLeft(event.target.closest?.('[data-section]')?.dataset.section || null);
         }, { passive: true });
 
-        // A short section (a nav bar) hangs its chip and toolbar below its
-        // own bottom edge rather than over its controls — measured on
-        // entry, so a re-rendered section is re-measured the next time.
+        // A short section (a nav bar) centres its chip and toolbar on its
+        // own height — measured on entry, so a re-rendered section is
+        // re-measured the next time.
         document.addEventListener('mouseover', (event) => {
             const wrapper = event.target.closest?.('[data-section]');
             if (!wrapper || wrapper === this.measured) return;
@@ -3710,7 +3710,9 @@ const StudioPreview = {
     measureShort(wrapper) {
         const content = wrapper.querySelector('[data-section-content]');
         const height = content ? content.offsetHeight : wrapper.offsetHeight;
-        const short = height > 0 && height < 120;
+        // Under 72px the default 10px offset would leave the chrome off
+        // centre or past the bottom edge
+        const short = height > 0 && height < 72;
 
         wrapper.classList.toggle('is-short', short);
         if (short) wrapper.style.setProperty('--studio-h', `${height}px`);

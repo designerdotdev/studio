@@ -76,18 +76,28 @@
                         localStorage.setItem('studio.sidebar', '0');
                     },
                     // Which panel the sidebar shows. The Assistant is the
-                    // first tab and the default wherever the server allows it.
-                    rails: ['assistant', 'pages', 'content', 'media'],
+                    // first tab and the default wherever the server allows it;
+                    // Code is the last, and holds Code mode's files.
+                    rails: ['assistant', 'pages', 'content', 'media', 'code'],
                     rail: (() => {
                         const saved = localStorage.getItem('studio.rail');
-                        const chatOk = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
+                        const developer = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
                         if (['pages', 'content', 'media'].includes(saved)) return saved;
-                        return chatOk ? 'assistant' : 'pages';
+                        // The files only ever show beside the editor they open in
+                        if (saved === 'code' && developer && localStorage.getItem('studio.mode') === 'code') return 'code';
+                        return developer ? 'assistant' : 'pages';
                     })(),
                     setRail(name, force = false) {
                         if (name === 'sections') name = 'assistant';
                         if (!this.rails.includes(name)) return;
                         if (name === 'assistant' && !this.chatAvailable) name = 'pages';
+                        if (name === 'code' && !this.codeAvailable) name = 'pages';
+                        // The Code tab is the way into Code mode, which opens
+                        // the sidebar on its files itself
+                        if (name === 'code' && this.mode !== 'code') {
+                            this.setMode('code');
+                            return;
+                        }
                         this.rail = name;
                         localStorage.setItem('studio.rail', name);
                         if (!this.sidebar) {
@@ -97,7 +107,7 @@
                         }
                         window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name } }));
                     },
-                    // Sections and Pages are lists; Content and Media are
+                    // Pages and Code's files are lists; Content and Media are
                     // grids and start wider; the chat has its own width.
                     // Each group remembers its width.
                     get wide() { return this.rail === 'content' || this.rail === 'media' },
@@ -210,13 +220,6 @@
                         this.focusChat();
                     },
 
-                    // Code mode's file tree column (inside the code pane)
-                    filesOpen: localStorage.getItem('studio.files') !== '0',
-                    toggleFiles() {
-                        this.filesOpen = !this.filesOpen;
-                        localStorage.setItem('studio.files', this.filesOpen ? '1' : '0');
-                    },
-
                     // The top bar's one responsive button steps Desktop → Tablet → Phone
                     cycleDevice() {
                         this.device = { desktop: 'tablet', tablet: 'mobile', mobile: 'desktop' }[this.device] || 'desktop';
@@ -255,14 +258,18 @@
                         // Code mode and the Assistant are developer surfaces —
                         // turning the switch off can't leave either showing
                         if (!this.devMode && this.mode === 'code') this.setMode('edit');
-                        if (!this.devMode && this.rail === 'assistant') this.setRail('pages');
+                        if (!this.devMode && ['assistant', 'code'].includes(this.rail)) this.setRail('pages');
                         if (this.devMode && this.rail === 'pages' && localStorage.getItem('studio.rail') === null) this.rail = 'assistant';
                     },
 
                     /* --- Edit / Code ------------------------------------- */
                     /* Edit is the page (the only mode a marketing team ever
-                       sees); Code is the file tree + editor, and only exists
-                       when the server gate AND the switch are on. */
+                       sees); Code is the editor in the stage with its files
+                       in the sidebar's Code tab, and only exists when the
+                       server gate AND the switch are on. Entering Code mode
+                       opens the sidebar on the files; leaving it puts the
+                       sidebar back the way it was. In between the other
+                       tabs still work — the Assistant beside the code. */
                     get codeAvailable() { return this.developer },
                     mode: (() => {
                         const saved = localStorage.getItem('studio.mode');
@@ -272,10 +279,37 @@
                     setMode(name) {
                         if (name === 'code' && !this.codeAvailable) return;
                         if (name !== 'code') name = 'edit';
+                        const was = this.mode;
                         this.mode = name;
                         localStorage.setItem('studio.mode', name);
+                        if (name === 'code' && was !== 'code') this.showFiles();
+                        if (name !== 'code' && was === 'code') this.putFilesAway();
                         toIframe('studio:mode', { mode: name });
                         window.dispatchEvent(new CustomEvent('studio:mode', { detail: { mode: name } }));
+                    },
+                    // What the sidebar was doing before Code mode borrowed it
+                    beforeCode: null,
+                    showFiles() {
+                        this.beforeCode = { rail: this.rail, sidebar: this.sidebar };
+                        this.rail = 'code';
+                        this.sidebar = true;
+                        this.sidebarBefore = null;
+                        localStorage.setItem('studio.rail', 'code');
+                        localStorage.setItem('studio.sidebar', '1');
+                        window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name: 'code' } }));
+                    },
+                    putFilesAway() {
+                        const before = this.beforeCode;
+                        this.beforeCode = null;
+                        // Another tab was chosen while in Code mode: it stays
+                        if (this.rail !== 'code') return;
+                        this.rail = before?.rail && before.rail !== 'code' ? before.rail : (this.chatAvailable ? 'assistant' : 'pages');
+                        localStorage.setItem('studio.rail', this.rail);
+                        if (before && !before.sidebar) {
+                            this.sidebar = false;
+                            localStorage.setItem('studio.sidebar', '0');
+                        }
+                        window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name: this.rail } }));
                     },
                     toggleCode() { this.setMode(this.mode === 'code' ? 'edit' : 'code') },
                     // Whether the canvas is on screen at all: Code mode hides
@@ -675,41 +709,69 @@
                 ['media', 'Media', '<path d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/>'],
             ];
         @endphp
+        {{-- One well of icons: the panel that is showing wears its name,
+             the others name themselves in a tooltip --}}
         <nav class="s-tabs" x-data aria-label="Sidebar">
-            @if($devModeAvailable)
-                {{-- The Assistant: first, and the default, in developer mode --}}
-                <button
-                    type="button"
-                    class="s-tab is-chat"
-                    x-show="$store.studio.chatAvailable"
-                    x-cloak
-                    :class="{ 'is-active': $store.studio.rail === 'assistant', 'is-busy': $store.studio.chatBusy }"
-                    @click="$store.studio.setRail('assistant')"
-                    :aria-pressed="$store.studio.rail === 'assistant'"
-                    title="Assistant  ⌘J"
-                >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
-                    <span>Assistant</span>
-                </button>
-            @endif
-            @foreach($tabs as [$name, $label, $icon])
-                <button
-                    type="button"
-                    class="s-tab"
-                    :class="$store.studio.rail === '{{ $name }}' && 'is-active'"
-                    @click="$store.studio.setRail('{{ $name }}')"
-                    :aria-pressed="$store.studio.rail === '{{ $name }}'"
-                    title="{{ $label }}"
-                >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $icon !!}</svg>
-                    <span>{{ $label }}</span>
-                </button>
-            @endforeach
+            <div class="s-tabs-well">
+                @if($devModeAvailable)
+                    {{-- The Assistant: first, and the default, in developer mode --}}
+                    <button
+                        type="button"
+                        class="s-tab s-tip is-chat"
+                        x-show="$store.studio.chatAvailable"
+                        x-cloak
+                        :class="{ 'is-active': $store.studio.rail === 'assistant', 'is-busy': $store.studio.chatBusy }"
+                        @click="$store.studio.setRail('assistant')"
+                        :aria-pressed="$store.studio.rail === 'assistant'"
+                        :data-tip="$store.studio.rail === 'assistant' && $store.studio.panelWidth >= 264 ? '' : 'Assistant  ⌘J'"
+                        aria-label="Assistant"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
+                        <span>Assistant</span>
+                    </button>
+                @endif
+                @foreach($tabs as [$name, $label, $icon])
+                    <button
+                        type="button"
+                        class="s-tab s-tip"
+                        :class="$store.studio.rail === '{{ $name }}' && 'is-active'"
+                        @click="$store.studio.setRail('{{ $name }}')"
+                        :aria-pressed="$store.studio.rail === '{{ $name }}'"
+                        :data-tip="$store.studio.rail === '{{ $name }}' && $store.studio.panelWidth >= 264 ? '' : '{{ $label }}'"
+                        aria-label="{{ $label }}"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $icon !!}</svg>
+                        <span>{{ $label }}</span>
+                    </button>
+                @endforeach
+                @if($devModeAvailable)
+                    {{-- Code: the site's files. Choosing it is Code mode, and
+                         Code mode opens on it. --}}
+                    <button
+                        type="button"
+                        class="s-tab s-tip"
+                        x-show="$store.studio.codeAvailable"
+                        x-cloak
+                        :class="$store.studio.rail === 'code' && 'is-active'"
+                        @click="$store.studio.setRail('code')"
+                        :aria-pressed="$store.studio.rail === 'code'"
+                        :data-tip="$store.studio.rail === 'code' && $store.studio.panelWidth >= 264 ? '' : 'Code'"
+                        aria-label="Code"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
+                        <span>Code</span>
+                    </button>
+                @endif
+            </div>
         </nav>
 
         @if($devModeAvailable)
             <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'assistant'" x-cloak>
                 <livewire:studio::assistant-panel :page-slug="$page->slug" />
+            </div>
+            {{-- Code mode's files --}}
+            <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'code'" x-cloak>
+                @include('studio::partials.file-tree')
             </div>
         @endif
         <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'pages'" x-cloak>
@@ -758,7 +820,6 @@
                     { label: 'Code mode', hint: 'Developer', when: studio.codeAvailable && studio.mode !== 'code', run: () => studio.setMode('code') },
                     { label: 'Back to the page', hint: 'Developer', when: studio.mode === 'code', run: () => studio.setMode('edit') },
                     { label: studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleCodeSplit() },
-                    { label: studio.filesOpen ? 'Hide the file tree' : 'Show the file tree', hint: 'Code', when: studio.mode === 'code', run: () => studio.toggleFiles() },
                     @if($draftMode)
                     { label: 'Publish…', hint: 'Site', run: () => window.dispatchEvent(new CustomEvent('studio:open-publish')) },
                     @endif
@@ -766,6 +827,7 @@
                     { label: 'Pages', hint: 'Sidebar', run: () => studio.setRail('pages', true) },
                     { label: 'Content', hint: 'Sidebar', run: () => studio.setRail('content', true) },
                     { label: 'Media', hint: 'Sidebar', run: () => studio.setRail('media', true) },
+                    { label: 'Files', hint: 'Sidebar', when: studio.mode === 'code', run: () => studio.setRail('code', true) },
                     { label: studio.sidebar ? 'Hide the sidebar' : 'Show the sidebar', hint: '⌘B', run: () => studio.toggleSidebar() },
                     { label: 'Refresh the preview', hint: 'Canvas', run: () => window.dispatchEvent(new CustomEvent('studio:refresh-preview')) },
                     { label: 'Open in a new tab', hint: 'Canvas', run: () => window.open(@js($openUrl), '_blank', 'noopener') },

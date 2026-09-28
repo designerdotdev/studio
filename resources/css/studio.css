@@ -520,6 +520,29 @@ html.studio-light,
         color: var(--color-accent);
     }
 
+    /* A quiet toggle: out of sight until the pointer is on the bar (or the
+       keyboard is in it). One that is switched on stays — it is the reason
+       the stage looks the way it does. It keeps its place either way, so
+       nothing in the bar moves when they arrive. */
+    .s-tb-quiet {
+        opacity: 0;
+        transition: opacity 200ms ease, background-color 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+
+    .s-topbar:hover .s-tb-quiet,
+    .s-topbar:has(:focus-visible) .s-tb-quiet,
+    .s-tb-quiet.is-active,
+    .s-tb-quiet.is-accent {
+        opacity: 1;
+    }
+
+    /* Nothing to hover with: they are simply there */
+    @media (hover: none) {
+        .s-tb-quiet {
+            opacity: 1;
+        }
+    }
+
     /* The sidebar toggle's inner bar previews the action: it narrows on
        hover to collapse, widens to expand (DevDojo's shared glyph) */
     .sidebar-toggle-bar {
@@ -560,13 +583,6 @@ html.studio-light,
     @keyframes s-busy {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.35; }
-    }
-
-    .s-tb-sep {
-        @apply shrink-0 bg-line;
-        width: 1px;
-        height: 16px;
-        margin: 0 6px;
     }
 
     /* The menu button: the brand mark at rest, cross-fading to the
@@ -857,37 +873,54 @@ html.studio-light,
         left: 0;
     }
 
-    /* The inspector's header: an eyebrow over the name, the close at the end */
+    /* The inspector's header: the name of what is being edited, the close at the end */
     .s-inspector-head {
-        height: 52px;
         padding-left: 14px;
     }
 
-    /* The sidebar's tab strip: Assistant · Pages · Content · Media */
+    /* The sidebar's tab strip: Assistant · Pages · Content · Media · Code.
+       One grey well of icons. The panel that is showing wears its name on
+       a lifted white segment; the others name themselves in a tooltip. */
     .s-tabs {
         @apply flex shrink-0 items-center border-b border-line;
-        height: 40px;
+        height: 44px;
         padding: 0 8px;
+    }
+
+    .s-tabs-well {
+        display: inline-flex;
+        align-items: center;
         gap: 2px;
+        padding: 2px;
+        border-radius: 9px;
+        background: var(--color-wash);
     }
 
     .s-tab {
-        @apply flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-soft;
+        @apply flex flex-none cursor-pointer items-center justify-center text-soft;
         height: 26px;
-        min-width: 0;
-        padding: 0 4px;
+        min-width: 30px;
+        padding: 0 8px;
+        border-radius: 7px;
         font-size: 12px;
         font-weight: 500;
         white-space: nowrap;
-        transition: background-color 120ms ease, color 120ms ease;
+        transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
     }
 
     .s-tab:hover {
-        @apply text-ink bg-wash;
+        @apply text-ink;
+        background: var(--color-wash);
+    }
+
+    .s-tab:active {
+        transform: scale(0.97);
     }
 
     .s-tab.is-active {
-        @apply bg-wash-strong text-ink;
+        @apply text-ink;
+        background: var(--color-panel);
+        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.08);
     }
 
     .s-tab:focus-visible {
@@ -896,31 +929,62 @@ html.studio-light,
     }
 
     .s-tab svg {
-        width: 14px;
-        height: 14px;
+        width: 15px;
+        height: 15px;
         flex: none;
     }
 
-    /* Narrow sidebar: icons only */
-    .s-sidebar.is-narrow .s-tab span {
+    /* The label folds away with the segment: it opens as its tab is chosen */
+    .s-tab > span {
+        max-width: 0;
+        margin-left: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition:
+            max-width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin-left 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 140ms ease;
+    }
+
+    .s-tab.is-active > span {
+        max-width: 96px;
+        margin-left: 6px;
+        opacity: 1;
+        transition-delay: 0ms, 0ms, 60ms;
+    }
+
+    /* Narrow sidebar: icons only, the tooltip names the open one too */
+    .s-sidebar.is-narrow .s-tab > span {
         display: none;
     }
 
-    /* The Assistant tab carries a live dot while a turn streams */
+    /* A tab's tooltip starts at the tab's own left edge — centred, the
+       first one would be cut off by the sidebar's rounded corner */
+    .s-tab.s-tip[data-tip]::after {
+        left: 0;
+        translate: 0 0;
+    }
+
+    .s-tab.s-tip[data-tip]:hover::after {
+        transition-delay: 350ms;
+    }
+
+    /* The Assistant tab carries a live dot while a turn streams (::before —
+       the tooltip is the ::after) */
     .s-tab.is-chat {
         position: relative;
     }
 
-    .s-tab.is-chat.is-busy::after {
+    .s-tab.is-chat.is-busy::before {
         content: '';
         position: absolute;
-        top: 4px;
-        right: 6px;
+        top: 3px;
+        right: 4px;
         width: 6px;
         height: 6px;
         border-radius: 999px;
         background: var(--color-accent);
-        box-shadow: 0 0 0 2px var(--color-panel);
+        box-shadow: 0 0 0 2px var(--color-wash);
         animation: s-busy 1.2s ease-in-out infinite;
     }
 
@@ -936,15 +1000,11 @@ html.studio-light,
         padding: 0 8px 0 12px;
     }
 
-    /* Code mode's file tree column, inside the code pane */
-    .s-code-files {
-        @apply flex shrink-0 flex-col border-r border-line bg-panel;
-        width: 260px;
-    }
-
     @media (prefers-reduced-motion: reduce) {
         .s-sidebar,
-        .s-inspector {
+        .s-inspector,
+        .s-tab,
+        .s-tab > span {
             transition: none;
         }
     }

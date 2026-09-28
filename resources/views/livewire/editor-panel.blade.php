@@ -25,10 +25,7 @@
         <div class="s-panel-enter flex h-full min-h-0 flex-col" wire:key="inspector-{{ $selectedId }}">
             {{-- Inspector header: what is being edited, and the way out --}}
             <div class="s-panel-head s-inspector-head">
-                <div class="min-w-0 flex-1">
-                    <p class="s-microlabel !text-[10.5px] uppercase tracking-[0.06em] text-faint">Editing</p>
-                    <p class="truncate text-[13px] font-semibold text-ink">{{ $selected['title'] }}</p>
-                </div>
+                <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{{ $selected['title'] }}</p>
                 @if(!empty($selected['block']))
                     <span class="s-chip !border-block/40 !text-block">Global</span>
                 @elseif(($selected['scope'] ?? 'page') === 'layout')
@@ -170,10 +167,7 @@
             @if($tab === 'page' || $tab === 'layout')
                 {{-- Page settings header --}}
                 <div class="s-panel-head s-inspector-head">
-                    <div class="min-w-0 flex-1">
-                        <p class="s-microlabel !text-[10.5px] uppercase tracking-[0.06em] text-faint">Page</p>
-                        <p class="truncate text-[13px] font-semibold text-ink">{{ $page['title'] ?? 'Settings' }}</p>
-                    </div>
+                    <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">Page settings</p>
                     <button wire:click="closePageSettings" class="s-icon-btn" title="Done (Esc)" aria-label="Close page settings">
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
                     </button>

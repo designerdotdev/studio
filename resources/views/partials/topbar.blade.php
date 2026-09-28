@@ -3,17 +3,21 @@
      switcher (a dark dropdown); right, the device button (one control
      cycling Desktop → Tablet → Phone), the Code toggle (developer mode),
      the open-in-new-tab link and Publish. There is one mode: the page is
-     always editable. The `menu` and `actions` slots come from home.blade.php. --}}
+     always editable. The `menu` and `actions` slots come from home.blade.php.
+
+     At rest the bar is the menu, the page, the open link and Publish. The
+     toggles are quiet (`s-tb-quiet`): they fade in while the pointer is on
+     the bar, and one that is switched on — a narrower device, Code mode,
+     the split — stays in view, because it explains what the stage shows. --}}
 <header class="s-topbar" aria-label="Editor">
     <div class="s-topbar-group is-start">
         {{ $menu ?? '' }}
 
-        <span class="s-tb-sep"></span>
-
-        {{-- Sidebar toggle — the inner bar previews the action on hover --}}
+        {{-- Sidebar toggle — the inner bar previews the action on hover.
+             No rule between it and the menu: room does the separating. --}}
         <button
             type="button"
-            class="s-tb-btn s-tip"
+            class="s-tb-btn s-tb-quiet s-tip ml-2.5"
             :class="$store.studio.sidebar ? 'tgl-collapse' : 'tgl-expand'"
             :data-tip="$store.studio.sidebar ? 'Collapse sidebar  ⌘B' : 'Open sidebar  ⌘B'"
             aria-label="Toggle the sidebar"
@@ -103,7 +107,7 @@
              The icon is the current device; the tooltip names the next one. --}}
         <button
             type="button"
-            class="s-tb-btn s-tip"
+            class="s-tb-btn s-tb-quiet s-tip"
             :class="$store.studio.device !== 'desktop' && 'is-accent'"
             x-show="$store.studio.canvasVisible"
             :data-tip="({ desktop: 'Desktop — switch to Tablet  ⌥2', tablet: 'Tablet · 768px — switch to Phone  ⌥3', mobile: 'Phone · 390px — switch to Desktop  ⌥1' })[$store.studio.device]"
@@ -115,11 +119,27 @@
             <svg x-show="$store.studio.device === 'mobile'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3"/></svg>
         </button>
 
+        {{-- Code mode: bring the live preview back beside the editor. Before
+             the Code toggle, so that toggle never moves from under the
+             pointer that just pressed it. --}}
+        <button
+            type="button"
+            class="s-tb-btn s-tb-quiet s-tip"
+            x-show="$store.studio.mode === 'code'"
+            x-cloak
+            :class="$store.studio.codeSplit && 'is-active'"
+            :data-tip="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
+            aria-label="Toggle the preview beside the code"
+            @click="$store.studio.toggleCodeSplit()"
+        >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path stroke-linecap="round" d="M3 9h18M6.2 6.75h.01M8.7 6.75h.01M11.2 6.75h.01"/></svg>
+        </button>
+
         {{-- Code mode — the site's source files, developer mode only. One
              toggle in place of the old Preview / Edit / Code control. --}}
         <button
             type="button"
-            class="s-tb-btn s-tip"
+            class="s-tb-btn s-tb-quiet s-tip"
             x-show="$store.studio.codeAvailable"
             x-cloak
             :class="$store.studio.mode === 'code' && 'is-active is-accent'"
@@ -129,20 +149,6 @@
             @click="$store.studio.toggleCode()"
         >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
-        </button>
-
-        {{-- Code mode: bring the live preview back beside the editor --}}
-        <button
-            type="button"
-            class="s-tb-btn s-tip"
-            x-show="$store.studio.mode === 'code'"
-            x-cloak
-            :class="$store.studio.codeSplit && 'is-active'"
-            :data-tip="$store.studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code'"
-            aria-label="Toggle the preview beside the code"
-            @click="$store.studio.toggleCodeSplit()"
-        >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path stroke-linecap="round" d="M3 9h18M6.2 6.75h.01M8.7 6.75h.01M11.2 6.75h.01"/></svg>
         </button>
 
         {{-- Open the draft (or live) page in a new tab --}}

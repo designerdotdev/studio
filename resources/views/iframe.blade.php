@@ -112,10 +112,16 @@
                becomes one card on a quiet dotted canvas — its own page
                background kept inside the card (--studio-site-bg, read from
                the body by setFocus()), a hairline ring and a soft shadow
-               around it. `overflow: clip`, never hidden: clip does not make
-               a scroll container, so the sticky rail still parks at the top
-               of the viewport while a tall card scrolls. Done, Esc or a click
-               on the canvas around the card brings the page back. */
+               around it, the same 32px of canvas on every side. Its rail
+               leaves the card and becomes a bar across the top of the canvas
+               (--studio-bar-h) carrying the chip and the toolbar; the card
+               scrolls under it. Done, Esc or a click on the canvas around
+               the card brings the page back. */
+            html.studio-focus {
+                --studio-bar-h: 56px;
+                --studio-focus-gap: 32px;
+            }
+
             html.studio-focus,
             html.studio-focus body {
                 background: #ececee !important;
@@ -136,12 +142,14 @@
                 display: none !important;
             }
 
+            /* No overflow on the card itself and nothing that transforms it
+               (the lift animates `top`): either would capture the fixed bar
+               inside the card. The content carries the rounded clip. */
             html.studio-focus .studio-section.is-editing {
-                margin: 32px auto 0;
-                width: calc(100% - 64px);
+                margin: calc(var(--studio-bar-h) + var(--studio-focus-gap)) auto 0;
+                width: calc(100% - var(--studio-focus-gap) * 2);
                 max-width: 1440px;
                 border-radius: 14px;
-                overflow: clip;
                 background: var(--studio-site-bg, #fff);
                 box-shadow:
                     0 0 0 1px rgba(0, 0, 0, 0.07),
@@ -154,15 +162,27 @@
                 box-shadow: none;
             }
 
-            /* The rail stops overlapping: it becomes the card's header — a
-               50px strip the content no longer takes back, carrying the
-               chip and the toolbar, sticky at the top of the viewport while
-               a tall card scrolls (a translucent bar over the content then) */
+            html.studio-focus .studio-section.is-editing [data-section-content] {
+                border-radius: 14px;
+                overflow: clip;
+            }
+
+            /* The rail is the bar: the width of the canvas, fixed to its top
+               edge, a frosted strip of the canvas's own grey so the card
+               reads through it as it scrolls under. It takes the pointer —
+               a click on it is not a click "around the card". */
             html.studio-focus .studio-section.is-editing .studio-rail {
-                background: color-mix(in srgb, var(--studio-site-bg, #fff) 88%, transparent);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: var(--studio-bar-h);
+                pointer-events: auto;
+                background: rgba(246, 246, 247, 0.8);
+                backdrop-filter: blur(14px) saturate(1.4);
+                -webkit-backdrop-filter: blur(14px) saturate(1.4);
+                box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+                animation: studio-fade 240ms ease both;
             }
 
             html.studio-focus .studio-section.is-editing .studio-rail + [data-section-content] {
@@ -171,13 +191,18 @@
 
             html.studio-focus .studio-section.is-editing .studio-chip,
             html.studio-focus .studio-section.is-editing .studio-hidden-badge {
-                left: 13px;
-                top: 13px;
+                left: 16px;
+                top: calc((var(--studio-bar-h) - 24px) / 2);
+                opacity: 1;
+                transform: none;
             }
 
             html.studio-focus .studio-section.is-editing .studio-toolbar {
-                right: 9px;
-                top: 9px;
+                right: 12px;
+                top: calc((var(--studio-bar-h) - 32px) / 2);
+                opacity: 1;
+                transform: none;
+                pointer-events: auto;
                 box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 8px 24px -12px rgba(0, 0, 0, 0.4);
             }
 
@@ -195,8 +220,8 @@
             }
 
             @keyframes studio-lift {
-                from { opacity: 0; transform: translateY(10px) scale(0.985); }
-                to { opacity: 1; transform: none; }
+                from { opacity: 0; top: 12px; }
+                to { opacity: 1; top: 0; }
             }
 
             @keyframes studio-fade {
@@ -206,6 +231,7 @@
 
             @media (prefers-reduced-motion: reduce) {
                 html.studio-focus .studio-section.is-editing,
+                html.studio-focus .studio-section.is-editing .studio-rail,
                 html.studio-focus body::after { animation: none; }
             }
 
@@ -1003,13 +1029,17 @@
             .studio-section.is-block .studio-tb-btn.is-edit { background: #14b8a6; }
             .studio-section.is-block .studio-tb-btn.is-edit:hover { background: #0f9b8e; }
 
-            /* A short section (a nav bar) has no room for chrome over its own
-               controls: the chip and the toolbar hang just under its bottom
-               edge instead. `is-short` + --studio-h are set from JS on hover. */
-            .studio-section.is-short .studio-toolbar,
+            /* A short section (a nav bar) keeps its chrome on itself, centred
+               on its own height — hung below, it sat on the next section and
+               read as that section's. `is-short` + --studio-h are set from JS
+               on hover. */
+            .studio-section.is-short .studio-toolbar {
+                top: max(0px, calc((var(--studio-h, 60px) - 32px) / 2));
+            }
+
             .studio-section.is-short .studio-chip,
             .studio-section.is-short .studio-hidden-badge {
-                top: calc(var(--studio-h, 60px) + 8px);
+                top: max(0px, calc((var(--studio-h, 60px) - 24px) / 2));
             }
 
             .studio-tb-btn.is-done { display: none; }
