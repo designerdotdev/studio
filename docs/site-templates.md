@@ -56,7 +56,8 @@ Installing:
 
 The catalog decides which templates the picker offers, and in what order. An entry is a
 repository URL, or an array with a `repo` plus the `name`/`description` shown before it is
-downloaded (the picture comes from the repository's `thumbnail.png`) and a `category` the
+downloaded (the picture of a template Studio ships is bundled with the package; one you add
+is read from its repository's `thumbnail.png`) and a `category` the
 picker's filters group by (`starter`, `landing`, `business`, or any word of your own).
 
 Studio ships with ten — two starting points and eight landing pages:

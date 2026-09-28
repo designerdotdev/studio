@@ -53,8 +53,12 @@
 
 /* Light chrome. A soft grey frame with white containers on it: near-black
    ink, neutral greys, one blue for what is interactive, black for the
-   primary action. */
-html.studio-light {
+   primary action. The sidebar and the inspector are white in both themes —
+   dark only changes the frame they sit on — so the same tokens are retuned
+   on their subtrees. */
+html.studio-light,
+.s-sidebar,
+.s-inspector {
     --color-frame: #efeff0;
     --color-shell: #f7f7f8;
     --color-panel: #ffffff;
@@ -429,9 +433,8 @@ html.studio-light {
        containers laid on it a gutter apart. */
     /* The frame: the top bar sits straight on it, and the sidebar, the
        site and the Assistant column are rounded containers laid on it a
-       gutter apart. Light, the frame is a soft grey and the containers
-       white; dark, the columns sit straight on the near-black and only
-       the site is a card. */
+       gutter apart. Light, the frame is a soft grey; dark, it is
+       near-black. The containers on it are white either way. */
     .s-app {
         --studio-topbar: 44px;
         --studio-gutter: 6px;
@@ -749,9 +752,9 @@ html.studio-light {
     /* --- the sidebar --------------------------------------------------- */
 
     /* A column beside the site — the sidebar on the left, the inspector
-       on the right. Dark, it sits straight on the frame — only the site is
-       a card; light, it is a white container like the site. It stays in
-       the row open or shut, so collapsing is one width + margin transition
+       on the right. A white container like the site, in both themes (the
+       light tokens are retuned on it, see the top of this file). It stays
+       in the row open or shut, so collapsing is one width + margin transition
        with the panel held at full width sliding out under the outer edge. */
     .s-sidebar,
     .s-inspector {
@@ -762,18 +765,13 @@ html.studio-light {
         min-height: 0;
         overflow: hidden;
         border-radius: var(--studio-radius);
+        color: var(--color-ink);
         background: var(--color-panel);
         box-shadow: 0 0 0 1px var(--color-line);
         transition:
             width 240ms cubic-bezier(0.22, 1, 0.36, 1),
             margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
             opacity 180ms ease;
-    }
-
-    html:not(.studio-light) .s-sidebar,
-    html:not(.studio-light) .s-inspector {
-        background: transparent;
-        box-shadow: none;
     }
 
     .s-sidebar.is-collapsed,
@@ -813,13 +811,6 @@ html.studio-light {
             width 260ms cubic-bezier(0.22, 1, 0.36, 1),
             margin 260ms cubic-bezier(0.22, 1, 0.36, 1),
             opacity 200ms ease;
-    }
-
-    /* Dark, the inspector reads as a card too — it is the thing you are
-       working in while the site steps back */
-    html:not(.studio-light) .s-inspector {
-        background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line);
     }
 
     /* While a seam is dragged the width follows the pointer, not a curve */
@@ -1036,7 +1027,7 @@ html.studio-light {
         box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.45);
     }
 
-    html.studio-light .s-pick-btn.is-on {
+    :is(html.studio-light, .s-sidebar, .s-inspector) .s-pick-btn.is-on {
         color: #6d28d9;
     }
 
@@ -1161,7 +1152,7 @@ html.studio-light {
         box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
-    html:not(.studio-light) .s-seg-btn.is-active {
+    html:not(.studio-light) .s-seg-btn.is-active:not(:is(.s-sidebar, .s-inspector) *) {
         background: var(--color-raised);
         box-shadow: 0 0 0 1px var(--color-line-strong);
     }
@@ -1482,6 +1473,7 @@ html.studio-light {
 
 /* ------------------------------------------------------------------ */
 /*  Light chrome adjustments                                           */
+/*  (the sidebar and the inspector are a light surface in both themes) */
 /* ------------------------------------------------------------------ */
 
 @layer components {
@@ -1499,7 +1491,7 @@ html.studio-light .s-modal-backdrop {
 
 /* Buttons with a little depth: the primary is a black key with a lit top
    edge; the outline button a white one with a heavier bottom edge */
-html.studio-light .s-btn-primary {
+:is(html.studio-light, .s-sidebar, .s-inspector) .s-btn-primary {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #303030;
     color: #ffffff;
     box-shadow:
@@ -1508,11 +1500,11 @@ html.studio-light .s-btn-primary {
         inset 0 0.5px 0 1.5px rgba(255, 255, 255, 0.22);
 }
 
-html.studio-light .s-btn-primary:hover {
+:is(html.studio-light, .s-sidebar, .s-inspector) .s-btn-primary:hover {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #1a1a1a;
 }
 
-html.studio-light .s-btn-outline {
+:is(html.studio-light, .s-sidebar, .s-inspector) .s-btn-outline {
     border-color: transparent;
     background: #ffffff;
     box-shadow:
@@ -1521,15 +1513,15 @@ html.studio-light .s-btn-outline {
         inset 0 0.5px 0 1.5px #ffffff;
 }
 
-html.studio-light .s-btn-outline:hover {
+:is(html.studio-light, .s-sidebar, .s-inspector) .s-btn-outline:hover {
     background: #fafafa;
 }
 
-html.studio-light .s-input {
+:is(html.studio-light, .s-sidebar, .s-inspector) .s-input {
     border-color: rgba(0, 0, 0, 0.12);
 }
 
-html.studio-light .s-input:hover {
+:is(html.studio-light, .s-sidebar, .s-inspector) .s-input:hover {
     border-color: rgba(0, 0, 0, 0.22);
 }
 

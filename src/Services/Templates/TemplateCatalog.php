@@ -10,8 +10,9 @@ use Illuminate\Support\Str;
  * Normally the entries of `studio.templates.catalog`, each a whole site in
  * its own git repository (the Designer template repository format). A template
  * does not have to be downloaded to be offered — the picker shows the
- * catalog's own name and description, with the thumbnail served from the
- * repository — and it is cloned the moment someone picks it.
+ * catalog's own name and description, with the picture of it that ships in
+ * the package (resources/thumbnails) — and it is cloned the moment someone
+ * picks it.
  *
  * When the local template previewer is on (`studio.template_preview`, the
  * folder of template repositories being worked on), that folder is the
@@ -159,16 +160,40 @@ class TemplateCatalog
         return $this->sync->ensure($name);
     }
 
-    /** Absolute path to a template's thumbnail, if it has one on disk. */
+    /**
+     * Absolute path to a template's thumbnail, if it has one on disk: the
+     * picture the package ships for a catalogued template, else the one in
+     * its downloaded copy.
+     */
     public function thumbnailPath(string $name): ?string
     {
         if ($this->local()) {
             return TemplatePreview::make()->thumbnail($name);
         }
 
+        if ($bundled = $this->bundledThumbnail($name)) {
+            return $bundled;
+        }
+
         $dir = $this->sync->directory($name);
 
         return $dir && is_file($dir . '/thumbnail.png') ? $dir . '/thumbnail.png' : null;
+    }
+
+    /**
+     * The picture the package ships for a template in its own catalog
+     * (`bin/thumbnails.sh` writes them). The repositories are not all
+     * public, so the picker cannot count on a download to show one.
+     */
+    public function bundledThumbnail(string $name): ?string
+    {
+        if (!preg_match('/^[a-z0-9-]+$/', $name) || !$this->has($name)) {
+            return null;
+        }
+
+        $path = dirname(__DIR__, 3) . '/resources/thumbnails/' . $name . '.jpg';
+
+        return is_file($path) ? $path : null;
     }
 
     /**

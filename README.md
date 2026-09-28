@@ -140,7 +140,7 @@ php artisan vendor:publish --tag=studio-config
 | `middleware` | `['web']` | Middleware for the editor and its API |
 | `gate` | `null` | Optional ability required for every Studio route |
 | `draft_mode` | `true` | Edits stay in a draft until published (`false` = edits go live at once) |
-| `dev_mode` | local only | Code mode, the section code editor, and the Assistant |
+| `dev_mode` | local only | Whether the editor offers the **Developer mode** switch (off until you turn it on in the menu): Code mode, the section code editor, and the Assistant |
 | `storage_path` | `storage_path('studio')` | Studio's working data (drafts, template downloads) |
 | `templates.catalog` | the eleven above | The templates the picker offers |
 | `iframe.*` | — | CDN toggles, extra assets, body classes for the canvas |

@@ -58,7 +58,9 @@
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
 
                     /* --- the sidebar ------------------------------------- */
-                    sidebar: localStorage.getItem('studio.sidebar') !== '0',
+                    // Shut until someone opens it: a new install starts on
+                    // the site, edge to edge
+                    sidebar: localStorage.getItem('studio.sidebar') === '1',
                     // Where the sidebar stood before the inspector took the
                     // room — null when nothing is remembered
                     sidebarBefore: null,
@@ -78,7 +80,7 @@
                     rails: ['assistant', 'pages', 'content', 'media'],
                     rail: (() => {
                         const saved = localStorage.getItem('studio.rail');
-                        const chatOk = devModeAvailable && localStorage.getItem('studio.devmode') !== '0';
+                        const chatOk = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
                         if (['pages', 'content', 'media'].includes(saved)) return saved;
                         return chatOk ? 'assistant' : 'pages';
                     })(),
@@ -239,9 +241,11 @@
                        page, its fields, pages, content rows, media, Publish —
                        with nothing that reads as code. `developer` is THE
                        gate for chrome (the switch, where the server allows
-                       one at all); the canvas mirrors it as html.studio-devmode. */
+                       one at all); the canvas mirrors it as html.studio-devmode.
+                       The switch starts off — a new install opens as the
+                       second editor until someone turns it on. */
                     devModeAvailable,
-                    devMode: localStorage.getItem('studio.devmode') !== '0',
+                    devMode: localStorage.getItem('studio.devmode') === '1',
                     get developer() { return this.devModeAvailable && this.devMode },
                     toggleDevMode() {
                         this.devMode = !this.devMode;
@@ -262,7 +266,7 @@
                     get codeAvailable() { return this.developer },
                     mode: (() => {
                         const saved = localStorage.getItem('studio.mode');
-                        const codeOk = devModeAvailable && localStorage.getItem('studio.devmode') !== '0';
+                        const codeOk = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
                         return saved === 'code' && codeOk ? 'code' : 'edit';
                     })(),
                     setMode(name) {

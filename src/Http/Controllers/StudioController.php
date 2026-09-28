@@ -418,10 +418,11 @@ class StudioController extends Controller
     }
 
     /**
-     * The picture a template ships of itself: from the local copy, which is
-     * downloaded on the first request for it (a private repository has no
-     * public raw URL to fall back on), and from the repository's raw
-     * thumbnail only when the download failed.
+     * The picture of a template: the one the package ships for its own
+     * catalog, so the picker never has to download anything to show it.
+     * A template added to the catalog by the app has none — its picture
+     * comes from the local copy, downloaded on the first request for it,
+     * and from the repository's raw thumbnail only when that failed.
      */
     public function templateThumbnail(string $name)
     {
@@ -441,7 +442,7 @@ class StudioController extends Controller
 
         if ($path) {
             return response()->file($path, [
-                'Content-Type' => 'image/png',
+                'Content-Type' => str_ends_with($path, '.jpg') ? 'image/jpeg' : 'image/png',
                 'Cache-Control' => 'private, max-age=300',
             ]);
         }

@@ -123,6 +123,14 @@ const StudioEditor = {
                     window.Livewire?.dispatch('studio:deselect-section');
                     break;
 
+                case 'studio:selection-released':
+                    // The pointer left the section it had selected. The
+                    // shortcuts let go of it; Livewire keeps it, so the
+                    // Assistant's context chip survives the walk over to
+                    // the composer.
+                    this.selectedId = null;
+                    break;
+
                 case 'studio:add-section':
                     window.dispatchEvent(new CustomEvent('studio:open-library', {
                         detail: { index: data.index ?? null, scope: data.scope || 'page' },
@@ -1115,10 +1123,10 @@ const StudioPreview = {
         this.csrf = csrf || null;
 
         // Dev-mode chrome (Edit-code buttons) follows the editor's toggle —
-        // on by default, sticky once the user turns it off
+        // off until the user turns it on
         document.documentElement.classList.toggle(
             'studio-devmode',
-            localStorage.getItem('studio.devmode') !== '0'
+            localStorage.getItem('studio.devmode') === '1'
         );
 
         // Edit is the default, matching the editor window's own fallback.
@@ -1243,7 +1251,19 @@ const StudioPreview = {
             this.hoverAt(event);
         }, { passive: true });
 
-        document.addEventListener('mouseleave', () => this.clearHover());
+        document.addEventListener('mouseleave', () => {
+            this.clearHover();
+            this.pointerLeft(null);
+        });
+
+        // A selection lasts while the pointer is on its section: a click
+        // picks the section the shortcuts act on, and leaving it lets go.
+        // The state that stays is Edit (the inspector). A menu opened for
+        // the section holds it until the menu closes.
+        document.addEventListener('mouseover', (event) => {
+            if (event.target.closest?.('.studio-menu')) return;
+            this.pointerLeft(event.target.closest?.('[data-section]')?.dataset.section || null);
+        }, { passive: true });
 
         // A short section (a nav bar) hangs its chip and toolbar below its
         // own bottom edge rather than over its controls — measured on
@@ -2464,6 +2484,33 @@ const StudioPreview = {
         if (on) {
             document.querySelector(`[data-section="${sectionId}"]`)?.classList.add('is-hinted');
         }
+    },
+
+    // The section under the pointer, as the last mouseover reported it
+    pointerSection: null,
+
+    /** The pointer is now over `sectionId` (null: over none, or gone). */
+    pointerLeft(sectionId) {
+        const was = this.pointerSection;
+        this.pointerSection = sectionId;
+
+        if (was && was !== sectionId && was === this.selectedId) this.releaseSelection();
+    },
+
+    /**
+     * Let go of a selection the pointer has walked away from. Only the
+     * canvas and the editor's shortcuts forget it — Livewire is not told,
+     * so the Assistant's context chip stays. Never while the section is
+     * being edited, while its menu is open, or with inline editing on
+     * (a caret in a field must outlive the pointer).
+     */
+    releaseSelection() {
+        if (!this.selectedId || this.menu || this.inline) return;
+        if (this.pointerSection === this.selectedId) return;
+        if (document.documentElement.classList.contains('studio-focus')) return;
+
+        this.clearSelection();
+        this.post('studio:selection-released');
     },
 
     clearSelection() {
@@ -4019,6 +4066,9 @@ const StudioPreview = {
         this.menu = null;
         this.menuOwner?.classList.remove('is-open');
         this.menuOwner = null;
+
+        // The menu was holding its section's selection
+        this.releaseSelection();
 
         if (instant) {
             menu.remove();
