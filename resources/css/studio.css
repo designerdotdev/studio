@@ -438,7 +438,7 @@ html.studio-light,
     .s-app {
         --studio-topbar: 44px;
         --studio-gutter: 6px;
-        --studio-radius: 14px;
+        --studio-radius: 12px;
         padding: 0 var(--studio-gutter) var(--studio-gutter);
         background-color: var(--color-frame);
     }

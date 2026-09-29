@@ -13,7 +13,9 @@ Everything below ships in the first public release.
 - **A quieter top bar.** The sidebar, device and Code toggles fade in when the pointer reaches the bar; at rest it is the menu, the page, the open link and Publish. A toggle that is switched on stays in view.
 - While a section is being edited its name and toolbar sit in a bar across the top of the canvas, with the section as a card below it — the same margin on every side.
 - A short section (a nav bar) keeps its name chip and toolbar on itself instead of hanging them over the section below.
-- **Light is the default appearance**; dark is one click away in the menu.
+- **Dark is the default appearance**; light is one click away in the menu.
+- While a section is being edited, a header's dropdown or mega panel opens past the card instead of being cut off at its edge.
+- Section thumbnails in the Add Section picker show entrance animations finished — a logo mark that rises on load is there in the picture.
 - **The sidebar's tabs are one well of icons.** The panel that is showing wears its name on a lifted white segment; the others name themselves on hover.
 - **Code mode's files are a tab of the sidebar** (Code, after Media). Choosing the tab is Code mode, Code mode opens on the tab, and leaving it puts the sidebar back the way it was; the other tabs keep working beside the editor.
 - The inspector's header is the name of what is being edited — the "Editing" and "Page" eyebrows are gone.

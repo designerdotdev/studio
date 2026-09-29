@@ -167,6 +167,38 @@
                 overflow: clip;
             }
 
+            /* A section that opens something past its own edge — a header's
+               dropdown, a mega panel — is not cut off at the card: the menu
+               hangs over the canvas as it hangs over the page. The clip is
+               redrawn as the card's rounded rectangle plus everything below
+               its bottom edge, so the corners stay round and only the way
+               down is open. Asked of what the section holds (a header, a
+               nav, anything expanded), so a hero whose glow bleeds past its
+               bottom edge still stops at the card. Where shape() is not
+               understood the clip is simply lifted. Raised one step so the
+               menu covers the line written under the card. */
+            html.studio-focus .studio-section.is-editing [data-section-content]:has(header, nav, [aria-expanded="true"]) {
+                position: relative;
+                z-index: 1;
+                overflow: visible;
+                clip-path: shape(
+                    from 14px 0,
+                    hline to calc(100% - 14px),
+                    arc to 100% 14px of 14px cw,
+                    vline to calc(100% - 14px),
+                    arc to calc(100% - 14px) 100% of 14px cw,
+                    hline to calc(100% + 100vw),
+                    vline to calc(100% + 200vh),
+                    hline to -100vw,
+                    vline to 100%,
+                    hline to 14px,
+                    arc to 0 calc(100% - 14px) of 14px cw,
+                    vline to 14px,
+                    arc to 14px 0 of 14px cw,
+                    close
+                );
+            }
+
             /* The rail is the bar: the width of the canvas, fixed to its top
                edge, a frosted strip of the canvas's own grey so the card
                reads through it as it scrolls under. It takes the pointer —

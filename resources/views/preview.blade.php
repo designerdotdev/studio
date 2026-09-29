@@ -14,7 +14,16 @@
         [x-cloak] { display: none !important; }
         html, body { pointer-events: none; overflow: hidden; }
         ::-webkit-scrollbar { display: none; }
-        * { animation-play-state: paused !important; }
+
+        /* A thumbnail is a still of the finished section: every animation is
+           taken straight to its last frame. Pausing them instead froze an
+           entrance on its first one — a logo mark that rises on load stayed
+           below its edge, so the thumbnail showed no mark at all. */
+        *, *::before, *::after {
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            animation-iteration-count: 1 !important;
+        }
 
         /* A thumbnail never scrolls, so scroll-reveal content would stay hidden */
         [data-reveal] {

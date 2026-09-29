@@ -15,8 +15,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 
         <script>
-            // Apply the saved editor theme before first paint (light is the default)
-            if (localStorage.getItem('studio.theme') !== 'dark') document.documentElement.classList.add('studio-light');
+            // Apply the saved editor theme before first paint (dark is the default)
+            if (localStorage.getItem('studio.theme') === 'light') document.documentElement.classList.add('studio-light');
         </script>
         @isset($sidebar)
             {{-- The editor boots hidden: the columns are laid out at once
