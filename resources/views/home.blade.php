@@ -47,9 +47,11 @@
                 const toIframe = (type, payload = {}) => window.dispatchEvent(new CustomEvent('studio:to-iframe', { detail: { type, ...payload } }));
 
                 /* The editor's chrome state. One arrangement: a top bar, a
-                   sidebar on the left (the Assistant, Pages, Content, Media),
-                   the site, and — while something is being edited — the
-                   inspector sliding in on the right. What is remembered is
+                   sidebar on the left (the Assistant, Pages, Media, Content,
+                   Code), the stage, and — while something is being edited —
+                   the inspector sliding in on the right. The stage shows
+                   what the sidebar's tab is about: the page, a collection's
+                   entries (Content) or the code editor (Code). What is remembered is
                    which panel, the widths, the theme and the developer
                    switch — never where the chrome sits. There is one mode:
                    the page is always editable. */
@@ -78,7 +80,7 @@
                     // Which panel the sidebar shows. The Assistant is the
                     // first tab and the default wherever the server allows it;
                     // Code is the last, and holds Code mode's files.
-                    rails: ['assistant', 'pages', 'content', 'media', 'code'],
+                    rails: ['assistant', 'pages', 'media', 'content', 'code'],
                     rail: (() => {
                         const saved = localStorage.getItem('studio.rail');
                         const developer = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
@@ -98,8 +100,15 @@
                             this.setMode('code');
                             return;
                         }
+                        // Content's entries take the stage, so nothing can
+                        // still be editing the page they replace
+                        if (name === 'content' && this.inspector) this.closeInspector();
                         this.rail = name;
                         localStorage.setItem('studio.rail', name);
+                        // The editor belongs to the Code tab: any other tab
+                        // puts it away (the tab just chosen stays — see
+                        // putFilesAway)
+                        if (name !== 'code' && this.mode === 'code') this.setMode('edit');
                         if (!this.sidebar) {
                             this.sidebar = true;
                             this.sidebarBefore = null;
@@ -107,10 +116,10 @@
                         }
                         window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name } }));
                     },
-                    // Pages and Code's files are lists; Content and Media are
-                    // grids and start wider; the chat has its own width.
-                    // Each group remembers its width.
-                    get wide() { return this.rail === 'content' || this.rail === 'media' },
+                    // Pages, Content's collections and Code's files are lists;
+                    // Media is a grid and starts wider; the chat has its own
+                    // width. Each group remembers its width.
+                    get wide() { return this.rail === 'media' },
                     widths_: {
                         narrow: clamp(parseInt(localStorage.getItem('studio.panel-width'), 10), 240, 520, 320),
                         wide: clamp(parseInt(localStorage.getItem('studio.panel-width-wide'), 10), 240, 640, 420),
@@ -158,6 +167,7 @@
                     // The toolbar's Edit, the context menu, E
                     openInspector(sectionId = null) {
                         if (this.mode === 'code') this.setMode('edit');
+                        this.leaveContent();
                         this.takeRoom();
                         this.inspector = 'section';
                         if (sectionId) toIframe('studio:focus', { sectionId, on: true });
@@ -165,6 +175,7 @@
                     // Page settings are the same column, without the scrim (⌘,)
                     openPageSettings() {
                         if (this.mode === 'code') this.setMode('edit');
+                        this.leaveContent();
                         if (this.inspector === 'section') toIframe('studio:focus', { on: false });
                         this.takeRoom();
                         this.inspector = 'page';
@@ -268,13 +279,18 @@
                        in the sidebar's Code tab, and only exists when the
                        server gate AND the switch are on. Entering Code mode
                        opens the sidebar on the files; leaving it puts the
-                       sidebar back the way it was. In between the other
-                       tabs still work — the Assistant beside the code. */
+                       sidebar back the way it was. The tab and the mode are
+                       one thing: choosing any other tab leaves Code mode
+                       (setRail), so the editor never sits over a panel that
+                       is not about it. */
                     get codeAvailable() { return this.developer },
                     mode: (() => {
                         const saved = localStorage.getItem('studio.mode');
                         const codeOk = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
-                        return saved === 'code' && codeOk ? 'code' : 'edit';
+                        // Code mode only ever comes back with its own tab
+                        if (saved === 'code' && codeOk && localStorage.getItem('studio.rail') === 'code') return 'code';
+                        if (saved === 'code') localStorage.setItem('studio.mode', 'edit');
+                        return 'edit';
                     })(),
                     setMode(name) {
                         if (name === 'code' && !this.codeAvailable) return;
@@ -312,9 +328,31 @@
                         window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name: this.rail } }));
                     },
                     toggleCode() { this.setMode(this.mode === 'code' ? 'edit' : 'code') },
+
+                    /* --- the stage --------------------------------------- */
+                    /* What fills the middle: 'code' in Code mode, 'content'
+                       (a collection's entries — partials/content-stage) while
+                       the Content tab is the sidebar's, the page otherwise.
+                       Derived, never set: change the tab or the mode. */
+                    get stage() {
+                        if (this.mode === 'code') return 'code';
+                        return this.rail === 'content' ? 'content' : 'page';
+                    },
+                    // Something needs the page on the stage: Content gives
+                    // way to the sidebar's default tab
+                    leaveContent() {
+                        if (this.rail !== 'content') return;
+                        this.rail = this.chatAvailable ? 'assistant' : 'pages';
+                        localStorage.setItem('studio.rail', this.rail);
+                        window.dispatchEvent(new CustomEvent('studio:rail', { detail: { name: this.rail } }));
+                    },
+                    // The collection the stage is showing; the Content
+                    // table owns it (livewire/content-table) and the
+                    // sidebar's list reads it for its highlight
+                    collection: null,
                     // Whether the canvas is on screen at all: Code mode hides
-                    // it unless the split is open.
-                    get canvasVisible() { return this.mode !== 'code' || this.codeSplit },
+                    // it unless the split is open, Content takes its place.
+                    get canvasVisible() { return this.stage === 'page' || (this.mode === 'code' && this.codeSplit) },
 
                     // Code mode is full-width by default; the split brings the
                     // live preview back beside the editor.
@@ -705,8 +743,8 @@
         @php
             $tabs = [
                 ['pages', 'Pages', '<path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>'],
-                ['content', 'Content', '<path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 3.75v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75"/>'],
                 ['media', 'Media', '<path d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/>'],
+                ['content', 'Content', '<path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 3.75v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75"/>'],
             ];
         @endphp
         {{-- One well of icons: the panel that is showing wears its name,
@@ -777,11 +815,12 @@
         <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'pages'" x-cloak>
             <livewire:studio::pages-panel :page-slug="$page->slug" />
         </div>
-        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'content'" x-cloak>
-            <livewire:studio::content-panel />
-        </div>
         <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'media'" x-cloak>
             <livewire:studio::media-panel />
+        </div>
+        {{-- Content: the collections. Their entries are on the stage. --}}
+        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.rail === 'content'" x-cloak>
+            <livewire:studio::content-panel />
         </div>
     </x-slot:sidebar>
 
@@ -814,7 +853,7 @@
                     // One per page, minus the open one
                     ...(window.__studioPageList || []).filter((p) => !p.current).map((p) => ({
                         label: 'Go to ' + p.title, hint: p.path,
-                        run: () => { window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(p.slug) },
+                        run: () => { studio.leaveContent(); window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(p.slug) },
                     })),
                     { label: 'Page settings', hint: 'Page', run: () => studio.openPageSettings() },
                     { label: 'Code mode', hint: 'Developer', when: studio.codeAvailable && studio.mode !== 'code', run: () => studio.setMode('code') },
@@ -825,8 +864,8 @@
                     @endif
                     { label: 'Assistant', hint: 'Sidebar  ⌘J', when: studio.chatAvailable, run: () => studio.focusChat() },
                     { label: 'Pages', hint: 'Sidebar', run: () => studio.setRail('pages', true) },
-                    { label: 'Content', hint: 'Sidebar', run: () => studio.setRail('content', true) },
                     { label: 'Media', hint: 'Sidebar', run: () => studio.setRail('media', true) },
+                    { label: 'Content', hint: 'Sidebar', run: () => studio.setRail('content', true) },
                     { label: 'Files', hint: 'Sidebar', when: studio.mode === 'code', run: () => studio.setRail('code', true) },
                     { label: studio.sidebar ? 'Hide the sidebar' : 'Show the sidebar', hint: '⌘B', run: () => studio.toggleSidebar() },
                     { label: 'Refresh the preview', hint: 'Canvas', run: () => window.dispatchEvent(new CustomEvent('studio:refresh-preview')) },
@@ -1075,8 +1114,11 @@
     </div>
 
     {{-- Code mode takes the canvas's slot; the split gives half of it back.
-         Both fill the canvas edge to edge as square frames. --}}
+         Both fill the canvas edge to edge as square frames. The Content tab
+         puts a collection's entries there instead. --}}
     <div class="s-canvas flex h-full w-full min-w-0" x-data>
+        @include('studio::partials.content-stage')
+
         @if($devModeAvailable)
             @include('studio::partials.code-pane')
 

@@ -40,7 +40,8 @@
                 open: false,
                 pages: window.__studioPageList || [],
                 get current() { return this.pages.find((p) => p.current) || { title: 'Page', path: '/' } },
-                go(slug) { window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(slug) },
+                // Choosing a page asks for the page: Content gives the stage back
+                go(slug) { $store.studio.leaveContent(); window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(slug) },
             }"
             @click.outside="open = false"
             @keydown.escape.window="open = false"

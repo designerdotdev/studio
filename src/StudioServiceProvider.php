@@ -95,6 +95,7 @@ class StudioServiceProvider extends ServiceProvider
         Livewire::component('studio::pages-panel', \Designer\Studio\Livewire\PagesPanel::class);
         Livewire::component('studio::media-panel', \Designer\Studio\Livewire\MediaPanel::class);
         Livewire::component('studio::content-panel', \Designer\Studio\Livewire\ContentPanel::class);
+        Livewire::component('studio::content-table', \Designer\Studio\Livewire\ContentTable::class);
         Livewire::component('studio::assistant-panel', \Designer\Studio\Livewire\AssistantPanel::class);
 
         // Register Blade directives for self-contained assets

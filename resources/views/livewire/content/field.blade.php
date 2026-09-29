@@ -97,8 +97,10 @@
     @elseif($type === 'select')
         <select class="s-input" wire:model="{{ $model }}">
             <option value="">—</option>
-            @foreach($config['options'] ?? [] as $option)
-                <option value="{{ $option }}">{{ $option }}</option>
+            {{-- A plain list stores what it shows; `yes: "Yes"` stores the key --}}
+            @php $options = $config['options'] ?? []; $keyed = !array_is_list($options); @endphp
+            @foreach($options as $value => $option)
+                <option value="{{ $keyed ? $value : $option }}">{{ $option }}</option>
             @endforeach
         </select>
 

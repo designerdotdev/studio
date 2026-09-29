@@ -17,7 +17,9 @@ Everything below ships in the first public release.
 - While a section is being edited, a header's dropdown or mega panel opens past the card instead of being cut off at its edge.
 - Section thumbnails in the Add Section picker show entrance animations finished — a logo mark that rises on load is there in the picture.
 - **The sidebar's tabs are one well of icons.** The panel that is showing wears its name on a lifted white segment; the others name themselves on hover.
-- **Code mode's files are a tab of the sidebar** (Code, after Media). Choosing the tab is Code mode, Code mode opens on the tab, and leaving it puts the sidebar back the way it was; the other tabs keep working beside the editor.
+- **Code mode's files are a tab of the sidebar** (Code, the last tab). Choosing the tab is Code mode, Code mode opens on the tab, and leaving it puts the sidebar back the way it was. Choosing any other tab leaves Code mode — the editor is only ever on screen beside its files.
+- **Content is a table.** The Content tab (now after Media) lists the collections and shows the chosen one — the first, to begin with — on the stage: every field a column, search, sort by a column, drag a row by its number to reorder. A click on an entry opens it in a drawer that slides over the editor, with Save changes, Cancel and Delete entry; Add entry opens the same drawer empty. In developer mode a Data / Structure switch shows the collection's fields, and the drawer edits them. Choosing another tab gives the stage back to the page.
+- A select field whose options are written `value: Label` stores the value, not the label, when it is changed in Content.
 - The inspector's header is the name of what is being edited — the "Editing" and "Page" eyebrows are gone.
 - **A new install opens on the site.** The sidebar starts shut and the **Developer mode** switch starts off, so the first thing `/studio` shows is the page, edge to edge, in the editor a marketing team uses. Both are remembered once changed.
 - **Dark changes the frame, not the panels.** The sidebar and the inspector are white in both appearances; dark turns the frame and the top bar near-black.
