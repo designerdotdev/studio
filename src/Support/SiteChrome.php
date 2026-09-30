@@ -16,7 +16,7 @@ use Illuminate\Support\HtmlString;
  * mode and the canvas follows. The stylesheets are handed to Tailwind's
  * browser build as `<style type="text/tailwindcss">`, exactly as the
  * runtime's `@vite` does, which is what turns the site's `@theme` tokens
- * into real utilities (`bg-canvas`, `text-ink`).
+ * into real utilities (`bg-background`, `text-foreground`).
  */
 class SiteChrome
 {
