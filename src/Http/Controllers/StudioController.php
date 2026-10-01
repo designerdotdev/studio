@@ -104,9 +104,10 @@ class StudioController extends Controller
     }
 
     /**
-     * Operational warnings surfaced inside the editor: an unprotected
-     * Studio in production, storage that can't be written to, or an app
-     * '/' route that keeps the homepage off the root URL.
+     * Operational warnings surfaced inside the editor, as toasts that stay
+     * until they are closed: an unprotected Studio in production, storage
+     * that can't be written to, or an app '/' route that keeps the
+     * homepage off the root URL.
      */
     protected function editorNotices(bool $homeClaimed = false): array
     {
@@ -119,7 +120,8 @@ class StudioController extends Controller
                 'id' => 'storage-unwritable',
                 'tone' => 'danger',
                 'dismissible' => false,
-                'text' => 'Studio can\'t write to ' . basename($storagePath) . ' — check directory permissions. Changes will not save.',
+                'title' => 'Changes can\'t be saved',
+                'text' => 'Studio can\'t write to ' . basename($storagePath) . '. Check the directory\'s permissions.',
             ];
         }
 
@@ -132,7 +134,8 @@ class StudioController extends Controller
                 'id' => 'unprotected',
                 'tone' => 'warn',
                 'dismissible' => true,
-                'text' => 'The Studio is open to anyone who can reach this URL. Add auth middleware or a gate in config/studio.php before sharing this site.',
+                'title' => 'Studio is open to anyone',
+                'text' => 'Anyone who can reach this URL can edit the site. Add auth middleware or a gate in config/studio.php before sharing it.',
             ];
         }
 
@@ -153,7 +156,8 @@ class StudioController extends Controller
                 'id' => 'app-owns-root',
                 'tone' => 'warn',
                 'dismissible' => true,
-                'text' => "Your app defines its own / route, so your homepage is served at /{$homeSlug} instead. Remove that route from routes/web.php to serve it at /.",
+                'title' => "Homepage is served at /{$homeSlug}",
+                'text' => 'Your app has its own / route. Remove it from routes/web.php to serve the homepage at /.',
             ];
         }
 
@@ -166,7 +170,8 @@ class StudioController extends Controller
                 'id' => 'template-link-blocked',
                 'tone' => 'warn',
                 'dismissible' => false,
-                'text' => 'Template link: ' . $blocked,
+                'title' => 'Template link is blocked',
+                'text' => $blocked,
             ];
         }
 

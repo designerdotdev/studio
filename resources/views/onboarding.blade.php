@@ -2,15 +2,91 @@
     <x-slot:title>Welcome — Designer Studio</x-slot:title>
 
     <style>
-        @keyframes onboard-up {
-            from { opacity: 0; transform: translateY(14px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* The welcome screen opens on the mark alone: guides draw around
+           it, a compass arm sweeps the circle, the square closes, then the
+           fill wipes up as the mark scales into its place and the text
+           follows. Everything is drawn in the ink colour, so it holds in
+           either theme. */
+        .intro {
+            --e: cubic-bezier(.25, 1, .5, 1);
+            --io: cubic-bezier(.65, 0, .35, 1);
+            --mv: cubic-bezier(.7, 0, .2, 1);   /* the wipe and the move into place share this curve */
+            --mark-n: 56;                        /* the mark's resting height, in px */
+            --big: 1.5;                          /* its size while it is drawn, as a multiple of that */
+            --ts: 2.15s;                         /* when the wipe and the move start */
+            --sd: .95s;                          /* how long they take */
+            --t0: 2.95s;                         /* when the text starts */
+            --dur: 3.9s;
+            --guide: .45;                        /* the guides and the compass arm: ink at this opacity */
+            --rule: color-mix(in srgb, var(--color-ink) 16%, transparent);
         }
 
-        .onboard-up {
-            opacity: 0;
-            animation: onboard-up 600ms cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+        .intro-dots {
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(circle, var(--rule) 1px, transparent 1.5px) center / 22px 22px;
+            -webkit-mask-image: radial-gradient(ellipse 62% 72% at 50% 42%, #000 15%, transparent 78%);
+            mask-image: radial-gradient(ellipse 62% 72% at 50% 42%, #000 15%, transparent 78%);
         }
+
+        .intro-progress { position: absolute; inset: auto 0 0 0; height: 2px; pointer-events: none; }
+        .intro-progress i { display: block; height: 100%; background: var(--rule); transform-origin: left; opacity: 0; }
+
+        .intro-mark {
+            /* Line widths in viewBox units: about 1.2px on screen while the mark is at its opening size. */
+            --sw: calc(94px / var(--mark-n) / var(--big));
+            position: relative;
+            isolation: isolate;
+            height: calc(var(--mark-n) * 1px);
+            aspect-ratio: 72 / 75;
+        }
+        .intro-plan, .intro-art { position: absolute; inset: 0; }
+        .intro-mark svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+        /* The drawing sheet: the guides stay where the mark was drawn (the
+           middle of the screen, --lift below its resting place) and fade
+           as it lifts away. */
+        .intro-plan { transform: translateY(var(--lift, 150px)) scale(var(--big)); }
+        .intro-plan .intro-guides-svg { inset: -32% auto auto -36.11%; width: 172.22%; height: 164%; }   /* viewBox -26 -24 124 123 over the mark's 72 x 75 */
+        .intro-guides { opacity: 0; }
+        .intro-g { fill: none; stroke: currentColor; stroke-opacity: var(--guide); stroke-width: calc(var(--sw) * .7); stroke-dasharray: 1 2; }
+
+        .intro-o, .intro-radius { fill: none; stroke: currentColor; stroke-width: var(--sw); }
+        .intro-o { stroke-dasharray: 1 2; opacity: 0; }   /* the long gap keeps a closed shape from leaving a speck at its start point */
+        .intro-radius { stroke-opacity: var(--guide); opacity: 0; transform-origin: 47px 25px; }
+
+        .intro-headline { overflow: hidden; padding-bottom: .12em; margin-bottom: -.12em; }
+        .intro-w { display: block; }
+
+        @keyframes intro-draw { from { stroke-dashoffset: 1; } }
+        @keyframes intro-fade-in { from { opacity: 0; } }
+        @keyframes intro-rise { from { opacity: 0; translate: 0 14px; } }
+        @keyframes intro-slide { from { translate: 0 118%; } }
+        @keyframes intro-blip { 0% { opacity: 0; } 8%, 88% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes intro-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes intro-o-life { 0%, 85% { opacity: .85; } 100% { opacity: 0; } }
+        @keyframes intro-prog { 0% { opacity: 1; transform: scaleX(0); } 97% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+        @keyframes intro-settle { from { transform: translateY(var(--lift, 150px)) scale(var(--big)); } }
+        @keyframes intro-wipe { from { clip-path: inset(102% -2% -2% -2%); } to { clip-path: inset(-2% -2% -2% -2%); } }
+        @keyframes intro-guides { 0%, 83% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* Guides, compass, square, then the wipe and the move together, then the text */
+        .intro.is-playing .intro-progress i { animation: intro-prog var(--dur) linear both; }
+        .intro.is-playing .intro-guides { animation: intro-guides 2.6s linear both; }
+        .intro.is-playing .intro-g { animation: intro-draw .7s calc(var(--i) * 45ms) var(--io) backwards; }
+        .intro.is-playing .intro-radius { animation: intro-spin .95s .55s var(--io) backwards, intro-blip .95s .55s linear both; }
+        .intro.is-playing .intro-o-circle { animation: intro-draw .95s .55s var(--io) backwards, intro-o-life calc(var(--ts) + var(--sd)) linear both; }
+        .intro.is-playing .intro-o-square { animation: intro-draw .75s 1.35s var(--io) backwards, intro-o-life calc(var(--ts) + var(--sd)) linear both; }
+        .intro.is-playing .intro-art { animation: intro-settle var(--sd) var(--ts) var(--mv) backwards; }
+        .intro.is-playing .intro-fill { animation: intro-wipe var(--sd) var(--ts) var(--mv) backwards; }
+        .intro.is-playing .intro-dots { animation: intro-fade-in 1.4s calc(var(--ts) + .3s) var(--e) backwards; }
+        .intro.is-playing .intro-w { animation: intro-slide .8s var(--t0) var(--e) backwards; }
+        .intro.is-playing .intro-t { animation: intro-rise .7s calc(var(--t0) + var(--i) * 90ms) var(--e) backwards; }
+
+        /* The pinned action bar owns the bottom edge of step 2 */
+        #studio-toasts { --studio-toast-bottom: 84px; }
     </style>
 
     <div
@@ -90,32 +166,105 @@
             }
         }"
     >
-        {{-- Step 1 — Welcome --}}
-        <div x-show="step === 1" class="flex min-h-full flex-col items-center justify-center px-6 py-16 text-center">
-            <div class="onboard-up flex h-16 w-16 items-center  text-ink justify-center rounded-2xl" style="animation-delay: 60ms">
-                <svg class="h-8 w-auto text-ink" viewBox="0 0 72 75" fill="none">
-                    <path fill="currentColor" fill-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z" clip-rule="evenodd"/>
-                </svg>
+        {{-- Step 1 — Welcome. It plays the intro once; a click or a key
+             skips to the end of it. --}}
+        <div x-show="step === 1" data-intro class="intro relative isolate flex min-h-full flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
+            <div class="intro-dots" aria-hidden="true"></div>
+
+            <div class="intro-mark text-ink" aria-hidden="true">
+                <div class="intro-plan">
+                    <svg class="intro-guides-svg" viewBox="-26 -24 124 123">
+                        <g class="intro-guides">
+                            <path class="intro-g" style="--i:0" pathLength="1" d="M-26 0H98"/>
+                            <path class="intro-g" style="--i:1" pathLength="1" d="M-26 25H98"/>
+                            <path class="intro-g" style="--i:2" pathLength="1" d="M-26 50H98"/>
+                            <path class="intro-g" style="--i:3" pathLength="1" d="M-26 75H98"/>
+                            <path class="intro-g" style="--i:4" pathLength="1" d="M0-24V99"/>
+                            <path class="intro-g" style="--i:5" pathLength="1" d="M22-24V99"/>
+                            <path class="intro-g" style="--i:6" pathLength="1" d="M50-24V99"/>
+                            <path class="intro-g" style="--i:7" pathLength="1" d="M72-24V99"/>
+                        </g>
+                    </svg>
+                </div>
+
+                <div class="intro-art">
+                    <svg viewBox="0 0 72 75">
+                        <path class="intro-radius" d="M47 25H72"/>
+                        <circle class="intro-o intro-o-circle" cx="47" cy="25" r="25" pathLength="1"/>
+                        <rect class="intro-o intro-o-square" x="0" y="25" width="50" height="50" rx="5" pathLength="1"/>
+                    </svg>
+                    <svg class="intro-fill" viewBox="0 0 72 75">
+                        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M50 49.822C62.393 48.34 72 37.792 72 25 72 11.193 60.807 0 47 0S22 11.193 22 25H5a5 5 0 0 0-5 5v40a5 5 0 0 0 5 5h40a5 5 0 0 0 5-5V49.822ZM47 50c1.015 0 2.016-.06 3-.178V30a5 5 0 0 0-5-5H22c0 13.807 11.193 25 25 25Z"/>
+                    </svg>
+                </div>
             </div>
 
-            <h1 class="onboard-up mt-8 text-4xl font-semibold tracking-tight text-ink" style="animation-delay: 140ms">
-                Welcome to Designer Studio
+            <h1 class="intro-headline mt-8 text-4xl font-semibold tracking-tight text-ink">
+                <span class="intro-w">Welcome to Designer Studio</span>
             </h1>
-            <p class="onboard-up mt-4 max-w-md text-[15px] leading-relaxed text-soft" style="animation-delay: 220ms">
+            <p class="intro-t mt-4 max-w-md text-[15px] leading-relaxed text-soft" style="--i:2">
                 The visual designer for your Laravel site. Developers define the sections — anyone on the team edits the pages.
             </p>
 
-            <div class="onboard-up mt-10" style="animation-delay: 300ms">
+            <div class="intro-t mt-10" style="--i:3">
                 <button @click="showTemplates()" class="s-btn-primary !h-11 !px-7 !text-sm">
                     Choose a template
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
                 </button>
             </div>
 
-            <p class="onboard-up mt-16 text-xs text-faint" style="animation-delay: 380ms">
+            <p class="intro-t mt-16 text-xs text-faint" style="--i:4">
                 Everything can be changed later — templates are just a starting point.
             </p>
+
+            <div class="intro-progress" aria-hidden="true"><i></i></div>
         </div>
+
+        {{-- Started here, before the first paint, so the mark is never seen
+             at rest first. The guides are drawn in the middle of the screen:
+             --lift is how far that is below where the mark comes to rest. --}}
+        <script>
+            (() => {
+                const stage = document.querySelector('[data-intro]');
+                const mark = stage.querySelector('.intro-mark');
+
+                if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+                // The transforms sit on layers inside the mark, so the mark itself can be measured at any time
+                const measure = () => {
+                    const s = stage.getBoundingClientRect();
+                    const m = mark.getBoundingClientRect();
+                    if (!s.height) return;
+                    stage.style.setProperty('--lift', (s.top + s.height / 2 - (m.top + m.height / 2)).toFixed(1) + 'px');
+                };
+
+                const animations = () => {
+                    try { return stage.getAnimations({ subtree: true }); } catch (e) { return []; }
+                };
+
+                const skip = (event) => {
+                    if (event.metaKey || event.ctrlKey || event.altKey) return;
+                    animations().forEach((a) => { try { a.finish(); } catch (e) { /* already done */ } });
+                };
+
+                measure();
+                stage.classList.add('is-playing');
+
+                addEventListener('resize', measure);
+                addEventListener('keydown', skip);
+                stage.addEventListener('click', skip);
+                document.fonts?.ready.then(measure);
+
+                // Played once: at rest the page is plain markup again, so coming
+                // back from the picker shows it as it is rather than replaying
+                Promise.allSettled(animations().map((a) => a.finished)).then(() => {
+                    stage.classList.remove('is-playing');
+                    removeEventListener('resize', measure);
+                    removeEventListener('keydown', skip);
+                    stage.removeEventListener('click', skip);
+                });
+            })();
+        </script>
 
         {{-- Step 2 — Template picker --}}
         <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">

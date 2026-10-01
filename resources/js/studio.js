@@ -12,53 +12,191 @@ document.addEventListener('alpine:init', () => {
 /*  Toasts                                                             */
 /* ------------------------------------------------------------------ */
 
+// One card for every kind: the icon is the only thing that changes
 const TOAST_ICONS = {
-    success: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>',
-    error: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>',
-    info: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>',
+    success: '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>',
+    error: '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>',
+    warning: '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>',
+    info: '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>',
 };
 
+const TOAST_CLOSE = '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>';
+
+// The names the server and the notices use for the same four kinds
+const TOAST_TYPES = { danger: 'error', warn: 'warning' };
+
+// More than this and the oldest one that would leave anyway leaves now
+const TOAST_LIMIT = 5;
+
+// The stack in this document, oldest first
+const toasts = [];
+
+// The canvas document's editor window, when it has one to hand its toasts to
+function toastHost() {
+    if (window.parent === window) return null;
+
+    try {
+        return window.parent.Studio?.toast || null;
+    } catch (e) {
+        return null; // framed by another origin
+    }
+}
+
+/**
+ * A toast, bottom right. `message` is the title, or `{ title, description }`
+ * — or the whole thing as one object: `{ title, description, type,
+ * duration, action, id, onDismiss }`. `type` is success | error | warning |
+ * info; a `duration` of 0 stays until it is closed; `id` keeps a second
+ * copy of the same toast from stacking; `onDismiss(byUser)` runs when it
+ * leaves. Returns `{ dismiss }`.
+ */
 function toast(message, type = 'success', duration = 3200, action = null) {
+    const options = message && typeof message === 'object'
+        ? { type, duration, action, ...message }
+        : { title: message, type, duration, action };
+
+    // The canvas has no stack of its own: its toasts join the editor's, so
+    // there is one place to look. An action's callback lives in the canvas
+    // document, so its toast leaves with that document
+    const host = toastHost();
+
+    if (host) {
+        const handle = host(options);
+
+        if (options.action?.label) window.addEventListener('pagehide', () => handle?.dismiss(), { once: true });
+
+        return handle;
+    }
+
+    const existing = options.id ? toasts.find((t) => t.id === options.id) : null;
+
+    if (existing) return existing.handle;
+
+    const kind = TOAST_TYPES[options.type] || (TOAST_ICONS[options.type] ? options.type : 'info');
+
     let container = document.getElementById('studio-toasts');
 
     if (!container) {
         container = document.createElement('div');
         container.id = 'studio-toasts';
+        container.setAttribute('role', 'region');
+        container.setAttribute('aria-label', 'Notifications');
         document.body.appendChild(container);
     }
 
-    const el = document.createElement('div');
-    el.className = `studio-toast studio-toast--${type}`;
-    el.innerHTML = `<span class="studio-toast__icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</span><span>${message}</span>`;
-    el.addEventListener('click', () => dismiss());
-    container.appendChild(el);
+    // The slot is what the stack lays out: its height opens and closes,
+    // so the toasts around it glide instead of jumping
+    const slot = document.createElement('div');
+    slot.className = 'studio-toast-slot';
 
-    let dismissed = false;
-    const dismiss = () => {
-        if (dismissed) return;
-        dismissed = true;
-        el.classList.remove('is-visible');
-        setTimeout(() => el.remove(), 220);
+    const el = document.createElement('div');
+    el.className = `studio-toast studio-toast--${kind}`;
+    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    el.innerHTML = `<span class="studio-toast__icon">${TOAST_ICONS[kind]}</span><div class="studio-toast__body"><p class="studio-toast__title"></p></div><button type="button" class="studio-toast__close" aria-label="Dismiss">${TOAST_CLOSE}</button>`;
+
+    const body = el.querySelector('.studio-toast__body');
+    body.firstChild.textContent = options.title ?? '';
+
+    if (options.description) {
+        const text = document.createElement('p');
+        text.className = 'studio-toast__text';
+        text.textContent = options.description;
+        body.appendChild(text);
+    }
+
+    let stay = Number(options.duration);
+    if (!Number.isFinite(stay)) stay = 0;
+
+    const item = {
+        id: options.id || null,
+        timer: null,
+        remaining: stay,
+        since: 0,
+        leaving: false,
+
+        // The clock stops while the pointer is on the stack
+        hold() {
+            if (!this.timer) return;
+            clearTimeout(this.timer);
+            this.timer = null;
+            this.remaining = Math.max(this.remaining - (Date.now() - this.since), 600);
+        },
+
+        run() {
+            if (this.leaving || this.timer || this.remaining <= 0) return;
+            this.since = Date.now();
+            this.timer = setTimeout(() => this.dismiss(false), this.remaining);
+        },
+
+        dismiss(byUser = false) {
+            if (this.leaving) return;
+            this.leaving = true;
+            clearTimeout(this.timer);
+            toasts.splice(toasts.indexOf(this), 1);
+
+            // Held where it is while it fades; the slot closes under it
+            slot.style.height = slot.offsetHeight + 'px';
+            slot.classList.add('is-leaving');
+            void slot.offsetHeight;
+            slot.style.height = '0px';
+            el.classList.remove('is-visible');
+            setTimeout(() => {
+                slot.remove();
+                // A toast closed under the pointer never says the pointer left
+                if (!container.matches(':hover')) toasts.forEach((t) => t.run());
+            }, 400);
+
+            options.onDismiss?.(byUser);
+        },
     };
 
+    item.handle = { dismiss: () => item.dismiss(false) };
+
     // Optional action button (e.g. Undo) — actionable toasts linger longer
-    if (action?.label) {
+    if (options.action?.label) {
+        const actions = document.createElement('div');
+        actions.className = 'studio-toast__actions';
+
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'studio-toast__action';
-        button.textContent = action.label;
-        button.addEventListener('click', (event) => {
-            event.stopPropagation();
-            action.onClick?.();
-            dismiss();
+        button.textContent = options.action.label;
+        button.addEventListener('click', () => {
+            options.action.onClick?.();
+            item.dismiss(true);
         });
-        el.appendChild(button);
-        duration = Math.max(duration, 6000);
+
+        actions.appendChild(button);
+        body.appendChild(actions);
+
+        if (item.remaining > 0) item.remaining = Math.max(item.remaining, 6000);
     }
 
-    requestAnimationFrame(() => el.classList.add('is-visible'));
+    el.querySelector('.studio-toast__close').addEventListener('click', () => item.dismiss(true));
+    el.addEventListener('mouseenter', () => toasts.forEach((t) => t.hold()));
+    el.addEventListener('mouseleave', () => toasts.forEach((t) => t.run()));
 
-    setTimeout(dismiss, duration);
+    slot.appendChild(el);
+    container.appendChild(slot);
+    toasts.push(item);
+
+    if (toasts.length > TOAST_LIMIT) toasts.find((t) => t !== item && t.remaining > 0)?.dismiss(false);
+
+    // In from below the stack: the slot opens to the toast's height (which
+    // lifts the ones above it) and the toast rides up on it
+    requestAnimationFrame(() => {
+        if (item.leaving) return;
+
+        slot.style.height = slot.scrollHeight + 'px';
+        el.classList.add('is-visible');
+
+        // Then let go of the height, so the slot follows its content
+        setTimeout(() => { if (!item.leaving) slot.style.height = 'auto'; }, 520);
+    });
+
+    item.run();
+
+    return item.handle;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2141,9 +2279,7 @@ const StudioPreview = {
 
             if (!await this.structural(() => this.request('DELETE', '/rows/' + encodeURIComponent(id)), null)) return;
 
-            const name = this.summary(removed).title.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-            toast(`“${name}” deleted`, 'success', 5000, {
+            toast(`“${this.summary(removed).title}” deleted`, 'success', 5000, {
                 label: 'Undo',
                 // Back where it was: the row is re-created (a new id), then
                 // the old order is restored around it

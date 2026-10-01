@@ -39,7 +39,7 @@
     --color-danger: #ff6b5b;
 
     /* Canvas — the surface behind a narrow preview */
-    --color-canvas: #171717;
+    --color-canvas: #090909;
 
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
@@ -1455,70 +1455,86 @@ html.studio-light,
 
     /* --- toasts ------------------------------------------------------ */
 
+    /* One stack, bottom right, newest at the bottom. Every toast is the
+       same card — icon, title, an optional line under it, a close — and
+       only the icon says which kind it is. The canvas hands its toasts to
+       this window (studio.js), so nothing here is repeated in the iframe. */
     #studio-toasts {
+        --toast-ease: cubic-bezier(0.22, 1, 0.36, 1);
         position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
+        right: 16px;
+        bottom: var(--studio-toast-bottom, 16px);
         z-index: 2147483000;
         display: flex;
-        flex-direction: column-reverse;
-        align-items: center;
-        gap: 8px;
+        flex-direction: column;
+        width: 356px;
+        max-width: calc(100vw - 32px);
+        pointer-events: none;
+    }
+
+    /* What the stack lays out. Its height opens from 0 and closes back to
+       it, so the toasts above glide; it never clips, or the shadow would go.
+       A toast coming in hangs from the slot's top edge and rides up with
+       it; one leaving is held at the bottom edge, so it fades where it is. */
+    .studio-toast-slot {
+        display: flex;
+        flex: none;
+        flex-direction: column;
+        justify-content: flex-start;
+        height: 0;
+        transition: height 480ms var(--toast-ease);
+    }
+
+    .studio-toast-slot.is-leaving {
+        justify-content: flex-end;
+        transition-duration: 340ms;
         pointer-events: none;
     }
 
     .studio-toast {
         pointer-events: auto;
         display: flex;
-        align-items: center;
-        gap: 9px;
-        max-width: 420px;
-        padding: 8px 12px 8px 10px;
-        border-radius: 8px;
+        flex: none;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 8px;
+        padding: 11px 10px 11px 13px;
+        border-radius: 10px;
         background: var(--color-overlay);
         border: 1px solid var(--color-line-strong);
         color: var(--color-ink);
         font-family: var(--font-sans);
         font-size: 13px;
-        font-weight: 500;
+        line-height: 20px;
         letter-spacing: -0.006em;
-        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 32px -8px rgba(0, 0, 0, 0.65);
-        cursor: pointer;
+        text-align: left;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 4px 10px -4px rgba(0, 0, 0, 0.35), 0 16px 36px -10px rgba(0, 0, 0, 0.5);
         opacity: 0;
-        transform: translateY(8px) scale(0.97);
-        transition: opacity 200ms ease, transform 200ms cubic-bezier(0.21, 1.02, 0.73, 1);
+        transform: scale(0.96);
+        transform-origin: 50% 100%;
+        transition: opacity 180ms ease, transform 220ms ease;
+    }
+
+    html.studio-light .studio-toast {
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 10px -4px rgba(0, 0, 0, 0.08), 0 16px 36px -10px rgba(0, 0, 0, 0.16);
     }
 
     .studio-toast.is-visible {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: scale(1);
+        transition: opacity 260ms ease, transform 480ms var(--toast-ease);
     }
 
-    .studio-toast__action {
-        margin-left: 4px;
-        padding: 3px 10px;
-        border: 1px solid var(--color-line-strong);
-        border-radius: 8px;
-        background: var(--color-wash);
-        color: var(--color-ink);
-        font: inherit;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-        transition: background-color 120ms ease, border-color 120ms ease;
-    }
-
-    .studio-toast__action:hover {
-        background: var(--color-wash-strong);
-        border-color: var(--color-line-strong);
+    .studio-toast-slot.is-leaving .studio-toast {
+        pointer-events: none;
     }
 
     .studio-toast__icon {
         display: flex;
+        flex: none;
         width: 16px;
         height: 16px;
+        margin-top: 2px;
     }
 
     .studio-toast__icon svg {
@@ -1534,8 +1550,93 @@ html.studio-light,
         color: var(--color-danger);
     }
 
+    .studio-toast--warning .studio-toast__icon {
+        color: var(--color-warn);
+    }
+
     .studio-toast--info .studio-toast__icon {
         color: var(--color-accent);
+    }
+
+    .studio-toast__body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .studio-toast__title {
+        font-weight: 500;
+        overflow-wrap: anywhere;
+    }
+
+    /* The line under the title sits close to it: one thought, two weights */
+    .studio-toast__text {
+        margin-top: 1px;
+        color: var(--color-soft);
+        font-size: 12.5px;
+        line-height: 18px;
+        overflow-wrap: anywhere;
+    }
+
+    .studio-toast__actions {
+        display: flex;
+        gap: 6px;
+        margin: 7px 0 1px;
+    }
+
+    .studio-toast__action {
+        height: 24px;
+        padding: 0 9px;
+        border: 1px solid var(--color-line-strong);
+        border-radius: 6px;
+        background: var(--color-wash);
+        color: var(--color-ink);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background-color 120ms ease;
+    }
+
+    .studio-toast__action:hover {
+        background: var(--color-wash-strong);
+    }
+
+    .studio-toast__close {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        color: var(--color-faint);
+        cursor: pointer;
+        transition: color 120ms ease, background-color 120ms ease;
+    }
+
+    .studio-toast__close:hover {
+        color: var(--color-ink);
+        background: var(--color-wash);
+    }
+
+    .studio-toast__action:focus-visible,
+    .studio-toast__close:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .studio-toast-slot {
+            transition: none;
+        }
+
+        .studio-toast,
+        .studio-toast.is-visible {
+            transform: none;
+            transition: opacity 160ms ease;
+        }
     }
 
     /* --- modals ------------------------------------------------------ */

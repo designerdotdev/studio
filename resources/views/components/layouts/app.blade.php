@@ -89,6 +89,7 @@
                         root.classList.add('studio-revealing');
                         root.classList.remove('studio-booting');
                         setTimeout(() => root.classList.remove('studio-revealing'), 250);
+                        window.dispatchEvent(new CustomEvent('studio:revealed'));
                     };
 
                     Promise.race([

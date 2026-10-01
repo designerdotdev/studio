@@ -384,7 +384,7 @@
             });
 
             window.addEventListener('studio:toast', (event) => {
-                const { message, type, action } = event.detail;
+                const { message, description, type, action } = event.detail;
 
                 let toastAction = null;
 
@@ -394,7 +394,7 @@
                     toastAction = { label: action.label, onClick: () => window.location.reload() };
                 }
 
-                window.Studio?.toast(message, type || 'success', undefined, toastAction);
+                window.Studio?.toast({ title: message, description }, type || 'success', undefined, toastAction);
             });
         </script>
 
@@ -1062,28 +1062,38 @@
     {{-- ============================================================ --}}
     {{-- Editor notices (security / storage warnings)                  --}}
     {{-- ============================================================ --}}
+    {{-- Toasts that stay until they are closed, raised once the editor
+         has faded in. Closing a dismissible one is remembered; the others
+         come back on the next load for as long as they are true. --}}
     @if(!empty($notices))
-        <div class="pointer-events-none absolute inset-x-0 top-3 z-40 flex flex-col items-center gap-2 px-4">
-            @foreach($notices as $notice)
-                <div
-                    x-data="{ show: {{ $notice['dismissible'] ? "localStorage.getItem('studio.notice.{$notice['id']}') !== '1'" : 'true' }} }"
-                    x-show="show"
-                    class="pointer-events-auto flex max-w-2xl items-center gap-2.5 rounded-xl border px-3.5 py-2.5 shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] backdrop-blur-md {{ $notice['tone'] === 'danger' ? 'border-danger/40 bg-danger/15' : 'border-warn/40 bg-warn/10' }}"
-                >
-                    <svg class="h-4 w-4 shrink-0 {{ $notice['tone'] === 'danger' ? 'text-danger' : 'text-warn' }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
-                    <span class="text-[12.5px] leading-snug text-ink/90">{{ $notice['text'] }}</span>
-                    @if($notice['dismissible'])
-                        <button
-                            @click="show = false; localStorage.setItem('studio.notice.{{ $notice['id'] }}', '1')"
-                            class="s-icon-btn !h-6 !w-6 shrink-0"
-                            title="Dismiss"
-                        >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
-                        </button>
-                    @endif
-                </div>
-            @endforeach
-        </div>
+        <script>
+            (() => {
+                const notices = @js($notices);
+
+                const show = () => notices.forEach((notice, i) => {
+                    const key = 'studio.notice.' + notice.id;
+
+                    if (notice.dismissible && localStorage.getItem(key) === '1') return;
+
+                    setTimeout(() => window.Studio?.toast({
+                        id: 'notice-' + notice.id,
+                        title: notice.title,
+                        description: notice.text,
+                        type: notice.tone,
+                        duration: 0,
+                        onDismiss: (byUser) => {
+                            if (byUser && notice.dismissible) localStorage.setItem(key, '1');
+                        },
+                    }), 500 + i * 140);
+                });
+
+                if (document.documentElement.classList.contains('studio-booting')) {
+                    window.addEventListener('studio:revealed', show, { once: true });
+                } else {
+                    window.addEventListener('load', show, { once: true });
+                }
+            })();
+        </script>
     @endif
 
     {{-- ============================================================ --}}
