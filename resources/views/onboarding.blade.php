@@ -19,16 +19,24 @@
             --dur: 3.9s;
             --guide: .45;                        /* the guides and the compass arm: ink at this opacity */
             --rule: color-mix(in srgb, var(--color-ink) 16%, transparent);
+            --dot: color-mix(in srgb, var(--color-ink) 24%, transparent);   /* a dot at the middle of the spotlight */
         }
 
+        /* The dot grid is only seen through one soft spotlight, which
+           follows the pointer (--x / --y, set by the script below) and
+           stays where the pointer last was. Until the pointer has moved it
+           sits behind the text. */
         .intro-dots {
+            --x: 50%;
+            --y: 42%;
+            --spot: radial-gradient(circle 420px at var(--x) var(--y), #000, rgb(0 0 0 / .55) 35%, rgb(0 0 0 / .16) 68%, transparent);
             position: absolute;
             inset: 0;
             z-index: -1;
             pointer-events: none;
-            background: radial-gradient(circle, var(--rule) 1px, transparent 1.5px) center / 22px 22px;
-            -webkit-mask-image: radial-gradient(ellipse 62% 72% at 50% 42%, #000 15%, transparent 78%);
-            mask-image: radial-gradient(ellipse 62% 72% at 50% 42%, #000 15%, transparent 78%);
+            background: radial-gradient(circle, var(--dot) 1px, transparent 1.5px) center / 22px 22px;
+            -webkit-mask-image: var(--spot);
+            mask-image: var(--spot);
         }
 
         .intro-progress { position: absolute; inset: auto 0 0 0; height: 2px; pointer-events: none; }
@@ -219,6 +227,50 @@
 
             <div class="intro-progress" aria-hidden="true"><i></i></div>
         </div>
+
+        {{-- The spotlight on the dot grid trails the pointer by a few
+             frames, and rests wherever the pointer was last. --}}
+        <script>
+            (() => {
+                const stage = document.querySelector('[data-intro]');
+                const dots = stage.querySelector('.intro-dots');
+                const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+                let at = null, to = null, frame = 0;
+
+                const place = () => {
+                    dots.style.setProperty('--x', at.x.toFixed(1) + 'px');
+                    dots.style.setProperty('--y', at.y.toFixed(1) + 'px');
+                };
+
+                const step = () => {
+                    at.x += (to.x - at.x) * 0.16;
+                    at.y += (to.y - at.y) * 0.16;
+
+                    const near = Math.abs(to.x - at.x) < 0.5 && Math.abs(to.y - at.y) < 0.5;
+
+                    if (near) at = { ...to };
+                    place();
+                    frame = near ? 0 : requestAnimationFrame(step);
+                };
+
+                stage.addEventListener('pointermove', (event) => {
+                    const box = stage.getBoundingClientRect();
+
+                    to = { x: event.clientX - box.left, y: event.clientY - box.top };
+
+                    // It starts from where it rests, behind the text
+                    at ??= { x: box.width * 0.5, y: box.height * 0.42 };
+
+                    if (still) {
+                        at = { ...to };
+                        place();
+                    } else if (!frame) {
+                        frame = requestAnimationFrame(step);
+                    }
+                }, { passive: true });
+            })();
+        </script>
 
         {{-- Started here, before the first paint, so the mark is never seen
              at rest first. The guides are drawn in the middle of the screen:
