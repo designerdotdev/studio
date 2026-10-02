@@ -1,12 +1,23 @@
-{{-- Content on the stage: the collection chosen in the sidebar's Content tab,
-     as a table, with a drawer to edit an entry (livewire/content-table). It
-     takes the canvas's slot while that tab is the sidebar's and gives it back
-     the moment another tab is chosen ($store.studio.stage). A light surface
-     in both themes, like the sidebar beside it (.s-content in studio.css). --}}
+{{-- The Content view: the collections docked on the left, the chosen one on
+     the right as a table with a drawer to edit an entry
+     (livewire/content-table). It is the whole stage while the top bar's
+     Content is chosen ($store.studio.view). A light surface in both themes,
+     like the inspector (.s-content + .s-light in studio.css). --}}
 <div
-    x-show="$store.studio.stage === 'content'"
+    x-show="$store.studio.view === 'content'"
     x-cloak
-    class="s-frame s-content min-h-0 min-w-0 flex-1"
+    class="s-content s-light flex h-full min-h-0 min-w-0 flex-1"
 >
-    <livewire:studio::content-table />
+    <div
+        class="s-dock"
+        x-show="$store.studio.docks.content"
+        :style="{ width: $store.studio.dockWidth + 'px' }"
+    >
+        <livewire:studio::content-panel />
+        @include('studio::partials.dock-seam')
+    </div>
+
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <livewire:studio::content-table />
+    </div>
 </div>

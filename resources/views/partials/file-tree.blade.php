@@ -1,4 +1,5 @@
-{{-- Code mode's file tree — the sidebar's Code tab. The node list arrives flat from
+{{-- The Code view's file tree, docked on the stage's left edge beside the
+     editor (home.blade.php). The node list arrives flat from
      CodeWorkspace::tree() (path/name/type/depth/parent/design), so this
      renders as one x-for with indentation instead of a recursive include —
      folder open/close is a plain map in $store.code.
@@ -8,9 +9,31 @@
      tinted). A file has the same path in both, so both drive one buffer
      and one save path. --}}
 <div class="flex h-full min-h-0 flex-col">
-    {{-- Header --}}
-    <div class="s-panel-head !border-b-0">
-        <p class="s-microlabel flex-1">Files</p>
+    {{-- Header: which tree — just the design surface, or the whole
+         application — and its actions. The same height as the editor's tab
+         strip, so one hairline runs across the view. --}}
+    <div class="s-code-files-head">
+        <div class="s-seg !h-7 min-w-0 flex-1">
+            <button
+                type="button"
+                class="s-seg-btn !h-6 !w-auto flex-1 gap-1.5 text-[11.5px] font-medium"
+                :class="$store.code.view === 'designer' && 'is-active'"
+                @click="$store.code.setView('designer')"
+                title="Only the site — resources/designer and public/designer"
+            >
+                <span class="s-tree-dot"></span>
+                Designer
+            </button>
+            <button
+                type="button"
+                class="s-seg-btn !h-6 !w-auto flex-1 text-[11.5px] font-medium"
+                :class="$store.code.view === 'laravel' && 'is-active'"
+                @click="$store.code.setView('laravel')"
+                title="The whole application — every file, hidden ones included"
+            >
+                Laravel
+            </button>
+        </div>
 
         <button
             type="button"
@@ -33,35 +56,20 @@
         >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5V9H15"/></svg>
         </button>
-    </div>
 
-    {{-- Which tree: just the design surface, or the whole application --}}
-    <div class="shrink-0 border-b border-line px-3 pb-2.5">
-        <div class="s-seg !h-7 w-full">
-            <button
-                type="button"
-                class="s-seg-btn !h-6 !w-auto flex-1 gap-1.5 text-[11.5px] font-medium"
-                :class="$store.code.view === 'designer' && 'is-active'"
-                @click="$store.code.setView('designer')"
-                title="Only the site — resources/designer and public/designer"
-            >
-                <span class="s-tree-dot"></span>
-                Designer
-            </button>
-            <button
-                type="button"
-                class="s-seg-btn !h-6 !w-auto flex-1 text-[11.5px] font-medium"
-                :class="$store.code.view === 'laravel' && 'is-active'"
-                @click="$store.code.setView('laravel')"
-                title="The whole application — every file, hidden ones included"
-            >
-                Laravel
-            </button>
-        </div>
+        <button
+            type="button"
+            class="s-icon-btn"
+            @click="$store.studio.toggleDock('code')"
+            title="Hide the files (⌘B)"
+            aria-label="Hide the files"
+        >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M9 4.75v14.5"/></svg>
+        </button>
     </div>
 
     {{-- New-section form --}}
-    <div x-show="$store.code.newSectionOpen" x-cloak class="shrink-0 border-y border-line bg-raised/60 px-3 py-2.5">
+    <div x-show="$store.code.newSectionOpen" x-cloak class="shrink-0 border-b border-line bg-wash-faint px-3 py-2.5">
         <p class="s-microlabel pb-1.5">New section</p>
         <div class="flex flex-col gap-1.5">
             <input
@@ -99,7 +107,7 @@
     </div>
 
     {{-- The tree --}}
-    <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 pt-1">
+    <div class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 pt-1.5">
         <template x-for="node in $store.code.visibleNodes" :key="node.path">
             {{-- An inert row (vendor, node_modules, .git, a binary or oversized
                  file) is listed so the project reads true, and does nothing --}}

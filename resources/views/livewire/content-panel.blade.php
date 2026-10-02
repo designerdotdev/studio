@@ -1,10 +1,10 @@
-{{-- The sidebar's Content tab: the collections. Choosing one shows its
-     entries on the stage (livewire/content-table), which owns the selection —
+{{-- The Content view's docked list: the collections. Choosing one shows
+     its entries beside it (livewire/content-table), which owns the selection —
      $store.studio.collection mirrors it, so the highlight moves with the
      click instead of waiting on the table. --}}
 <div class="flex h-full min-h-0 flex-col" x-data>
     <div class="s-panel-head">
-        <p class="s-microlabel flex-1">Content</p>
+        <p class="s-microlabel flex-1">Collections</p>
         <button type="button" x-show="$store.studio.developer" x-cloak class="s-icon-btn" title="New collection" aria-label="New collection" @click="Livewire.dispatch('studio:content-create')">
             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
         </button>

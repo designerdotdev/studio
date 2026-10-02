@@ -24,7 +24,7 @@
         dragOver: false,
 
         // picker mode: the id of the field waiting for an image, and the
-        // sidebar tab it was on
+        // flyout that was open when it asked (null: none)
         picker: null,
         pickerFrom: null,
 
@@ -51,15 +51,42 @@
         },
 
         init() {
-            window.addEventListener('studio:rail', (e) => { if (e.detail.name === 'media' && !this.loaded) this.load(this.dir); });
+            window.addEventListener('studio:drawer', (e) => {
+                if (e.detail.name === 'media') {
+                    if (!this.loaded) this.load(this.dir);
+                    return;
+                }
+                // The flyout went away with a pick still armed: nothing was chosen
+                if (this.picker) {
+                    window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: null } }));
+                    this.picker = null;
+                }
+            });
             window.addEventListener('studio:media-pick', (e) => {
+                // A second field asking while one waits: the first gets nothing
+                if (this.picker) window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: null } }));
+                // Remember what the flyout was showing so the pick lands back there
+                this.pickerFrom = Alpine.store('studio').drawer === 'media' ? this.pickerFrom : Alpine.store('studio').drawer;
                 this.picker = e.detail.id;
-                // Remember where the field lives so the pick lands back there
-                this.pickerFrom = Alpine.store('studio').rail;
-                Alpine.store('studio').setRail('media', true);
+                Alpine.store('studio').openDrawer('media');
                 if (!this.loaded) this.load(this.dir);
             });
-            if (Alpine.store('studio').rail === 'media') this.load('');
+            // Esc, relayed by the editor: the innermost thing first
+            window.addEventListener('studio:drawer-escape', () => {
+                if (Alpine.store('studio').drawer !== 'media') return;
+                if (this.lightbox !== null) this.lightbox = null;
+                else if (this.menu) this.menu = null;
+                else if (this.picker) this.cancelPick();
+                else Alpine.store('studio').closeDrawer();
+            });
+        },
+
+        // The pick is over: back to whatever the flyout held before it
+        afterPick() {
+            const studio = Alpine.store('studio');
+            const from = this.pickerFrom;
+            this.pickerFrom = null;
+            from ? studio.openDrawer(from) : studio.closeDrawer();
         },
 
         async request(url, options = {}) {
@@ -179,7 +206,7 @@
             if (this.picker) {
                 window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: item.url } }));
                 this.picker = null;
-                Alpine.store('studio').setRail(this.pickerFrom || 'sections', true);
+                this.afterPick();
                 return;
             }
             this.lightbox = this.visibleFiles.indexOf(item);
@@ -187,7 +214,7 @@
         cancelPick() {
             window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: null } }));
             this.picker = null;
-            Alpine.store('studio').setRail(this.pickerFrom || 'sections', true);
+            this.afterPick();
         },
         size(bytes) {
             if (bytes < 1024) return bytes + ' B';
@@ -195,7 +222,6 @@
             return (bytes / 1024 / 1024).toFixed(1) + ' MB';
         },
     }"
-    @keydown.escape.window="if (lightbox !== null) lightbox = null; else if (menu) menu = null; else if (picker) cancelPick()"
     @keydown.arrow-right.window="if (lightbox !== null && lightbox < visibleFiles.length - 1) lightbox++"
     @keydown.arrow-left.window="if (lightbox !== null && lightbox > 0) lightbox--"
     @click.window="menu = null"

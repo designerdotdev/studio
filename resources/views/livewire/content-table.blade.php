@@ -22,11 +22,13 @@
 >
     @if($doc)
         {{-- ============================ Toolbar ============================ --}}
-        <div class="flex h-11 shrink-0 items-center gap-3 border-b border-line px-4">
-            <h2 class="truncate text-[13px] font-semibold text-ink">{{ $doc['title'] }}</h2>
+        {{-- As tall as every other panel's top row, so one hairline runs
+             across the view. The file's path is the first thing to give way. --}}
+        <div class="flex h-10 shrink-0 items-center gap-3 border-b border-line px-4">
+            <h2 class="max-w-[40%] shrink-0 truncate text-[13px] font-semibold text-ink">{{ $doc['title'] }}</h2>
             <span class="shrink-0 text-[11.5px] text-faint tabular-nums">{{ $total }} {{ Str::plural('entry', $total) }}</span>
-            <span x-show="$store.studio.developer" x-cloak class="min-w-0 truncate font-mono text-[10.5px] text-faint">{{ $this->file }}</span>
-            <span class="flex-1"></span>
+            <span x-show="$store.studio.developer" x-cloak class="min-w-0 flex-1 truncate font-mono text-[10.5px] text-faint">{{ $this->file }}</span>
+            <span class="flex-1" x-show="!$store.studio.developer"></span>
 
             {{-- Search leads the cluster: it is the only control that leaves
                  in Structure, so the buttons to its right never shift --}}
@@ -168,7 +170,7 @@
         class="s-drawer"
         x-show="$wire.drawer"
         x-cloak
-        @keydown.escape.window="if ($wire.drawer) $wire.drawer = null"
+        @keydown.escape.window="if ($wire.drawer && !$event.defaultPrevented) $wire.drawer = null"
         role="dialog"
         aria-modal="true"
     >

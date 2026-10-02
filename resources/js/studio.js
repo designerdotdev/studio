@@ -375,7 +375,7 @@ const StudioEditor = {
                 case 'studio:open-collection':
                     // The card's "Open in Content": the full editor — the
                     // schema, every row — for the collection it was showing
-                    window.Alpine?.store('studio')?.setRail('content', true);
+                    window.Alpine?.store('studio')?.setView('content');
                     window.dispatchEvent(new CustomEvent('studio:open-collection', { detail: { name: data.name } }));
                     break;
 
@@ -388,12 +388,18 @@ const StudioEditor = {
                     break;
 
                 case 'studio:open-code-at':
-                    window.Alpine?.store('studio')?.setMode('code');
+                    window.Alpine?.store('studio')?.setView('code');
                     window.Alpine?.store('code')?.openFileAt(data.path, data.line);
                     break;
 
                 case 'studio:navigate':
                     this.navigate(data.path);
+                    break;
+
+                case 'studio:canvas-down':
+                    // A press on the page: the flyout over it (Pages, Media)
+                    // was in the way, and goes
+                    window.Alpine?.store('studio')?.closeDrawer?.();
                     break;
 
                 case 'studio:key':
@@ -508,10 +514,13 @@ const StudioEditor = {
             return;
         }
 
-        // Cmd/Ctrl+J — the Assistant column, with the caret in the composer
+        // Cmd/Ctrl+J — the Assistant: open with the caret in the composer,
+        // or closed again when it is already showing
         if (meta && (key === 'j' || key === 'J')) {
             preventDefault();
-            window.Alpine?.store('studio')?.focusChat?.();
+            const studio = window.Alpine?.store('studio');
+            if (studio?.assistantOpen) studio.setAssistant(false);
+            else studio?.focusChat?.();
             return;
         }
 
@@ -531,13 +540,25 @@ const StudioEditor = {
             return;
         }
 
+        // Esc with a flyout open (Pages, Media) puts it away — before the
+        // typing check, so it works from the panel's own search field. The
+        // panels decide what Esc means inside them (studio:drawer-escape).
+        if (key === 'Escape' && window.Alpine?.store('studio')?.drawer) {
+            // Claimed: whatever else listens for Esc (Content's entry
+            // drawer) checks defaultPrevented and leaves this one alone
+            preventDefault();
+            window.dispatchEvent(new CustomEvent('studio:drawer-escape'));
+            return;
+        }
+
         if (typing) return;
 
-        // Cmd/Ctrl+B — collapse the sidebar for a full-width canvas (after
-        // the typing check: rich-text fields own ⌘B as bold)
+        // Cmd/Ctrl+B — the view's left side: Design's flyout, Content's
+        // collections, Code's files (after the typing check: rich-text
+        // fields own ⌘B as bold)
         if (meta && (key === 'b' || key === 'B')) {
             preventDefault();
-            window.Alpine?.store('studio')?.toggleSidebar();
+            window.Alpine?.store('studio')?.toggleSide();
             return;
         }
 
@@ -554,7 +575,8 @@ const StudioEditor = {
                 window.dispatchEvent(new CustomEvent('studio:pick-cancel'));
                 return;
             }
-            // Then an open editor (section fields or page settings) closes
+            // Then an open editor (section fields or page settings) closes.
+            // The Assistant is never closed by Esc.
             const store = window.Alpine?.store('studio');
             if (store?.inspector) {
                 if (store.inspector === 'section') this.selectedId = null;
@@ -1271,6 +1293,10 @@ const StudioPreview = {
         // Code mode hides the canvas, so as far as this document is concerned
         // it behaves exactly like Edit.
         this.setMode(localStorage.getItem('studio.mode') === 'preview' ? 'preview' : 'edit');
+
+        // Any press on the page tells the editor, which puts away a flyout
+        // (Pages, Media) lying over it. The press itself carries on.
+        document.addEventListener('pointerdown', () => this.post('studio:canvas-down'), { capture: true, passive: true });
 
         this.setupContextMenu();
 

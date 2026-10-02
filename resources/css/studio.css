@@ -41,6 +41,10 @@
     /* Canvas — the surface behind a narrow preview */
     --color-canvas: #090909;
 
+    /* The Code view's surface: Monaco's own background (studio-monaco.js),
+       so the files, the tabs and the editor read as one */
+    --color-code: #0b0b0d;
+
     /* Hover washes — a translucent tint over any surface (flips with the theme) */
     --color-wash: rgba(255, 255, 255, 0.06);
     --color-wash-strong: rgba(255, 255, 255, 0.1);
@@ -53,13 +57,13 @@
 
 /* Light chrome. A soft grey frame with white containers on it: near-black
    ink, neutral greys, one blue for what is interactive, black for the
-   primary action. The sidebar, the inspector and Content's table on the
-   stage are white in both themes — dark only changes the frame they sit
-   on — so the same tokens are retuned on their subtrees. */
+   primary action. The flyout, the right column and the Content view are
+   white in both themes — dark only changes the frame they sit on — so the
+   same tokens are retuned on their subtrees: anything that carries
+   `.s-light`. (The Code view and the column beside it do not: they follow
+   the editor's theme.) */
 html.studio-light,
-.s-sidebar,
-.s-inspector,
-.s-content {
+.s-light {
     --color-frame: #efeff0;
     --color-shell: #f7f7f8;
     --color-panel: #ffffff;
@@ -78,6 +82,7 @@ html.studio-light,
     --color-warn: #b98900;
     --color-danger: #e51c00;
     --color-canvas: #f3f3f4;
+    --color-code: #ffffff;
     --color-wash: rgba(0, 0, 0, 0.05);
     --color-wash-strong: rgba(0, 0, 0, 0.08);
     --color-wash-faint: rgba(0, 0, 0, 0.02);
@@ -429,13 +434,10 @@ html.studio-light,
 
     /* --- the frame ---------------------------------------------------- */
 
-    /* The editor's ground: the top bar sits straight on it, and the site,
-       the sidebar (light theme) and the Assistant column are rounded
-       containers laid on it a gutter apart. */
-    /* The frame: the top bar sits straight on it, and the sidebar, the
-       site and the Assistant column are rounded containers laid on it a
-       gutter apart. Light, the frame is a soft grey; dark, it is
-       near-black. The containers on it are white either way. */
+    /* The frame: the top bar and the Design view's rail sit straight on
+       it, and the stage and the right column are rounded containers laid on
+       it a gutter apart. Light, the frame is a soft grey; dark, it is
+       near-black. */
     .s-app {
         --studio-topbar: 44px;
         --studio-gutter: 6px;
@@ -448,7 +450,7 @@ html.studio-light,
         gap: var(--studio-gutter);
     }
 
-    /* The site is the screen: the stage fills what the columns leave */
+    /* The stage fills what the rail and the right column leave */
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
         border-radius: var(--studio-radius);
@@ -544,28 +546,86 @@ html.studio-light,
         }
     }
 
-    /* The sidebar toggle's inner bar previews the action: it narrows on
-       hover to collapse, widens to expand (DevDojo's shared glyph) */
-    .sidebar-toggle-bar {
-        transition: width 0.2s ease-out, x 0.2s ease-out;
+    /* The page switcher is about the canvas: where the canvas is not on
+       screen it steps back, keeping its place */
+    .s-topbar-group.is-center {
+        transition: opacity 180ms ease;
     }
 
-    .tgl-expand .sidebar-toggle-bar {
-        width: 2px;
+    .s-topbar-group.is-center.is-away {
+        opacity: 0;
+        pointer-events: none;
     }
 
-    .tgl-expand:hover .sidebar-toggle-bar,
-    .tgl-expand:focus-visible .sidebar-toggle-bar {
-        width: 4.5px;
+    /* The view switch — Design · Content · Code. One well on the frame; a
+       thumb slides under the view that is showing. */
+    .s-views {
+        position: relative;
+        display: flex;
+        align-items: center;
+        margin-left: 8px;
+        padding: 2px;
+        border-radius: 8px;
+        background: var(--color-wash);
     }
 
-    .tgl-collapse .sidebar-toggle-bar {
-        width: 4.5px;
+    .s-views-thumb {
+        position: absolute;
+        top: 2px;
+        bottom: 2px;
+        left: 0;
+        border-radius: 6px;
+        background: var(--color-wash-strong);
+        box-shadow: inset 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.18);
     }
 
-    .tgl-collapse:hover .sidebar-toggle-bar,
-    .tgl-collapse:focus-visible .sidebar-toggle-bar {
-        width: 2px;
+    .s-views-thumb.is-ready {
+        transition:
+            transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    html.studio-light .s-views-thumb {
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .s-view {
+        @apply relative flex shrink-0 cursor-pointer items-center text-soft;
+        height: 24px;
+        gap: 6px;
+        padding: 0 10px 0 8px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        font-weight: 500;
+        transition: color 140ms ease;
+    }
+
+    .s-view svg {
+        width: 14px;
+        height: 14px;
+        flex: none;
+        opacity: 0.8;
+    }
+
+    .s-view:hover,
+    .s-view.is-active {
+        @apply text-ink;
+    }
+
+    .s-view.is-active svg {
+        opacity: 1;
+    }
+
+    .s-view:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-views-thumb.is-ready {
+            transition: none;
+        }
     }
 
     .s-tb-btn.is-busy::before {
@@ -766,14 +826,80 @@ html.studio-light,
         display: none;
     }
 
-    /* --- the sidebar --------------------------------------------------- */
+    /* Beside the control instead of under it (the rail) */
+    .s-tip.is-right[data-tip]::after {
+        top: 50%;
+        left: calc(100% + 8px);
+        translate: 0 -50%;
+    }
 
-    /* A column beside the site — the sidebar on the left, the inspector
-       on the right. A white container like the site, in both themes (the
-       light tokens are retuned on it, see the top of this file). It stays
-       in the row open or shut, so collapsing is one width + margin transition
-       with the panel held at full width sliding out under the outer edge. */
-    .s-sidebar,
+    .s-tip.is-right[data-tip]:hover::after {
+        transition-delay: 350ms;
+    }
+
+    /* --- the rail, the flyout, the right column ------------------------ */
+
+    /* The rail: Design's tools, in a column on the frame under the menu —
+       the same buttons as the top bar, so the two read as one L of chrome.
+       In the other views it folds to nothing (it stays in the row, so the
+       change is one width + margin transition). */
+    .s-rail {
+        position: relative;
+        z-index: 30;
+        display: flex;
+        flex: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        width: 32px;
+        padding: 2px 0 4px;
+        user-select: none;
+        transition:
+            width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 160ms ease;
+    }
+
+    .s-rail.is-collapsed {
+        width: 0;
+        margin-right: calc(-1 * var(--studio-gutter));
+        opacity: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .s-rail-rule {
+        width: 16px;
+        height: 1px;
+        margin: 5px 0;
+        background: var(--color-line-strong);
+    }
+
+    /* The flyout: Pages or Media, floating over the stage's left edge. A
+       card on the canvas — nothing moves to make room for it. */
+    .s-flyout {
+        position: absolute;
+        top: 8px;
+        bottom: 8px;
+        left: 8px;
+        z-index: 85;
+        display: flex;
+        flex-direction: column;
+        max-width: calc(100% - 16px);
+        overflow: hidden;
+        border-radius: 10px;
+        color: var(--color-ink);
+        background: var(--color-panel);
+        box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.08),
+            0 2px 6px -2px rgba(0, 0, 0, 0.12),
+            0 18px 48px -12px rgba(0, 0, 0, 0.32);
+    }
+
+    /* The right column: a white container like the stage, in both themes
+       (it carries .s-light — except beside the Code view). It stays in the
+       row open or shut, so opening is one width + margin transition with
+       the panel held at full width sliding out under the outer edge. */
     .s-inspector {
         position: relative;
         display: flex;
@@ -786,57 +912,50 @@ html.studio-light,
         background: var(--color-panel);
         box-shadow: 0 0 0 1px var(--color-line);
         transition:
-            width 240ms cubic-bezier(0.22, 1, 0.36, 1),
-            margin 240ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 180ms ease;
+            width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            margin 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 200ms ease,
+            background-color 200ms ease;
     }
 
-    .s-sidebar.is-collapsed,
     .s-inspector.is-collapsed {
         width: 0 !important;
+        margin-left: calc(-1 * var(--studio-gutter));
         opacity: 0;
         pointer-events: none;
     }
 
-    /* The row's gap is the gutter; a collapsed column gives it back */
-    .s-sidebar.is-collapsed {
-        margin-right: calc(-1 * var(--studio-gutter));
-    }
-
-    .s-inspector.is-collapsed {
-        margin-left: calc(-1 * var(--studio-gutter));
-    }
-
     /* Held at exactly the column's width so the panel slides, never reflows */
-    .s-sidebar-inner {
+    .s-column-inner {
         display: flex;
         flex: 1 1 auto;
         flex-direction: column;
         min-height: 0;
-        margin-left: auto;
-    }
-
-    .s-inspector .s-sidebar-inner {
-        margin-left: 0;
         margin-right: auto;
     }
 
-    /* The inspector slides in a beat faster than the sidebar slides away,
-       so the site never seems to jump twice */
-    .s-inspector {
-        transition:
-            width 260ms cubic-bezier(0.22, 1, 0.36, 1),
-            margin 260ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 200ms ease;
-    }
-
     /* While a seam is dragged the width follows the pointer, not a curve */
-    body.select-none .s-sidebar,
-    body.select-none .s-inspector {
+    body.select-none .s-inspector,
+    body.select-none .s-flyout {
         transition: none;
     }
 
-    /* The resize seam: a 6px grab strip on the column's inner edge */
+    /* A docked list: Content's collections, Code's files. Part of the
+       stage, on its left edge, behind a hairline. */
+    .s-dock {
+        position: relative;
+        display: flex;
+        flex: none;
+        flex-direction: column;
+        min-height: 0;
+        border-right: 1px solid var(--color-line);
+    }
+
+    .s-content .s-dock {
+        border-right-color: rgba(0, 0, 0, 0.07);
+    }
+
+    /* The resize seam: a 6px grab strip on a panel's inner edge */
     .s-panel-seam {
         position: absolute;
         top: 10px;
@@ -864,12 +983,23 @@ html.studio-light,
         background: var(--color-accent);
     }
 
-    .s-inspector .s-panel-seam {
+    .s-dock > .s-panel-seam {
+        top: 0;
+        bottom: 0;
+        right: -3px;
+    }
+
+    .s-dock > .s-panel-seam::after {
+        right: 2px;
+        border-radius: 0;
+    }
+
+    .s-inspector > .s-panel-seam {
         right: auto;
         left: 0;
     }
 
-    .s-inspector .s-panel-seam::after {
+    .s-inspector > .s-panel-seam::after {
         right: auto;
         left: 0;
     }
@@ -877,116 +1007,6 @@ html.studio-light,
     /* The inspector's header: the name of what is being edited, the close at the end */
     .s-inspector-head {
         padding-left: 14px;
-    }
-
-    /* The sidebar's tab strip: Assistant · Pages · Content · Media · Code.
-       One grey well of icons. The panel that is showing wears its name on
-       a lifted white segment; the others name themselves in a tooltip. */
-    .s-tabs {
-        @apply flex shrink-0 items-center border-b border-line;
-        height: 44px;
-        padding: 0 8px;
-    }
-
-    .s-tabs-well {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        padding: 2px;
-        border-radius: 9px;
-        background: var(--color-wash);
-    }
-
-    .s-tab {
-        @apply flex flex-none cursor-pointer items-center justify-center text-soft;
-        height: 26px;
-        min-width: 30px;
-        padding: 0 8px;
-        border-radius: 7px;
-        font-size: 12px;
-        font-weight: 500;
-        white-space: nowrap;
-        transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
-    }
-
-    .s-tab:hover {
-        @apply text-ink;
-        background: var(--color-wash);
-    }
-
-    .s-tab:active {
-        transform: scale(0.97);
-    }
-
-    .s-tab.is-active {
-        @apply text-ink;
-        background: var(--color-panel);
-        box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.08);
-    }
-
-    .s-tab:focus-visible {
-        outline: 2px solid var(--color-accent);
-        outline-offset: -2px;
-    }
-
-    .s-tab svg {
-        width: 15px;
-        height: 15px;
-        flex: none;
-    }
-
-    /* The label folds away with the segment: it opens as its tab is chosen */
-    .s-tab > span {
-        max-width: 0;
-        margin-left: 0;
-        overflow: hidden;
-        opacity: 0;
-        transition:
-            max-width 260ms cubic-bezier(0.22, 1, 0.36, 1),
-            margin-left 260ms cubic-bezier(0.22, 1, 0.36, 1),
-            opacity 140ms ease;
-    }
-
-    .s-tab.is-active > span {
-        max-width: 96px;
-        margin-left: 6px;
-        opacity: 1;
-        transition-delay: 0ms, 0ms, 60ms;
-    }
-
-    /* Narrow sidebar: icons only, the tooltip names the open one too */
-    .s-sidebar.is-narrow .s-tab > span {
-        display: none;
-    }
-
-    /* A tab's tooltip starts at the tab's own left edge — centred, the
-       first one would be cut off by the sidebar's rounded corner */
-    .s-tab.s-tip[data-tip]::after {
-        left: 0;
-        translate: 0 0;
-    }
-
-    .s-tab.s-tip[data-tip]:hover::after {
-        transition-delay: 350ms;
-    }
-
-    /* The Assistant tab carries a live dot while a turn streams (::before —
-       the tooltip is the ::after) */
-    .s-tab.is-chat {
-        position: relative;
-    }
-
-    .s-tab.is-chat.is-busy::before {
-        content: '';
-        position: absolute;
-        top: 3px;
-        right: 4px;
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: var(--color-accent);
-        box-shadow: 0 0 0 2px var(--color-wash);
-        animation: s-busy 1.2s ease-in-out infinite;
     }
 
     /* The composer's pick button: an icon in the column, its label lives in the tooltip */
@@ -1002,10 +1022,8 @@ html.studio-light,
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .s-sidebar,
-        .s-inspector,
-        .s-tab,
-        .s-tab > span {
+        .s-rail,
+        .s-inspector {
             transition: none;
         }
     }
@@ -1088,7 +1106,7 @@ html.studio-light,
         box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.45);
     }
 
-    :is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-pick-btn.is-on {
+    :is(html.studio-light, .s-light) .s-pick-btn.is-on {
         color: #6d28d9;
     }
 
@@ -1213,7 +1231,7 @@ html.studio-light,
         box-shadow: 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
-    html:not(.studio-light) .s-seg-btn.is-active:not(:is(.s-sidebar, .s-inspector, .s-content) *) {
+    html:not(.studio-light) .s-seg-btn.is-active:not(.s-light *) {
         background: var(--color-raised);
         box-shadow: 0 0 0 1px var(--color-line-strong);
     }
@@ -1750,9 +1768,117 @@ html.studio-light,
         }
     }
 
+    /* The Code view: the files, the tabs and the editor share Monaco's own
+       background, so the stage is one surface — dark with the dark theme,
+       white with the light one. */
+    .s-code,
+    .s-code-files {
+        background: var(--color-code);
+    }
+
+    /* The files' header and the editor's tab strip are one height, so a
+       single hairline runs across the view */
+    .s-code-files-head,
+    .s-code-tabs {
+        @apply flex shrink-0 items-center border-b border-line;
+        height: 40px;
+    }
+
+    .s-code-files-head {
+        gap: 2px;
+        padding: 0 6px 0 8px;
+    }
+
+    .s-code-files-head .s-seg {
+        margin-right: 4px;
+    }
+
+    .s-code-tabs {
+        align-items: stretch;
+    }
+
+    .s-code-tabs-toggle {
+        @apply flex shrink-0 cursor-pointer items-center justify-center border-r border-line text-faint;
+        width: 40px;
+        transition: color 120ms ease, background-color 120ms ease;
+    }
+
+    .s-code-tabs-toggle:hover {
+        @apply bg-wash text-ink;
+    }
+
+    .s-code-tabs-scroll {
+        @apply flex min-w-0 flex-1 items-stretch overflow-x-auto;
+        scrollbar-width: none;
+    }
+
+    .s-code-tabs-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* A tab: the file's name, and at its end a dot while it has unsaved
+       changes — which gives way to the close on hover */
+    .s-code-tab {
+        @apply relative flex shrink-0 cursor-pointer items-center border-r border-line text-faint;
+        gap: 8px;
+        padding: 0 8px 0 14px;
+        font-size: 11.5px;
+        transition: color 120ms ease, background-color 120ms ease;
+    }
+
+    .s-code-tab:hover {
+        @apply text-soft;
+        background: var(--color-wash-faint);
+    }
+
+    .s-code-tab.is-active {
+        @apply text-ink;
+        background: var(--color-wash);
+    }
+
+    /* The open tab is tied to the editor under it: the strip's hairline
+       gives way beneath it to a line of ink along its top */
+    .s-code-tab.is-active::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 1px;
+        background: color-mix(in srgb, var(--color-ink) 55%, transparent);
+    }
+
+    .s-code-tab-end {
+        @apply relative flex shrink-0 items-center justify-center;
+        width: 16px;
+        height: 16px;
+    }
+
+    .s-code-tab-dot {
+        @apply rounded-full bg-accent;
+        width: 6px;
+        height: 6px;
+        opacity: 0;
+        transition: opacity 100ms ease;
+    }
+
+    .s-code-tab-close {
+        @apply absolute inset-0 flex cursor-pointer items-center justify-center rounded text-faint;
+        opacity: 0;
+        transition: opacity 100ms ease, background-color 100ms ease, color 100ms ease;
+    }
+
+    .s-code-tab-close:hover {
+        @apply bg-wash-strong text-ink;
+    }
+
+    .s-code-tab.is-dirty:not(:hover) .s-code-tab-dot,
+    .s-code-tab:hover .s-code-tab-close,
+    .s-code-tab.is-active:not(.is-dirty) .s-code-tab-close {
+        opacity: 1;
+    }
+
     /* Monaco paints its own theme; the pane bg covers the lazy-load gap */
     .s-code-pane {
-        background: var(--color-shell);
+        background: var(--color-code);
     }
 
     .s-code-pane .monaco-editor {
@@ -1797,8 +1923,8 @@ html.studio-light,
 
 /* ------------------------------------------------------------------ */
 /*  Light chrome adjustments                                           */
-/*  (the sidebar, the inspector and the content stage are a light      */
-/*  surface in both themes)                                            */
+/*  (anything carrying .s-light — the flyout, the right column and the */
+/*  Content view — is a light surface in both themes)                  */
 /* ------------------------------------------------------------------ */
 
 @layer components {
@@ -1816,7 +1942,7 @@ html.studio-light .s-modal-backdrop {
 
 /* Buttons with a little depth: the primary is a black key with a lit top
    edge; the outline button a white one with a heavier bottom edge */
-:is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-btn-primary {
+:is(html.studio-light, .s-light) .s-btn-primary {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #303030;
     color: #ffffff;
     box-shadow:
@@ -1825,11 +1951,11 @@ html.studio-light .s-modal-backdrop {
         inset 0 0.5px 0 1.5px rgba(255, 255, 255, 0.22);
 }
 
-:is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-btn-primary:hover {
+:is(html.studio-light, .s-light) .s-btn-primary:hover {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #1a1a1a;
 }
 
-:is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-btn-outline {
+:is(html.studio-light, .s-light) .s-btn-outline {
     border-color: transparent;
     background: #ffffff;
     box-shadow:
@@ -1838,15 +1964,15 @@ html.studio-light .s-modal-backdrop {
         inset 0 0.5px 0 1.5px #ffffff;
 }
 
-:is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-btn-outline:hover {
+:is(html.studio-light, .s-light) .s-btn-outline:hover {
     background: #fafafa;
 }
 
-:is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-input {
+:is(html.studio-light, .s-light) .s-input {
     border-color: rgba(0, 0, 0, 0.12);
 }
 
-:is(html.studio-light, .s-sidebar, .s-inspector, .s-content) .s-input:hover {
+:is(html.studio-light, .s-light) .s-input:hover {
     border-color: rgba(0, 0, 0, 0.22);
 }
 
@@ -1885,9 +2011,12 @@ html.studio-light .s-modal-backdrop {
         flex-direction: column;
     }
 
+    /* The same row as the inspector's header, so the column's first
+       hairline does not move when the Assistant takes its place */
     .s-chat-head {
-        @apply flex shrink-0 items-center gap-1 border-b border-line px-3;
-        height: 44px;
+        @apply flex shrink-0 items-center gap-1 border-b border-line;
+        height: 40px;
+        padding: 0 8px 0 14px;
     }
 
     .s-chat-log {

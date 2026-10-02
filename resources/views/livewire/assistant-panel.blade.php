@@ -1,6 +1,8 @@
-{{-- The Assistant: the first tab of the sidebar (developer mode), ⌘J.
-     Header, transcript, composer. A section's Ask AI button lands here
-     with that section as the context chip. --}}
+{{-- The Assistant: the right column (developer mode), opened from the top
+     bar or ⌘J, in any view. Header, transcript, composer. A section's Ask AI
+     button lands here with that section as the context chip; while that
+     section is being edited, its fields are one click behind (the header's
+     back button). --}}
 @php
     $engines = $this->engines;
     $thread = $this->thread;
@@ -55,7 +57,7 @@
         scrollToEnd() { const el = this.$refs.log; if (el) el.scrollTop = el.scrollHeight; },
 
         // The textarea grows with the message, up to a few lines. Hidden
-        // (another rail panel is showing) it cannot be measured — leave it
+        // (the column is shut, or showing an edit) it cannot be measured — leave it
         // alone, it is re-measured the moment it shows.
         grow() {
             const el = this.$refs.composer;
@@ -212,7 +214,11 @@
         <div class="s-chat-thread-inner">
             {{-- Header --}}
             <div class="s-chat-head">
-                <p class="s-microlabel flex-1">Assistant</p>
+                {{-- Over an edit: the way back to its fields --}}
+                <button type="button" class="s-icon-btn -ml-1" x-show="$store.studio.inspector" x-cloak title="Back to the fields" aria-label="Back to the fields" @click="$store.studio.showFields()">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>
+                </button>
+                <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">Assistant</p>
                 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                     <button type="button" class="s-icon-btn" title="Conversation history" aria-label="Conversation history" @click="open = !open">
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd"/></svg>
@@ -240,8 +246,8 @@
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>
                 </button>
 
-                <button type="button" class="s-icon-btn" title="Hide the sidebar (⌘B)" aria-label="Hide the sidebar" @click="$store.studio.setAssistant(false)">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><path d="M12.25 3.25v13.5"/></svg>
+                <button type="button" class="s-icon-btn" title="Close the Assistant (⌘J)" aria-label="Close the Assistant" @click="$store.studio.setAssistant(false)">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
                 </button>
             </div>
 

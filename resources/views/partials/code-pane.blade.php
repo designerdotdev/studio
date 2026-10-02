@@ -1,49 +1,67 @@
-{{-- Code mode's editor pane: open files as tabs above one Monaco instance
-     whose model is swapped per tab, so each file keeps its own undo history
-     and cursor. The file tree is not here — it is the sidebar's Code tab
-     (partials/file-tree). Full-width by default; the split hands half back
-     to the live preview. All state lives in $store.code (see the dev-mode
-     script block in home.blade.php). --}}
+{{-- The Code view's editor pane: open files as tabs above one Monaco
+     instance whose model is swapped per tab, so each file keeps its own undo
+     history and cursor. The files are docked beside it (partials/file-tree)
+     on the same surface — the editor's own background, so the whole view
+     reads as one. Full-width by default; the split hands half back to the
+     live preview. All state lives in $store.code (see the dev-mode script
+     block in home.blade.php). --}}
 <div
-    x-show="$store.studio.mode === 'code'"
+    x-show="$store.studio.view === 'code'"
     x-cloak
-    class="s-frame min-h-0 min-w-0 bg-panel"
+    class="s-frame s-code min-h-0 min-w-0"
     :class="$store.studio.codeSplit ? 'shrink-0' : 'flex-1'"
     :style="$store.studio.codeSplit ? { width: $store.studio.codeSize + '%' } : { width: '' }"
     {{-- Register the Monaco host without loading Monaco: the bundle is
-         fetched on the first file open, not on entering Code mode. --}}
+         fetched on the first file open, not on entering the Code view. --}}
     x-init="
         $nextTick(() => {
             $store.code.host = $refs.host;
-            if ($store.studio.mode === 'code') $store.code.boot();
+            if ($store.studio.view === 'code') $store.code.boot();
         });
-        $watch(() => $store.studio.mode, (mode) => { if (mode === 'code') $store.code.boot() });
+        $watch(() => $store.studio.view, (view) => { if (view === 'code') $store.code.boot() });
     "
-    @keydown.window="if ($store.studio.mode === 'code' && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S') && !window.Studio.codeModalOpen) { $event.preventDefault(); $store.code.save() }"
+    @keydown.window="if ($store.studio.view === 'code' && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S') && !window.Studio.codeModalOpen) { $event.preventDefault(); $store.code.save() }"
 >
-    {{-- Tab strip --}}
-    <div class="flex h-9 shrink-0 items-stretch gap-px overflow-x-auto border-b border-line bg-raised/50">
-        <template x-for="tab in $store.code.tabs" :key="tab.path">
-            <div
-                class="group flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-3 text-[11.5px] transition-colors"
-                :class="$store.code.active === tab.path ? 'bg-panel text-ink' : 'text-faint hover:text-soft'"
-                @click="$store.code.activate(tab.path)"
-                :title="tab.display"
-            >
-                <span class="font-mono" x-text="tab.name"></span>
-                <span x-show="$store.code.dirty[tab.path]" x-cloak class="h-1.5 w-1.5 rounded-full bg-accent"></span>
-                <button
-                    type="button"
-                    class="-mr-1 flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity hover:bg-wash group-hover:opacity-100"
-                    @click.stop="$store.code.closeTab(tab.path)"
-                    :aria-label="`Close ${tab.name}`"
-                >
-                    <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
-                </button>
-            </div>
-        </template>
+    {{-- Tab strip. Its hairline runs on from the files' header beside it. --}}
+    <div class="s-code-tabs">
+        {{-- The files, folded away: the way back --}}
+        <button
+            type="button"
+            class="s-code-tabs-toggle"
+            x-show="!$store.studio.docks.code"
+            x-cloak
+            @click="$store.studio.toggleDock('code')"
+            title="Show the files (⌘B)"
+            aria-label="Show the files"
+        >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M9 4.75v14.5"/></svg>
+        </button>
 
-        <div class="flex flex-1 items-center justify-end gap-2 px-2.5">
+        <div class="s-code-tabs-scroll">
+            <template x-for="tab in $store.code.tabs" :key="tab.path">
+                <div
+                    class="s-code-tab group"
+                    :class="{ 'is-active': $store.code.active === tab.path, 'is-dirty': $store.code.dirty[tab.path] }"
+                    @click="$store.code.activate(tab.path)"
+                    :title="tab.display"
+                >
+                    <span class="font-mono" x-text="tab.name"></span>
+                    <span class="s-code-tab-end">
+                        <span class="s-code-tab-dot"></span>
+                        <button
+                            type="button"
+                            class="s-code-tab-close"
+                            @click.stop="$store.code.closeTab(tab.path)"
+                            :aria-label="`Close ${tab.name}`"
+                        >
+                            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
+                        </button>
+                    </span>
+                </div>
+            </template>
+        </div>
+
+        <div class="flex shrink-0 items-center gap-2 pl-2 pr-2.5">
             {{-- Split the pane with the live preview --}}
             <button
                 type="button"
@@ -81,14 +99,13 @@
             <p class="max-w-xs text-[12px] leading-relaxed text-faint">
                 The site lives in resources/designer and public/designer — pages, sections, layouts, data, and CSS. A saved file is live at once, and the editor picks it up.
             </p>
-            {{-- The files are a tab of the sidebar: offer the way there
-                 whenever they are not on screen --}}
+            {{-- The files can be folded away: offer the way back --}}
             <button
                 type="button"
                 class="s-btn-outline mt-2"
-                x-show="!$store.studio.sidebar || $store.studio.rail !== 'code'"
+                x-show="!$store.studio.docks.code"
                 x-cloak
-                @click="$store.studio.setRail('code')"
+                @click="$store.studio.toggleDock('code')"
             >
                 Show the files
             </button>

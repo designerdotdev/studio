@@ -18,7 +18,7 @@
             // Apply the saved editor theme before first paint (dark is the default)
             if (localStorage.getItem('studio.theme') === 'light') document.documentElement.classList.add('studio-light');
         </script>
-        @isset($sidebar)
+        @isset($inspector)
             {{-- The editor boots hidden: the columns are laid out at once
                  but stay invisible until Alpine is up, the fonts are in and
                  the canvas document has loaded, then fade in together.
@@ -26,7 +26,7 @@
                  regardless, so nothing can stay hidden. --}}
             <style>
                 html.studio-booting .s-topbar,
-                html.studio-booting .s-sidebar,
+                html.studio-booting .s-rail,
                 html.studio-booting .s-inspector,
                 html.studio-booting .s-stage {
                     visibility: hidden;
@@ -37,7 +37,7 @@
                 }
 
                 html.studio-revealing .s-topbar,
-                html.studio-revealing .s-sidebar,
+                html.studio-revealing .s-rail,
                 html.studio-revealing .s-inspector,
                 html.studio-revealing .s-stage {
                     transition: opacity 180ms ease;
@@ -125,50 +125,103 @@
             </button>
         </div>
 
-        {{-- The app root. In the editor it is the frame: the top bar sits on
-             it, and the sidebar, the site and the inspector column are laid
-             on it a gutter apart. --}}
-        <div class="flex h-dvh flex-col @isset($sidebar) s-app @endisset" x-data>
-            @isset($sidebar)
+        {{-- The app root. In the editor it is the frame: the top bar and
+             the Design view's rail sit straight on it, and the stage and
+             the right column are rounded containers laid on it a gutter
+             apart. --}}
+        <div class="flex h-dvh flex-col @isset($inspector) s-app @endisset" x-data>
+            @isset($inspector)
                 @include('studio::partials.topbar')
 
                 <div class="s-app-row flex min-h-0 min-w-0 flex-1">
 
-                    {{-- The sidebar: one panel at a time, chosen by the tab
-                         strip. It stays in the row open or shut so collapsing
-                         is one width transition. --}}
-                    <aside
-                        class="s-sidebar"
-                        :class="{ 'is-collapsed': !$store.studio.sidebar, 'is-narrow': $store.studio.panelWidth < 264 }"
-                        :style="{ width: ($store.studio.sidebar ? $store.studio.panelWidth : 0) + 'px' }"
-                        :aria-hidden="!$store.studio.sidebar"
-                        :inert="!$store.studio.sidebar"
-                        @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
-                    >
-                        <div class="s-sidebar-inner" :style="{ width: $store.studio.panelWidth + 'px', minWidth: $store.studio.panelWidth + 'px' }">
-                            {{ $sidebar }}
-                        </div>
+                    {{-- The rail: Design's tools. It stays in the row in the
+                         other views, folded to nothing, so changing view is
+                         one width transition. --}}
+                    @include('studio::partials.rail')
 
-                        {{-- A drag seam on the inner edge sets the width. A
-                             shield covers the window while it is held so the
-                             canvas iframe can't swallow the pointer. --}}
+                    {{-- The stage: whatever the top bar's view chose --}}
+                    <main class="s-stage">
+                        {{ $slot }}
+
+                        {{-- The flyout: Pages or Media, over the stage's left
+                             edge. It floats — nothing moves to make room —
+                             and a click on the canvas puts it away. --}}
+                        @isset($flyout)
+                            <aside
+                                class="s-flyout s-light"
+                                x-show="$store.studio.drawer"
+                                x-cloak
+                                x-transition:enter="transition duration-200 ease-[cubic-bezier(.22,1,.36,1)]"
+                                x-transition:enter-start="-translate-x-2 opacity-0"
+                                x-transition:enter-end="translate-x-0 opacity-100"
+                                x-transition:leave="transition duration-150 ease-in"
+                                x-transition:leave-start="translate-x-0 opacity-100"
+                                x-transition:leave-end="-translate-x-1.5 opacity-0"
+                                :style="{ width: $store.studio.drawerWidth + 'px' }"
+                                :aria-label="$store.studio.drawerShown === 'media' ? 'Media' : 'Pages'"
+                            >
+                                {{ $flyout }}
+
+                                <div
+                                    class="s-panel-seam"
+                                    role="separator"
+                                    aria-label="Resize the panel"
+                                    @mousedown.prevent="
+                                        const panel = $el.closest('aside');
+                                        const shield = document.createElement('div');
+                                        shield.className = 's-drag-shield';
+                                        document.body.appendChild(shield);
+                                        const move = (event) => $store.studio.setDrawerWidth(event.clientX - panel.getBoundingClientRect().left);
+                                        const stop = () => {
+                                            shield.remove();
+                                            document.removeEventListener('mousemove', move);
+                                            document.removeEventListener('mouseup', stop);
+                                            window.removeEventListener('blur', stop);
+                                            document.body.classList.remove('select-none');
+                                        };
+                                        document.body.classList.add('select-none');
+                                        document.addEventListener('mousemove', move);
+                                        document.addEventListener('mouseup', stop);
+                                        window.addEventListener('blur', stop);
+                                    "
+                                ></div>
+                            </aside>
+                        @endisset
+                    </main>
+
+                    {{-- The right column: the section being edited, the
+                         page's settings, or the Assistant — one at a time.
+                         It stays in the row open or shut, so opening and
+                         closing is one width transition. A light surface,
+                         except beside the Code view, where it follows the
+                         editor's theme. --}}
+                    <aside
+                        class="s-inspector"
+                        :class="{ 'is-collapsed': !$store.studio.rightPanel, 's-light': $store.studio.view !== 'code' }"
+                        :style="{ width: ($store.studio.rightPanel ? $store.studio.rightWidth : 0) + 'px' }"
+                        :aria-hidden="!$store.studio.rightPanel"
+                        :inert="!$store.studio.rightPanel"
+                    >
+                        <div class="s-column-inner" :style="{ width: $store.studio.rightWidth + 'px', minWidth: $store.studio.rightWidth + 'px' }">
+                            {{ $inspector }}
+                        </div>
                         <div
                             class="s-panel-seam"
                             role="separator"
-                            aria-label="Resize the sidebar"
+                            aria-label="Resize the column"
                             @mousedown.prevent="
                                 const aside = $el.closest('aside');
                                 const shield = document.createElement('div');
                                 shield.className = 's-drag-shield';
                                 document.body.appendChild(shield);
-                                const move = (event) => $store.studio.setPanelWidth(event.clientX - aside.getBoundingClientRect().left);
+                                const move = (event) => $store.studio.setRightWidth(aside.getBoundingClientRect().right - event.clientX);
                                 const stop = () => {
                                     shield.remove();
                                     document.removeEventListener('mousemove', move);
                                     document.removeEventListener('mouseup', stop);
                                     window.removeEventListener('blur', stop);
                                     document.body.classList.remove('select-none');
-                                    window.dispatchEvent(new CustomEvent('studio:reflow'));
                                 };
                                 document.body.classList.add('select-none');
                                 document.addEventListener('mousemove', move);
@@ -177,53 +230,6 @@
                             "
                         ></div>
                     </aside>
-
-                    {{-- The site is the screen: the stage fills what is left --}}
-                    <main class="s-stage">
-                        {{ $slot }}
-                    </main>
-
-                    {{-- The inspector: a slide-over on the right for the section
-                         being edited, or the page's settings. Same column
-                         mechanics as the sidebar, mirrored. --}}
-                    @isset($inspector)
-                        <aside
-                            class="s-inspector"
-                            :class="{ 'is-collapsed': !$store.studio.inspector }"
-                            :style="{ width: ($store.studio.inspector ? $store.studio.inspectorWidth : 0) + 'px' }"
-                            :aria-hidden="!$store.studio.inspector"
-                            :inert="!$store.studio.inspector"
-                            @transitionend.self="if ($event.propertyName === 'width') window.dispatchEvent(new CustomEvent('studio:reflow'))"
-                        >
-                            <div class="s-sidebar-inner" :style="{ width: $store.studio.inspectorWidth + 'px', minWidth: $store.studio.inspectorWidth + 'px' }">
-                                {{ $inspector }}
-                            </div>
-                            <div
-                                class="s-panel-seam"
-                                role="separator"
-                                aria-label="Resize the inspector"
-                                @mousedown.prevent="
-                                    const aside = $el.closest('aside');
-                                    const shield = document.createElement('div');
-                                    shield.className = 's-drag-shield';
-                                    document.body.appendChild(shield);
-                                    const move = (event) => $store.studio.setInspectorWidth(aside.getBoundingClientRect().right - event.clientX);
-                                    const stop = () => {
-                                        shield.remove();
-                                        document.removeEventListener('mousemove', move);
-                                        document.removeEventListener('mouseup', stop);
-                                        window.removeEventListener('blur', stop);
-                                        document.body.classList.remove('select-none');
-                                        window.dispatchEvent(new CustomEvent('studio:reflow'));
-                                    };
-                                    document.body.classList.add('select-none');
-                                    document.addEventListener('mousemove', move);
-                                    document.addEventListener('mouseup', stop);
-                                    window.addEventListener('blur', stop);
-                                "
-                            ></div>
-                        </aside>
-                    @endisset
                 </div>
             @else
                 <main class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
