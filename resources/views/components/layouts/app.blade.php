@@ -140,24 +140,32 @@
                          one width transition. --}}
                     @include('studio::partials.rail')
 
-                    {{-- The stage: whatever the top bar's view chose --}}
-                    <main class="s-stage">
-                        {{ $slot }}
+                    {{-- The stage and, over its left edge, the flyout. They
+                         share this box so the flyout can lie exactly on the
+                         stage without being clipped by its rounded corners. --}}
+                    <div class="s-stage-wrap">
+                        {{-- The stage: whatever the top bar's view chose --}}
+                        <main class="s-stage">
+                            {{ $slot }}
+                        </main>
 
                         {{-- The flyout: Pages or Media, over the stage's left
-                             edge. It floats — nothing moves to make room —
-                             and a click on the canvas puts it away. --}}
+                             edge, flush with the frame. It lies over the canvas
+                             — nothing moves to make room — and a click on the
+                             canvas puts it away. Beside the stage, not in it:
+                             inside, the stage's rounded clip would let the
+                             canvas show through along the corners' edges. --}}
                         @isset($flyout)
                             <aside
-                                class="s-flyout s-light"
+                                class="s-flyout"
                                 x-show="$store.studio.drawer"
                                 x-cloak
                                 x-transition:enter="transition duration-200 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none"
-                                x-transition:enter-start="-translate-x-2 opacity-0"
+                                x-transition:enter-start="-translate-x-3 opacity-0"
                                 x-transition:enter-end="translate-x-0 opacity-100"
                                 x-transition:leave="transition duration-150 ease-in motion-reduce:transition-none"
                                 x-transition:leave-start="translate-x-0 opacity-100"
-                                x-transition:leave-end="-translate-x-1.5 opacity-0"
+                                x-transition:leave-end="-translate-x-2 opacity-0"
                                 :style="{ width: $store.studio.drawerWidth + 'px' }"
                                 :aria-label="$store.studio.drawerShown === 'media' ? 'Media' : 'Pages'"
                             >
@@ -188,7 +196,7 @@
                                 ></div>
                             </aside>
                         @endisset
-                    </main>
+                    </div>
 
                     {{-- The right column: the section being edited, the
                          page's settings, or the Assistant — one at a time.

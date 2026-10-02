@@ -356,9 +356,14 @@ html.studio-light,
         --color-ink: #f0f0f0;
         --color-soft: #d4d4d4;
         --color-faint: #8a8a8a;
+        --color-ok: #36c285;
+        --color-warn: #ffb800;
+        --color-danger: #ff6b5b;
         --color-wash: rgba(255, 255, 255, 0.07);
         --color-wash-strong: rgba(255, 255, 255, 0.11);
         --color-wash-faint: rgba(255, 255, 255, 0.03);
+        --color-scroll: rgba(255, 255, 255, 0.14);
+        --color-scroll-hover: rgba(255, 255, 255, 0.24);
         color-scheme: dark;
         @apply rounded-xl p-1.5;
         color: var(--color-ink);
@@ -450,11 +455,33 @@ html.studio-light,
         gap: var(--studio-gutter);
     }
 
+    /* The box the stage and the flyout share (see the layout) */
+    .s-stage-wrap {
+        position: relative;
+        display: flex;
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 0;
+    }
+
     /* The stage fills what the rail and the right column leave */
     .s-stage {
         @apply relative min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas;
         border-radius: var(--studio-radius);
-        box-shadow: 0 0 0 1px var(--color-line);
+    }
+
+    /* The stage's hairline ring, drawn just inside its edge rather than
+       around it: the flyout lies over the stage, and has to be able to cover
+       the ring where it meets the frame — a ring outside the box would trace
+       the flyout's edge and undo the seam. */
+    .s-stage::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        border-radius: inherit;
+        box-shadow: inset 0 0 0 1px var(--color-line);
+        pointer-events: none;
     }
 
     /* Over everything (incl. the canvas iframe, which would otherwise
@@ -876,27 +903,57 @@ html.studio-light,
         background: var(--color-line-strong);
     }
 
-    /* The flyout: Pages or Media, floating over the stage's left edge. A
-       card on the canvas — nothing moves to make room for it. */
+    /* The flyout: Pages or Media. The rail opens out into it — it is the
+       frame itself, carried over the stage's left edge: flush with the top
+       bar and the rail, in the frame's own colour (near-black, or the light
+       theme's grey), following the theme like they do. It lies over the
+       canvas, so nothing moves to make room for it; a hairline and a soft
+       shadow on its one free edge lift it off the page. */
     .s-flyout {
         position: absolute;
-        top: 8px;
-        bottom: 8px;
-        left: 8px;
+        top: 0;
+        bottom: 0;
+        left: 0;
         /* Over Content's entry drawer (80), which Media is picked from;
            under the rail's tooltips (87) and the top bar's menus (88) */
         z-index: 85;
         display: flex;
         flex-direction: column;
-        max-width: calc(100% - 16px);
-        overflow: hidden;
-        border-radius: 10px;
+        max-width: calc(100% - 48px);
         color: var(--color-ink);
-        background: var(--color-panel);
+        background: var(--color-frame);
         box-shadow:
-            0 0 0 1px rgba(0, 0, 0, 0.08),
-            0 2px 6px -2px rgba(0, 0, 0, 0.12),
-            0 18px 48px -12px rgba(0, 0, 0, 0.32);
+            1px 0 0 rgba(0, 0, 0, 0.1),
+            16px 0 40px -16px rgba(0, 0, 0, 0.28);
+    }
+
+    /* Its panels clip themselves: the flyout cannot, or it would cut off
+       the corners below */
+    .s-flyout > [data-drawer] {
+        overflow: hidden;
+    }
+
+    /* Where the flyout's free edge meets the top and bottom of the stage,
+       the frame curves inward by the stage's own radius — so the canvas
+       beside it still reads as a rounded card, only narrower. */
+    .s-flyout::before,
+    .s-flyout::after {
+        content: '';
+        position: absolute;
+        left: 100%;
+        width: var(--studio-radius);
+        height: var(--studio-radius);
+        pointer-events: none;
+    }
+
+    .s-flyout::before {
+        top: 0;
+        background: radial-gradient(circle at 100% 100%, transparent calc(var(--studio-radius) - 0.5px), var(--color-frame) var(--studio-radius));
+    }
+
+    .s-flyout::after {
+        bottom: 0;
+        background: radial-gradient(circle at 100% 0, transparent calc(var(--studio-radius) - 0.5px), var(--color-frame) var(--studio-radius));
     }
 
     /* The right column: a white container like the stage, in both themes
@@ -1005,6 +1062,16 @@ html.studio-light,
     .s-inspector > .s-panel-seam::after {
         right: auto;
         left: 0;
+    }
+
+    /* The search-result preview's title, in a search engine's own link blue:
+       the light-page blue on a light surface, the dark-page one on the dark column */
+    .s-serp-title {
+        color: #8ab4f8;
+    }
+
+    :is(html.studio-light, .s-light) .s-serp-title {
+        color: #1a0dab;
     }
 
     /* The inspector's header: the name of what is being edited, the close at the end */
@@ -1188,6 +1255,12 @@ html.studio-light,
 
     .s-media-tile:hover {
         @apply bg-wash;
+    }
+
+    /* A thumbnail sits on a light tile whatever the surface: a dark logo on
+       a transparent ground would disappear into a dark one */
+    .s-media-tile button:first-child {
+        background: #f3f3f4;
     }
 
     .s-media-tile.is-pickable button:first-child {
@@ -2068,9 +2141,11 @@ html.studio-light .s-modal-backdrop {
     -webkit-backdrop-filter: blur(3px);
 }
 
+/* (None of these reach into a popover, which is dark whatever the theme and
+   keeps the dark chrome's own buttons and inputs.) */
 /* Buttons with a little depth: the primary is a black key with a lit top
    edge; the outline button a white one with a heavier bottom edge */
-:is(html.studio-light, .s-light) .s-btn-primary {
+:is(html.studio-light, .s-light) .s-btn-primary:not(.s-pop *) {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #303030;
     color: #ffffff;
     box-shadow:
@@ -2079,11 +2154,11 @@ html.studio-light .s-modal-backdrop {
         inset 0 0.5px 0 1.5px rgba(255, 255, 255, 0.22);
 }
 
-:is(html.studio-light, .s-light) .s-btn-primary:hover {
+:is(html.studio-light, .s-light) .s-btn-primary:not(.s-pop *):hover {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 60%), #1a1a1a;
 }
 
-:is(html.studio-light, .s-light) .s-btn-outline {
+:is(html.studio-light, .s-light) .s-btn-outline:not(.s-pop *) {
     border-color: transparent;
     background: #ffffff;
     box-shadow:
@@ -2092,15 +2167,15 @@ html.studio-light .s-modal-backdrop {
         inset 0 0.5px 0 1.5px #ffffff;
 }
 
-:is(html.studio-light, .s-light) .s-btn-outline:hover {
+:is(html.studio-light, .s-light) .s-btn-outline:not(.s-pop *):hover {
     background: #fafafa;
 }
 
-:is(html.studio-light, .s-light) .s-input {
+:is(html.studio-light, .s-light) .s-input:not(.s-pop *) {
     border-color: rgba(0, 0, 0, 0.12);
 }
 
-:is(html.studio-light, .s-light) .s-input:hover {
+:is(html.studio-light, .s-light) .s-input:not(.s-pop *):hover {
     border-color: rgba(0, 0, 0, 0.22);
 }
 

@@ -315,7 +315,7 @@
                                 {{-- Live result preview --}}
                                 <div class="rounded-lg border border-line bg-shell px-3 py-2.5">
                                     <p class="truncate text-[11px] text-faint">{{ parse_url(url('/'), PHP_URL_HOST) }} › {{ $page['slug'] ?? '' }}</p>
-                                    <p class="mt-0.5 truncate text-[14.5px] leading-snug text-[#1a0dab]">{{ ($page['seo_title'] ?? '') !== '' ? $page['seo_title'] : ($page['title'] ?? 'Untitled') }}</p>
+                                    <p class="mt-0.5 truncate s-serp-title text-[14.5px] leading-snug">{{ ($page['seo_title'] ?? '') !== '' ? $page['seo_title'] : ($page['title'] ?? 'Untitled') }}</p>
                                     <p class="mt-0.5 line-clamp-2 text-xs leading-relaxed {{ ($page['seo_description'] ?? '') !== '' ? 'text-soft' : 'text-faint italic' }}">
                                         {{ ($page['seo_description'] ?? '') !== '' ? $page['seo_description'] : 'Add a description to control how this page reads in search results.' }}
                                     </p>
