@@ -216,6 +216,49 @@ const StudioEditor = {
         this.listenToPanel();
         this.bindShortcuts();
         this.trackSaveStatus();
+        this.watchCorners();
+    },
+
+    /**
+     * The canvas is seen through the stage's rounded window, so anything
+     * the canvas draws edge to edge (a section's outline) is cut off at the
+     * corners. The canvas cannot see that from inside, so it is told: how
+     * much of each of its own four corners the stage rounds away — the
+     * stage's radius where a corner of the frame sits in a corner of the
+     * stage, nothing where it does not (a tablet width, the far side of the
+     * Code view's split). Sent whenever the frame loads or changes size.
+     */
+    syncCorners() {
+        const stage = this.iframe?.closest('.s-stage');
+        if (!stage) return;
+
+        const frame = this.iframe.getBoundingClientRect();
+        const box = stage.getBoundingClientRect();
+
+        // Not on screen (Content, Code without the split): nothing to say
+        if (!frame.width || !frame.height) return;
+
+        const radius = parseFloat(getComputedStyle(stage).borderTopLeftRadius) || 0;
+        const left = frame.left - box.left, top = frame.top - box.top;
+        const right = box.right - frame.right, bottom = box.bottom - frame.bottom;
+        // A corner of the frame this far in from the stage's is cut by what is left of the curve
+        const cut = (dx, dy) => (dx < radius && dy < radius ? Math.max(0, Math.ceil(radius - Math.min(dx, dy))) : 0);
+
+        this.send('studio:corners', {
+            tl: cut(left, top),
+            tr: cut(right, top),
+            br: cut(right, bottom),
+            bl: cut(left, bottom),
+        });
+    },
+
+    watchCorners() {
+        // A reloaded canvas has forgotten everything it was told: whoever
+        // told it something (the Assistant's context) says it again
+        this.iframe.addEventListener('load', () => window.dispatchEvent(new CustomEvent('studio:canvas-loaded')));
+        this.iframe.addEventListener('load', () => this.syncCorners());
+        new ResizeObserver(() => this.syncCorners()).observe(this.iframe);
+        this.syncCorners();
     },
 
     send(type, payload = {}) {
@@ -1332,6 +1375,18 @@ const StudioPreview = {
 
                 case 'studio:hover':
                     this.applyHover(data.sectionId, data.on);
+                    break;
+
+                case 'studio:corners':
+                    this.setCorners(data);
+                    break;
+
+                case 'studio:context':
+                    this.setContext(data);
+                    break;
+
+                case 'studio:focus-field':
+                    this.setFieldFocus(data.on ? { sectionId: data.sectionId, key: data.key } : null);
                     break;
 
                 case 'studio:deselect':
@@ -4099,8 +4154,174 @@ const StudioPreview = {
         // leave it floating over whatever used to be there. Closing it
         // here, from the same path, is simpler and safer than
         // repositioning a popover mid-interaction.
-        document.addEventListener('scroll', () => { this.rehover(); this.control.close(); }, { capture: true, passive: true });
-        window.addEventListener('resize', () => { this.rehover(); this.control.close(); }, { passive: true });
+        document.addEventListener('scroll', () => { this.rehover(); this.control.close(); this.roundCorners(); this.paintFieldFocus(); }, { capture: true, passive: true });
+        window.addEventListener('resize', () => { this.rehover(); this.control.close(); this.roundCorners(); this.paintFieldFocus(); }, { passive: true });
+
+        // A section that grows or shrinks moves every section under it
+        new ResizeObserver(() => this.roundCorners()).observe(document.body);
+    },
+
+    /* --- what the editor is pointing at --------------------------- */
+
+    // The Assistant's context — the section its chip names, and the element
+    // inside it when one was picked: { sectionId, locator }. Null: nothing.
+    context: null,
+
+    /**
+     * Show, on the page, what the Assistant's composer is holding: a dashed
+     * violet ring on the picked element, or — with no element — on the
+     * section. Dashed violet is the pick tool's own mark, so the thing that
+     * was picked keeps looking picked for as long as the chat has it. The
+     * editor says when that changes (studio:context); `reveal` scrolls it
+     * into view.
+     */
+    setContext({ sectionId = null, locator = null, reveal = false } = {}) {
+        this.context = sectionId ? { sectionId, locator } : null;
+
+        const el = this.applyContext();
+
+        if (reveal && el) {
+            const box = el.getBoundingClientRect();
+            const hidden = box.bottom < 40 || box.top > window.innerHeight - 40;
+
+            if (hidden) el.scrollIntoView({ block: box.height > window.innerHeight ? 'start' : 'center', behavior: 'smooth' });
+        }
+    },
+
+    /** Mark what `context` names (again, after a re-render replaced the markup). Returns the marked node. */
+    applyContext() {
+        document.querySelectorAll('[data-studio-context]').forEach((el) => el.removeAttribute('data-studio-context'));
+        document.querySelectorAll('.studio-section.is-context').forEach((el) => el.classList.remove('is-context'));
+
+        if (!this.context) return null;
+
+        const wrapper = document.querySelector(`[data-section="${this.context.sectionId}"]`);
+
+        if (!wrapper) return null;
+
+        const el = this.locate(wrapper, this.context.locator);
+
+        if (el) {
+            el.setAttribute('data-studio-context', '');
+
+            return el;
+        }
+
+        wrapper.classList.add('is-context');
+
+        return wrapper;
+    },
+
+    /** The element a locator (child indexes from the section's content) points at, if it is still there. */
+    locate(wrapper, locator) {
+        if (!Array.isArray(locator) || !locator.length) return null;
+
+        let node = wrapper.querySelector('[data-section-content]');
+
+        for (const index of locator) {
+            node = node?.children[index];
+        }
+
+        return node || null;
+    },
+
+    // The field whose input has the caret in the inspector: { sectionId, key }
+    fieldFocus: null,
+
+    /**
+     * The inspector's caret is in a field: halo what that field renders on
+     * the page, under its name, so the input and the text it changes point
+     * at each other. Repainted on scroll, on resize and after each
+     * re-render — the halo is a fixed box and the text under it moves.
+     */
+    setFieldFocus(focus) {
+        const had = this.fieldFocus;
+        this.fieldFocus = focus;
+
+        if (focus) this.paintFieldFocus();
+        else if (had) this.clearHover();
+    },
+
+    paintFieldFocus() {
+        const focus = this.fieldFocus;
+
+        if (!focus || this.mode === 'preview') return;
+
+        // Everything the field renders: one text, or every row of a list
+        const entries = StudioFields.entriesFor(focus.sectionId).filter((entry) => entry.key === focus.key);
+        const boxes = entries.map((entry) => StudioFields.box(entry)).filter((box) => box && box.width && box.height);
+
+        if (!boxes.length) return this.clearHover();
+
+        const left = Math.min(...boxes.map((b) => b.left));
+        const top = Math.min(...boxes.map((b) => b.top));
+        const right = Math.max(...boxes.map((b) => b.left + b.width));
+        const bottom = Math.max(...boxes.map((b) => b.top + b.height));
+
+        this.queuePaint({
+            kind: 'field',
+            box: { left: left - 3, top: top - 2, width: right - left + 6, height: bottom - top + 4 },
+            label: this.labelFor(entries[0], focus.sectionId),
+            source: '',
+            cursorKind: null,
+        });
+    },
+
+    /* --- corners -------------------------------------------------- */
+
+    // How much of each corner of this document the editor's rounded stage
+    // cuts away, in px (studio:corners). Zero until the editor says.
+    corners: { tl: 0, tr: 0, br: 0, bl: 0 },
+    cornersQueued: false,
+
+    setCorners({ tl = 0, tr = 0, br = 0, bl = 0 }) {
+        this.corners = { tl, tr, br, bl };
+        // What is drawn round the whole canvas (the pick tool's edge) follows them as they are
+        document.documentElement.style.setProperty('--studio-canvas-corners', `${tl}px ${tr}px ${br}px ${bl}px`);
+        this.roundCorners();
+    },
+
+    /**
+     * Give every section the corner radii that keep its outline inside the
+     * canvas's rounded window. A section's corner only needs rounding while
+     * it sits within a cut corner of the viewport — the first section's top
+     * at the top of the page, whichever section's edge has scrolled into a
+     * corner — so this is measured, once a frame, on scroll and on any
+     * change of layout. The outline (`.studio-section::after`) reads the
+     * result as --studio-corners.
+     */
+    roundCorners() {
+        if (this.cornersQueued) return;
+        this.cornersQueued = true;
+
+        requestAnimationFrame(() => {
+            this.cornersQueued = false;
+
+            const { tl, tr, br, bl } = this.corners;
+            const any = tl || tr || br || bl;
+            const width = window.innerWidth, height = window.innerHeight;
+            // A corner `dx`, `dy` in from a viewport corner cut by `cut`:
+            // the radius that keeps it inside what is left of the curve
+            // (a corner a fraction of a pixel outside still counts as on the edge)
+            const fit = (cut, dx, dy) => (cut && dx > -1 && dy > -1 && dx < cut && dy < cut ? Math.ceil(cut - Math.max(0, Math.min(dx, dy))) : 0);
+
+            document.querySelectorAll('.studio-section').forEach((el) => {
+                let value = '';
+
+                if (any) {
+                    const box = el.getBoundingClientRect();
+                    const left = box.left, top = box.top, right = width - box.right, bottom = height - box.bottom;
+                    const radii = [fit(tl, left, top), fit(tr, right, top), fit(br, right, bottom), fit(bl, left, bottom)];
+
+                    if (radii.some(Boolean)) value = radii.map((r) => r + 'px').join(' ');
+                }
+
+                // Written only when it changes: this runs on every scrolled frame
+                if (el._studioCorners === value) return;
+                el._studioCorners = value;
+                value ? el.style.setProperty('--studio-corners', value) : el.style.removeProperty('--studio-corners');
+            });
+        });
     },
 
     sectionMenuItems(wrapper, event = null) {
@@ -4261,8 +4482,13 @@ const StudioPreview = {
         const path = [];
         let node = target;
 
+        // Its path two ways: tag names, for the Assistant to read, and child
+        // indexes, for the canvas to find the same element again
+        const locator = [];
+
         while (content && node && node !== content) {
             path.unshift(node.tagName.toLowerCase());
+            locator.unshift([...node.parentElement.children].indexOf(node));
             node = node.parentElement;
         }
 
@@ -4274,6 +4500,7 @@ const StudioPreview = {
             sectionId,
             ref: section?.dataset.ref || null,
             path: path.join(' > '),
+            locator,
             tag: target.tagName.toLowerCase(),
             text: (target.innerText || '').trim().slice(0, 160),
             field: entry ? entry.key : null,
@@ -4444,6 +4671,10 @@ const StudioPreview = {
 
         // The sentinels came with the new markup — rebuild this section's map
         StudioFields.index(el.closest('[data-section]'));
+
+        // What the editor was pointing at was in the old markup
+        if (this.context?.sectionId === sectionId) this.applyContext();
+        if (this.fieldFocus?.sectionId === sectionId) this.paintFieldFocus();
     },
 };
 
@@ -4556,8 +4787,10 @@ window.Studio = {
     /**
      * Ask the Media panel for an image. Opens the panel in picker mode and
      * resolves with the chosen URL, or null when the pick is cancelled.
+     * `current` is the image the field holds now: the panel opens on its
+     * folder and marks it.
      */
-    mediaPick() {
+    mediaPick(current = null) {
         return new Promise((resolve) => {
             const id = (window.crypto?.randomUUID?.() || String(Date.now() + Math.random()));
 
@@ -4568,7 +4801,7 @@ window.Studio = {
             };
 
             window.addEventListener('studio:media-picked', onPicked);
-            window.dispatchEvent(new CustomEvent('studio:media-pick', { detail: { id } }));
+            window.dispatchEvent(new CustomEvent('studio:media-pick', { detail: { id, current: typeof current === 'string' && current ? current : null } }));
         });
     },
 

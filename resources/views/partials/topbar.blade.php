@@ -92,7 +92,7 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 scale-[0.98]"
-                class="s-pop absolute left-0 top-full z-50 mt-1.5 w-72"
+                class="s-pop absolute left-0 top-full z-[88] mt-1.5 w-72"
                 role="menu"
             >
                 <template x-for="p in pages" :key="p.slug">

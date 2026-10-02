@@ -25,6 +25,26 @@
                 border-radius: 3px;
             }
 
+            /* What the Assistant's composer is holding (studio:context): the
+               picked element keeps the pick tool's dashed violet for as long
+               as the chat has it — an outline only, so the element's own
+               shape and colours are left alone. With no element, the section
+               wears the ring, just inside its edge. */
+            [data-studio-context] {
+                outline: 1.5px dashed #8b5cf6 !important;
+                outline-offset: 3px !important;
+            }
+
+            .studio-section.is-context::after {
+                outline: 1.5px dashed rgba(139, 92, 246, 0.9);
+                outline-offset: -4px;
+            }
+
+            /* The section being edited on its own is the subject already */
+            html.studio-focus .studio-section.is-context::after {
+                outline: none;
+            }
+
             html.studio-element-select .studio-section::after,
             html.studio-element-select .studio-chip,
             html.studio-element-select .studio-toolbar,
@@ -38,13 +58,16 @@
                 display: none !important;
             }
 
-            /* A violet edge on the whole canvas while it is armed */
+            /* A violet edge on the whole canvas while it is armed. It follows
+               the corners the editor cuts off the canvas (--studio-canvas-corners,
+               from studio:corners). */
             html.studio-element-select body::after {
                 content: '';
                 position: fixed;
                 inset: 0;
                 pointer-events: none;
                 z-index: 2147483001;
+                border-radius: var(--studio-canvas-corners, 0);
                 box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.75);
             }
 
@@ -63,12 +86,18 @@
                 animation: none !important;
             }
 
+            /* The outline. The editor shows the canvas through a rounded
+               window, so an outline whose corner reaches a corner of the
+               canvas would be cut off there: the runtime gives each section
+               the radius that keeps it inside (--studio-corners, set by
+               StudioPreview.roundCorners() from where the section sits). */
             .studio-section::after {
                 content: '';
                 position: absolute;
                 inset: 0;
                 pointer-events: none;
                 z-index: 2147483000;
+                border-radius: var(--studio-corners, 0);
                 background-color: transparent;
                 transition: box-shadow 120ms ease, background-color 220ms ease;
             }

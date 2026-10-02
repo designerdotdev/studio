@@ -80,6 +80,9 @@ Route::group([
         Route::get('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'show'])->name('api.code.show');
         Route::put('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'update'])->middleware('throttle:60,1')->name('api.code.update');
         Route::post('/code/section', [\Designer\Studio\Http\Controllers\CodeController::class, 'store'])->middleware('throttle:20,1')->name('api.code.store');
+        Route::post('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'create'])->middleware('throttle:30,1')->name('api.code.create');
+        Route::patch('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'rename'])->middleware('throttle:30,1')->name('api.code.rename');
+        Route::post('/code/duplicate', [\Designer\Studio\Http\Controllers\CodeController::class, 'duplicate'])->middleware('throttle:30,1')->name('api.code.duplicate');
         Route::delete('/code/file', [\Designer\Studio\Http\Controllers\CodeController::class, 'destroy'])->middleware('throttle:20,1')->name('api.code.destroy');
 
         // Dev mode — section source editing (404s unless the gate passes)

@@ -23,10 +23,12 @@
         uploading: 0,
         dragOver: false,
 
-        // picker mode: the id of the field waiting for an image, and the
-        // flyout that was open when it asked (null: none)
+        // picker mode: the id of the field waiting for an image, the
+        // flyout that was open when it asked (null: none), and the image
+        // the field holds now — marked in the grid
         picker: null,
         pickerFrom: null,
+        current: null,
 
         // per-item UI
         menu: null,          // { item, x, y }
@@ -60,6 +62,7 @@
                 if (this.picker) {
                     window.dispatchEvent(new CustomEvent('studio:media-picked', { detail: { id: this.picker, url: null } }));
                     this.picker = null;
+                    this.current = null;
                 }
             });
             window.addEventListener('studio:media-pick', (e) => {
@@ -68,8 +71,9 @@
                 // Remember what the flyout was showing so the pick lands back there
                 this.pickerFrom = Alpine.store('studio').drawer === 'media' ? this.pickerFrom : Alpine.store('studio').drawer;
                 this.picker = e.detail.id;
+                this.current = e.detail.current || null;
                 Alpine.store('studio').openDrawer('media');
-                if (!this.loaded) this.load(this.dir);
+                this.showCurrent();
             });
             // Esc, relayed by the editor: the innermost thing first
             window.addEventListener('studio:drawer-escape', () => {
@@ -81,8 +85,24 @@
             });
         },
 
+        // A pick opens on the folder of the image the field already holds
+        // (when it is one of the library's), with that image in view
+        async showCurrent() {
+            const match = (this.current || '').match(/^\/designer\/(?:(.+)\/)?[^\/]+$/);
+            const dir = match ? (match[1] || '') : null;
+
+            if (dir !== null && dir !== this.dir) {
+                if (!await this.load(dir, true)) await this.load(this.dir);
+            } else if (!this.loaded) {
+                await this.load(this.dir);
+            }
+
+            this.$nextTick(() => this.$root.querySelector('.s-media-tile.is-current')?.scrollIntoView({ block: 'nearest' }));
+        },
+
         // The pick is over: back to whatever the flyout held before it
         afterPick() {
+            this.current = null;
             const studio = Alpine.store('studio');
             const from = this.pickerFrom;
             this.pickerFrom = null;
@@ -104,9 +124,12 @@
             return this.request(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         },
 
-        async load(dir) {
+        // Resolves true when the folder was read. `quiet`: no toast when it
+        // was not (a guess at a folder that may be gone).
+        async load(dir, quiet = false) {
             this.loading = true;
             this.menu = null;
+            let ok = true;
             try {
                 const data = await this.request(this.urls.list + '?dir=' + encodeURIComponent(dir ?? ''));
                 this.dir = data.dir;
@@ -117,9 +140,11 @@
                 this.allFolders = ['', ...data.all_folders];
                 this.loaded = true;
             } catch (e) {
-                window.Studio.toast(e.message, 'error');
+                ok = false;
+                if (!quiet) window.Studio.toast(e.message, 'error');
             }
             this.loading = false;
+            return ok;
         },
 
         async uploadFiles(fileList) {
@@ -306,10 +331,12 @@
         {{-- Files --}}
         <div class="grid grid-cols-3 gap-1.5">
             <template x-for="file in visibleFiles" :key="file.path">
-                <div class="s-media-tile group" :class="picker && 'is-pickable'" @contextmenu="!file.readonly && openMenu(file, $event)">
-                    <button type="button" class="block aspect-square w-full overflow-hidden rounded-lg bg-shell" @click="choose(file)" :title="file.name">
+                <div class="s-media-tile group" :class="{ 'is-pickable': picker, 'is-current': picker && current === file.url }" @contextmenu="!file.readonly && openMenu(file, $event)">
+                    <button type="button" class="block aspect-square w-full overflow-hidden rounded-lg bg-shell" @click="choose(file)" :title="picker && current === file.url ? file.name + ' — in use' : file.name">
                         <img :src="file.url" :alt="file.name" class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.04]" loading="lazy">
                     </button>
+                    {{-- The image the field holds now --}}
+                    <span class="s-media-tile-current" x-show="picker && current === file.url" x-cloak>In use</span>
                     <template x-if="renaming === file.path">
                         <input type="text" class="s-input mt-1 !h-6 !text-[11px]" x-init="$nextTick(() => { $el.focus(); $el.select() })" x-model="renameValue" @keydown.enter="saveRename()" @keydown.escape="renaming = null" @blur="saveRename()">
                     </template>

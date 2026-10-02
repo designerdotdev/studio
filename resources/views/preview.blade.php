@@ -13,6 +13,13 @@
     <style>
         [x-cloak] { display: none !important; }
         html, body { pointer-events: none; overflow: hidden; }
+
+        /* A section shorter than the thumbnail (a nav bar, a logo strip)
+           sits in the middle of it instead of at the top of an empty card.
+           Auto margins, so a taller one still starts at the top. */
+        html, body { min-height: 100vh; }
+        body { display: flex; flex-direction: column; }
+        .studio-preview-fit { width: 100%; margin-block: auto; }
         ::-webkit-scrollbar { display: none; }
 
         /* A thumbnail is a still of the finished section: every animation is
@@ -40,8 +47,10 @@
     {!! $chrome->head() !!}
 </head>
 <body class="{{ $chrome->bodyClass() }}">
-    @foreach($sections as $html)
-        {!! $html !!}
-    @endforeach
+    <div class="studio-preview-fit">
+        @foreach($sections as $html)
+            {!! $html !!}
+        @endforeach
+    </div>
 </body>
 </html>

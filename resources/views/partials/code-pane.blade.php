@@ -37,12 +37,17 @@
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4.75" width="18" height="14.5" rx="2.25"/><path d="M9 4.75v14.5"/></svg>
         </button>
 
-        <div class="s-code-tabs-scroll">
+        <div class="s-code-tabs-scroll" role="tablist" aria-label="Open files">
             <template x-for="tab in $store.code.tabs" :key="tab.path">
                 <div
                     class="s-code-tab group"
+                    role="tab"
+                    tabindex="0"
+                    :aria-selected="$store.code.active === tab.path"
                     :class="{ 'is-active': $store.code.active === tab.path, 'is-dirty': $store.code.dirty[tab.path] }"
                     @click="$store.code.activate(tab.path)"
+                    @keydown.enter.self="$store.code.activate(tab.path)"
+                    @keydown.space.self.prevent="$store.code.activate(tab.path)"
                     :title="tab.display"
                 >
                     <span class="font-mono" x-text="tab.name"></span>
@@ -98,6 +103,9 @@
             <p class="text-[13px] font-medium text-soft">Pick a file to edit</p>
             <p class="max-w-xs text-[12px] leading-relaxed text-faint">
                 The site lives in resources/designer and public/designer — pages, sections, layouts, data, and CSS. A saved file is live at once, and the editor picks it up.
+            </p>
+            <p class="mt-1 flex items-center gap-1.5 text-[11.5px] text-faint">
+                <span class="s-kbd">⌘K</span> finds a file by name
             </p>
             {{-- The files can be folded away: offer the way back --}}
             <button

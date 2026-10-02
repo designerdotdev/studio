@@ -11,14 +11,12 @@
             --e: cubic-bezier(.25, 1, .5, 1);
             --io: cubic-bezier(.65, 0, .35, 1);
             --mv: cubic-bezier(.7, 0, .2, 1);   /* the wipe and the move into place share this curve */
-            --mark-n: 56;                        /* the mark's resting height, in px */
-            --big: 1.5;                          /* its size while it is drawn, as a multiple of that */
+            --mark-n: 40;                        /* the mark's resting height, in px */
+            --big: 2.1;                          /* its size while it is drawn, as a multiple of that (84px) */
             --ts: 2.15s;                         /* when the wipe and the move start */
             --sd: .95s;                          /* how long they take */
             --t0: 2.95s;                         /* when the text starts */
-            --dur: 3.9s;
             --guide: .45;                        /* the guides and the compass arm: ink at this opacity */
-            --rule: color-mix(in srgb, var(--color-ink) 16%, transparent);
             --dot: color-mix(in srgb, var(--color-ink) 24%, transparent);   /* a dot at the middle of the spotlight */
         }
 
@@ -38,9 +36,6 @@
             -webkit-mask-image: var(--spot);
             mask-image: var(--spot);
         }
-
-        .intro-progress { position: absolute; inset: auto 0 0 0; height: 2px; pointer-events: none; }
-        .intro-progress i { display: block; height: 100%; background: var(--rule); transform-origin: left; opacity: 0; }
 
         .intro-mark {
             /* Line widths in viewBox units: about 1.2px on screen while the mark is at its opening size. */
@@ -75,13 +70,11 @@
         @keyframes intro-blip { 0% { opacity: 0; } 8%, 88% { opacity: 1; } 100% { opacity: 0; } }
         @keyframes intro-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes intro-o-life { 0%, 85% { opacity: .85; } 100% { opacity: 0; } }
-        @keyframes intro-prog { 0% { opacity: 1; transform: scaleX(0); } 97% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
         @keyframes intro-settle { from { transform: translateY(var(--lift, 150px)) scale(var(--big)); } }
         @keyframes intro-wipe { from { clip-path: inset(102% -2% -2% -2%); } to { clip-path: inset(-2% -2% -2% -2%); } }
         @keyframes intro-guides { 0%, 83% { opacity: 1; } 100% { opacity: 0; } }
 
         /* Guides, compass, square, then the wipe and the move together, then the text */
-        .intro.is-playing .intro-progress i { animation: intro-prog var(--dur) linear both; }
         .intro.is-playing .intro-guides { animation: intro-guides 2.6s linear both; }
         .intro.is-playing .intro-g { animation: intro-draw .7s calc(var(--i) * 45ms) var(--io) backwards; }
         .intro.is-playing .intro-radius { animation: intro-spin .95s .55s var(--io) backwards, intro-blip .95s .55s linear both; }
@@ -98,7 +91,7 @@
     </style>
 
     <div
-        class="s-canvas relative h-full w-full overflow-y-auto"
+        class="s-canvas relative flex h-full w-full flex-col overflow-y-auto"
         x-data="{
             step: 1,
             selected: @js(array_key_first(array_filter($templates, fn ($t) => $t['active'])) ?? array_key_first($templates)),
@@ -176,7 +169,7 @@
     >
         {{-- Step 1 — Welcome. It plays the intro once; a click or a key
              skips to the end of it. --}}
-        <div x-show="step === 1" data-intro class="intro relative isolate flex min-h-full flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
+        <div x-show="step === 1" data-intro class="intro relative isolate flex min-h-full shrink-0 flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
             <div class="intro-dots" aria-hidden="true"></div>
 
             <div class="intro-mark text-ink" aria-hidden="true">
@@ -224,8 +217,6 @@
             <p class="intro-t mt-16 text-xs text-faint" style="--i:4">
                 Everything can be changed later — templates are just a starting point.
             </p>
-
-            <div class="intro-progress" aria-hidden="true"><i></i></div>
         </div>
 
         {{-- The spotlight on the dot grid trails the pointer by a few
@@ -319,7 +310,7 @@
         </script>
 
         {{-- Step 2 — Template picker --}}
-        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
+        <div x-show="step === 2" x-cloak class="mx-auto w-full max-w-6xl flex-1 px-6 py-12 lg:py-16">
             <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
                     <p class="s-microlabel">Step 2 of 2</p>

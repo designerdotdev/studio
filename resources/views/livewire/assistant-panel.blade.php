@@ -44,9 +44,15 @@
             window.addEventListener('studio:element-selected', (e) => {
                 this.element = e.detail;
                 this.setPicking(false);
+                // The chip names the element's own section, whichever one was selected before
+                if (e.detail?.sectionId && $wire.selected?.id !== e.detail.sectionId) {
+                    window.Livewire?.dispatch('studio:select-section', { id: e.detail.sectionId });
+                }
                 $store.studio.setAssistant(true);
                 this.$nextTick(() => this.$refs.composer?.focus());
             });
+            // A reloaded canvas has forgotten what was marked on it
+            window.addEventListener('studio:canvas-loaded', () => this.syncContext());
             // Esc (in the editor or the canvas) and the banner's Cancel
             window.addEventListener('studio:pick-cancel', () => { if (this.picking) this.setPicking(false) });
             this.$watch('busy', () => this.$nextTick(() => this.scrollToEnd()));
@@ -55,6 +61,21 @@
         },
 
         scrollToEnd() { const el = this.$refs.log; if (el) el.scrollTop = el.scrollHeight; },
+
+        // What the composer's chip holds is marked on the canvas — the picked
+        // element, or else the section — while the Assistant is on screen.
+        // Closed (or behind an edit) the mark goes; the chip itself is kept,
+        // like the rest of the draft, and the mark returns with the panel.
+        // `reveal` also scrolls the canvas to it (a click on the chip).
+        syncContext(reveal = false) {
+            const showing = $store.studio.assistantOpen;
+            const sectionId = showing ? (this.element?.sectionId || $wire.selected?.id || null) : null;
+
+            window.dispatchEvent(new CustomEvent('studio:to-iframe', {
+                // (a plain copy: what Alpine holds is a proxy, which cannot be posted to the canvas)
+                detail: { type: 'studio:context', sectionId, locator: sectionId && this.element?.locator ? [...this.element.locator] : null, reveal },
+            }));
+        },
 
         // The textarea grows with the message, up to a few lines. Hidden
         // (the column is shut, or showing an edit) it cannot be measured — leave it
@@ -198,6 +219,8 @@
 
             if (files.length) {
                 window.Studio.toast(`Assistant changed ${files.length} ${files.length === 1 ? 'file' : 'files'}`, 'success');
+                // Files open in the Code view may be among them
+                window.dispatchEvent(new CustomEvent('studio:files-changed', { detail: { paths: files } }));
             }
         },
 
@@ -207,7 +230,7 @@
         },
     }"
     @studio:focus-chat.window="$nextTick(() => $refs.composer?.focus())"
-    x-effect="$store.studio.assistantOpen; $nextTick(() => grow())"
+    x-effect="$store.studio.assistantOpen; $wire.selected; element; $nextTick(() => { grow(); syncContext(); })"
 >
     {{-- The conversation: the header and the transcript --}}
     <div class="s-chat-thread">
@@ -353,9 +376,13 @@
                 {{-- $wire.selected is reactive, so the chip follows the canvas
                      selection (Ask AI, a click) without waiting on a morph --}}
                 <div class="s-chat-chips" x-show="$wire.selected || element || attachments.length" data-context-chips>
-                    <span class="s-chat-chip" x-show="$wire.selected || element" data-context-chip>
-                        <svg class="h-2.5 w-2.5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5a.75.75 0 0 1 1.14-.64l12 7a.75.75 0 0 1-.09 1.33l-4.2 1.72-1.72 4.2a.75.75 0 0 1-1.33.09l-7-12A.75.75 0 0 1 3 3.5Z"/></svg>
-                        <span class="truncate" x-text="($wire.selected?.title || '') + (element ? ($wire.selected ? ' › ' : '') + element.path : '')"></span>
+                    {{-- The same violet the canvas marks it with; a click on the
+                         name scrolls the canvas to it --}}
+                    <span class="s-chat-chip is-context" x-show="$wire.selected || element" data-context-chip>
+                        <button type="button" class="s-chat-chip-name" @click="syncContext(true)" title="Show it on the page">
+                            <svg class="h-2.5 w-2.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 3.5a.75.75 0 0 1 1.14-.64l12 7a.75.75 0 0 1-.09 1.33l-4.2 1.72-1.72 4.2a.75.75 0 0 1-1.33.09l-7-12A.75.75 0 0 1 3 3.5Z"/></svg>
+                            <span class="truncate" x-text="($wire.selected?.title || '') + (element ? ($wire.selected ? ' › ' : '') + element.path : '')"></span>
+                        </button>
                         <button type="button" class="s-chat-chip-x" x-show="element" @click="element = null" title="Clear element" aria-label="Clear element">×</button>
                         <button type="button" class="s-chat-chip-x" x-show="!element && $wire.selected" @click="$wire.clearSelection()" title="Clear section" aria-label="Clear section">×</button>
                     </span>

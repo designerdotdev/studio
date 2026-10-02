@@ -152,10 +152,10 @@
                                 class="s-flyout s-light"
                                 x-show="$store.studio.drawer"
                                 x-cloak
-                                x-transition:enter="transition duration-200 ease-[cubic-bezier(.22,1,.36,1)]"
+                                x-transition:enter="transition duration-200 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none"
                                 x-transition:enter-start="-translate-x-2 opacity-0"
                                 x-transition:enter-end="translate-x-0 opacity-100"
-                                x-transition:leave="transition duration-150 ease-in"
+                                x-transition:leave="transition duration-150 ease-in motion-reduce:transition-none"
                                 x-transition:leave-start="translate-x-0 opacity-100"
                                 x-transition:leave-end="-translate-x-1.5 opacity-0"
                                 :style="{ width: $store.studio.drawerWidth + 'px' }"

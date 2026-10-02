@@ -11,20 +11,15 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * The file set Code mode can browse and edit.
+ * The file set the Code view can browse and edit: the whole application
+ * root, hidden files included, as real paths relative to it. The tree comes
+ * back one folder per request (a project walked whole blows any node cap),
+ * with the site's two folders — `resources/designer` and `public/designer` —
+ * marked `design` so they stay findable.
  *
- * Two views over one set of real paths (relative to the app root):
- *
- *   designer   only the site — `resources/designer` and `public/designer`,
- *              shown as `resources/` and `public/` holding just `designer/`,
- *              walked whole in one request
- *   laravel    the whole application root, hidden files included, one
- *              folder per request (a project walked whole blows any node
- *              cap), with the site's two folders marked so they stay findable
- *
- * The views overlap (resources/designer is inside resources/), but a file
- * has one path in both, so a tab, an unsaved buffer, or a save is the same
- * whichever view it was opened from.
+ * Files and folders can be created, renamed, duplicated and deleted here
+ * too. What must not move is refused: dependency trees, the top-level
+ * project folders, and the folders the site itself lives in.
  *
  * Every file is listed, but not every file opens: dependency trees
  * (self::INERT_DIRS) are shown and never entered, and binary or oversized
@@ -54,6 +49,9 @@ class CodeWorkspace
     /** Refuse to load anything a browser-side editor has no business holding. */
     public const MAX_BYTES = 512 * 1024;
 
+    /** A folder holding more than this is not deleted from a browser. */
+    public const MAX_DELETE = 500;
+
     /** The site's two folders, as workspace paths. */
     public function siteRoots(): array
     {
@@ -64,48 +62,67 @@ class CodeWorkspace
     }
 
     /**
-     * A flat node list — {path, name, type, depth, parent, design, lazy,
-     * inert, note} — ordered so the browser can render it as a tree without
-     * recursing. Directories come before files at every level, both
-     * alphabetical. An `inert` node is listed but never opened; `note` says why.
-     *
-     * The Designer view comes back whole. The Laravel view comes back one
-     * folder at a time — the root, or the children of `$dir` — and a folder
-     * whose children are still to fetch is `lazy`.
-     *
-     * @param  string  $view  'designer' (the site) or 'laravel' (the app)
+     * One folder of the application as a flat node list — {path, name, type,
+     * depth, parent, design, lazy, inert, note} — directories before files,
+     * both alphabetical. `$dir` null is the root. Every sub-folder is `lazy`:
+     * its children are a request of their own. An `inert` node is listed but
+     * never opened; `note` says why.
      */
-    public function tree(string $view = 'designer', ?string $dir = null): array
+    public function tree(?string $dir = null): array
     {
         $nodes = [];
+        $dir = trim((string) $dir, '/') === '' ? null : $this->normaliseDirectory($dir);
 
-        if ($view === 'laravel') {
-            $dir = trim((string) $dir, '/') === '' ? null : $this->normaliseDirectory($dir);
+        $this->walk(
+            $dir === null ? base_path() : base_path($dir),
+            $dir,
+            $dir === null ? 0 : substr_count($dir, '/') + 1,
+            $nodes,
+        );
 
-            $this->walk(
-                $dir === null ? base_path() : base_path($dir),
-                $dir,
-                $dir === null ? 0 : substr_count($dir, '/') + 1,
-                $nodes,
-                recursive: false,
-            );
+        return $nodes;
+    }
 
-            return $nodes;
-        }
+    /**
+     * Every text file of the site, as workspace paths — the index the
+     * palette's quick-open searches, since the tree itself only knows the
+     * folders that have been opened.
+     *
+     * @return list<string>
+     */
+    public function siteFiles(): array
+    {
+        $files = [];
 
         foreach ($this->siteRoots() as $root) {
-            [$parent, $folder] = explode('/', $root, 2);
-
             if (!is_dir(base_path($root))) {
                 continue;
             }
 
-            $nodes[] = $this->node($parent, $parent, 'dir', 0, null);
-            $nodes[] = $this->node($root, $folder, 'dir', 1, $parent);
-            $this->walk(base_path($root), $root, 2, $nodes);
+            $walker = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator(base_path($root), \FilesystemIterator::SKIP_DOTS)
+            );
+
+            foreach ($walker as $entry) {
+                if (count($files) >= self::MAX_NODES) {
+                    break 2;
+                }
+
+                $path = $root . '/' . str_replace(DIRECTORY_SEPARATOR, '/', $walker->getSubPathname());
+
+                if (
+                    $entry->isFile()
+                    && preg_match(self::PATH_PATTERN, $path)
+                    && !in_array(strtolower($entry->getExtension()), self::BINARY_EXTENSIONS, true)
+                ) {
+                    $files[] = $path;
+                }
+            }
         }
 
-        return $nodes;
+        sort($files, SORT_STRING | SORT_FLAG_CASE);
+
+        return $files;
     }
 
     /** Is this path part of the site (resources/designer or public/designer)? */
@@ -136,11 +153,10 @@ class CodeWorkspace
     }
 
     /**
-     * List one directory into $nodes — every entry, hidden ones included —
-     * and, when $recursive, everything under it. A null $prefix is the
-     * application root.
+     * List one directory into $nodes — every entry, hidden ones included. A
+     * null $prefix is the application root.
      */
-    protected function walk(string $absolute, ?string $prefix, int $depth, array &$nodes, bool $recursive = true): void
+    protected function walk(string $absolute, ?string $prefix, int $depth, array &$nodes): void
     {
         if (count($nodes) >= self::MAX_NODES) {
             return;
@@ -197,16 +213,8 @@ class CodeWorkspace
             }
 
             $node = $this->node($path, $name, 'dir', $depth, $prefix);
-
-            if (!$recursive) {
-                $node['lazy'] = true;
-                $nodes[] = $node;
-
-                continue;
-            }
-
+            $node['lazy'] = true;
             $nodes[] = $node;
-            $this->walk($real, $path, $depth + 1, $nodes);
         }
 
         foreach ($files as $name) {
@@ -279,7 +287,7 @@ class CodeWorkspace
             throw new RuntimeException('That file is too large to save.');
         }
 
-        // Must already exist — new files go through createSection()
+        // Must already exist — new files go through create()
         $absolute = $this->resolveExisting($path);
 
         if ($this->isDesignPath($path)) {
@@ -329,16 +337,147 @@ class CodeWorkspace
         ];
     }
 
-    /** Delete a workspace file. A section takes its field contract with it. */
+    /**
+     * Create an empty file or a folder. Its parent has to exist already, and
+     * nothing may be there yet.
+     */
+    public function create(string $path, string $type): array
+    {
+        $path = $this->normalise($path);
+        $absolute = $this->resolveNew($path);
+
+        if ($type === 'dir') {
+            File::makeDirectory($absolute);
+        } else {
+            if (in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), self::BINARY_EXTENSIONS, true)) {
+                throw new RuntimeException('The editor only makes text files.');
+            }
+
+            // The site reads its JSON on every page: an empty file would not parse
+            File::put($absolute, str_ends_with($path, '.json') ? "{}\n" : '');
+        }
+
+        app(TemplateLink::class)->touch();
+
+        return ['path' => $path, 'type' => $type === 'dir' ? 'dir' : 'file'];
+    }
+
+    /**
+     * Rename (or move) a file or a folder. A section is a pair, so renaming
+     * either half renames both.
+     *
+     * @return array{path: string, type: string, language: ?string, moved: array<int, array{from: string, to: string}>}
+     */
+    public function rename(string $from, string $to): array
+    {
+        $from = $this->normalise($from);
+        $to = $this->normalise($to);
+
+        if ($from === $to) {
+            throw new RuntimeException('That is already its name.');
+        }
+
+        $source = $this->resolveMovable($from);
+        $moves = [[$from, $to]];
+
+        if (is_file($source)) {
+            $this->resolveExisting($from);
+
+            // Both halves of a section follow one name
+            if ($this->isSectionSource($from)) {
+                [$stem, $suffix] = $this->splitSection($from);
+
+                if (!str_ends_with($to, $suffix)) {
+                    throw new RuntimeException("A section's file keeps its {$suffix} ending — the editor pairs it with its other half by name.");
+                }
+
+                $target = substr($to, 0, -strlen($suffix));
+                $moves = [];
+
+                foreach (['.blade.php', '.yml'] as $half) {
+                    $moves[] = [$stem . $half, $target . $half];
+                }
+            }
+        }
+
+        foreach ($moves as [, $destination]) {
+            $this->resolveNew($destination);
+        }
+
+        foreach ($moves as [$origin, $destination]) {
+            if (!@rename(base_path($origin), base_path($destination))) {
+                throw new RuntimeException('That could not be renamed — check the folder\'s permissions.');
+            }
+        }
+
+        app(TemplateLink::class)->touch();
+
+        return [
+            'path' => $to,
+            'type' => is_dir(base_path($to)) ? 'dir' : 'file',
+            'language' => is_dir(base_path($to)) ? null : $this->languageFor($to),
+            'moved' => array_map(fn ($move) => ['from' => $move[0], 'to' => $move[1]], $moves),
+        ];
+    }
+
+    /**
+     * Copy a file beside itself as `<name>-copy`. A section is copied as a
+     * pair, which makes a new section.
+     */
+    public function duplicate(string $path): array
+    {
+        $path = $this->normalise($path);
+        $this->resolveExisting($path);
+
+        $section = $this->isSectionSource($path);
+        [$stem, $suffix] = $section ? $this->splitSection($path) : $this->splitName($path);
+        $halves = $section ? ['.blade.php', '.yml'] : [$suffix];
+
+        // -copy, then -copy-2, -copy-3… until every half of the name is free
+        for ($n = 1, $copy = null; $copy === null && $n < 100; $n++) {
+            $candidate = $stem . '-copy' . ($n > 1 ? '-' . $n : '');
+
+            foreach ($halves as $half) {
+                if (file_exists(base_path($candidate . $half))) {
+                    continue 2;
+                }
+            }
+
+            $copy = $candidate;
+        }
+
+        if ($copy === null) {
+            throw new RuntimeException('There are too many copies of that file already.');
+        }
+
+        foreach ($halves as $half) {
+            $this->resolveNew($copy . $half);
+            File::copy(base_path($stem . $half), base_path($copy . $half));
+        }
+
+        app(TemplateLink::class)->touch();
+
+        return ['path' => $copy . $suffix, 'type' => 'file'];
+    }
+
+    /**
+     * Delete a file — a section takes its field contract with it — or a
+     * folder and everything in it.
+     */
     public function delete(string $path): array
     {
         $path = $this->normalise($path);
+
+        if (is_dir(base_path($path))) {
+            return $this->deleteDirectory($path);
+        }
+
         $absolute = $this->resolveExisting($path);
         $removed = [$path];
 
         // A section is a pair; leaving half of it behind breaks the library
         if ($this->isSectionSource($path)) {
-            $stem = preg_replace('/(\.blade\.php|\.yml)$/', '', $path);
+            [$stem] = $this->splitSection($path);
             $removed = [];
 
             foreach (['.blade.php', '.yml'] as $extension) {
@@ -353,7 +492,34 @@ class CodeWorkspace
 
         app(TemplateLink::class)->touch();
 
-        return ['removed' => $removed];
+        return ['removed' => $removed, 'type' => 'file'];
+    }
+
+    /** A folder goes whole — unless it is one that must stay, or too much to lose in a click. */
+    protected function deleteDirectory(string $path): array
+    {
+        $absolute = $this->resolveMovable($path);
+        $count = 0;
+
+        $walker = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($absolute, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($walker as $entry) {
+            if (in_array($entry->getFilename(), self::INERT_DIRS, true)) {
+                throw new RuntimeException('That folder holds dependencies or a repository — delete it from a terminal.');
+            }
+
+            if (++$count > self::MAX_DELETE) {
+                throw new RuntimeException('That folder holds more than ' . self::MAX_DELETE . ' files — delete it from a terminal.');
+            }
+        }
+
+        File::deleteDirectory($absolute);
+        app(TemplateLink::class)->touch();
+
+        return ['removed' => [$path], 'type' => 'dir'];
     }
 
     /* ------------------------------------------------------------------ */
@@ -382,6 +548,87 @@ class CodeWorkspace
     }
 
     /**
+     * A path nothing lives at yet, whose parent folder exists inside the
+     * application. Returns where it will be on disk.
+     */
+    protected function resolveNew(string $path): string
+    {
+        $absolute = base_path($path);
+        $parent = realpath(dirname($absolute));
+
+        if ($parent === false || !is_dir($parent) || !$this->insideBase($parent)) {
+            throw new RuntimeException('That folder could not be found in the Studio workspace.');
+        }
+
+        if (file_exists($absolute) || is_link($absolute)) {
+            throw new RuntimeException('"' . basename($path) . '" already exists there.');
+        }
+
+        return $parent . DIRECTORY_SEPARATOR . basename($path);
+    }
+
+    /**
+     * A file or folder that may be renamed or deleted. The folders the app
+     * and the site stand on stay where they are.
+     */
+    protected function resolveMovable(string $path): string
+    {
+        $absolute = base_path($path);
+
+        if (is_link($absolute)) {
+            throw new RuntimeException('That is a link to somewhere else — change it from a terminal.');
+        }
+
+        $real = realpath($absolute);
+
+        if ($real === false || !$this->insideBase($real)) {
+            throw new RuntimeException('That could not be found in the Studio workspace.');
+        }
+
+        if (is_dir($real)) {
+            if (!str_contains($path, '/')) {
+                throw new RuntimeException('A top-level project folder can\'t be renamed or deleted from Studio.');
+            }
+
+            foreach ($this->siteRoots() as $root) {
+                if ($root === $path || str_starts_with($root, $path . '/')) {
+                    throw new RuntimeException('The site lives in that folder — it can\'t be renamed or deleted.');
+                }
+            }
+        }
+
+        return $real;
+    }
+
+    /** A section file as [its path without the ending, `.blade.php` | `.yml`]. */
+    protected function splitSection(string $path): array
+    {
+        $suffix = str_ends_with($path, '.blade.php') ? '.blade.php' : '.yml';
+
+        return [substr($path, 0, -strlen($suffix)), $suffix];
+    }
+
+    /** Any file as [its path without the ending, the ending] — `.blade.php` counts as one. */
+    protected function splitName(string $path): array
+    {
+        if (str_ends_with($path, '.blade.php')) {
+            return [substr($path, 0, -10), '.blade.php'];
+        }
+
+        $name = basename($path);
+        $dot = strrpos($name, '.');
+
+        // No ending, or a dotfile (.env): the whole name is the stem
+        if ($dot === false || $dot === 0) {
+            return [$path, ''];
+        }
+
+        $suffix = substr($name, $dot);
+
+        return [substr($path, 0, -strlen($suffix)), $suffix];
+    }
+
+    /**
      * Validate a workspace path's shape — every traversal trick and every
      * dependency tree rejected up front — and return it normalised.
      */
@@ -406,7 +653,7 @@ class CodeWorkspace
         return $path;
     }
 
-    /** A folder the Laravel view may list, normalised like a file path. */
+    /** A folder the tree may list, normalised like a file path. */
     protected function normaliseDirectory(string $path): string
     {
         $path = $this->normalise($path);
@@ -444,7 +691,7 @@ class CodeWorkspace
             return false;
         }
 
-        $stem = preg_replace('/(\.blade\.php|\.yml)$/', '', $path);
+        [$stem] = $this->splitSection($path);
 
         return is_file(base_path($stem . '.blade.php')) && is_file(base_path($stem . '.yml'));
     }

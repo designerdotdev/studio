@@ -14,7 +14,17 @@
                 detail: { type: 'studio:hover', sectionId, on }
             }));
         },
+        /* The caret is in a field (or has left it): the canvas haloes what that field renders */
+        focusField(event, on) {
+            const row = event.target.closest('[data-field-key]');
+            if (!row) return;
+            window.dispatchEvent(new CustomEvent('studio:to-iframe', {
+                detail: { type: 'studio:focus-field', sectionId: row.dataset.fieldSection, key: row.dataset.fieldKey, on }
+            }));
+        },
     }"
+    @focusin="focusField($event, true)"
+    @focusout="focusField($event, false)"
 >
     @php $selected = $this->selectedSection; @endphp
 
@@ -115,7 +125,7 @@
                     {{-- Developer mode off: a value written in code is not
                          the editor's to change, so it is not listed at all —
                          the same rule the canvas follows (no affordance) --}}
-                    <div wire:key="field-{{ $selectedId }}-{{ $key }}" data-field-key="{{ $key }}" @if(\Designer\Studio\Services\CollectionBinder::isCode($binding)) x-data x-show="$store.studio.developer" x-cloak @endif>
+                    <div wire:key="field-{{ $selectedId }}-{{ $key }}" data-field-key="{{ $key }}" data-field-section="{{ $selectedId }}" @if(\Designer\Studio\Services\CollectionBinder::isCode($binding)) x-data x-show="$store.studio.developer" x-cloak @endif>
                         @if(\Designer\Studio\Services\CollectionBinder::isCode($binding))
                             {{-- Written as code in the page file: shown, not edited --}}
                             <span class="s-label">{{ $field['label'] ?? \Illuminate\Support\Str::headline($key) }}</span>

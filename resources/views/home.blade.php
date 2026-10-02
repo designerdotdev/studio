@@ -4,7 +4,7 @@
     // Where publishing writes this page (index.blade.php for the home page)
     $pageFile = 'resources/designer/views/pages/' . ($page->slug === $homeSlug ? 'index' : $page->slug) . '.blade.php';
     $totalComponents = $library->flatten(1)->count();
-    // The server-side gate. Code mode and the Assistant need this AND the
+    // The server-side gate. The Code view and the Assistant need this AND the
     // user's developer-mode switch.
     $devModeAvailable = \Designer\Studio\Support\DevMode::enabled();
     // The top bar's "open in a new tab": the draft preview, or the live page
@@ -150,6 +150,10 @@
                         this.drawer = name;
                         this.drawerShown = name;
                         window.dispatchEvent(new CustomEvent('studio:drawer', { detail: { name } }));
+                        // Typing goes to the panel's own search, straight away
+                        requestAnimationFrame(() => requestAnimationFrame(() => {
+                            if (this.drawer === name) document.querySelector('[data-drawer=' + name + '] input[type=search]')?.focus({ preventScroll: true });
+                        }));
                     },
                     closeDrawer() {
                         if (!this.drawer) return;
@@ -323,6 +327,13 @@
                 // while the column closes
                 Alpine.effect(() => { if (studio.rightPanel) studio.rightShown = studio.rightPanel; });
 
+                // Toasts rise at the stage's bottom right corner — beside the
+                // right column when it is open, never over the fields or the
+                // composer in it
+                Alpine.effect(() => {
+                    document.documentElement.style.setProperty('--studio-toast-right', (studio.rightPanel ? studio.rightWidth + 22 : 16) + 'px');
+                });
+
                 // Esc with a flyout open (studio.js relays it): Media has its
                 // own ladder — lightbox, menu, an armed pick — and closes last
                 window.addEventListener('studio:drawer-escape', () => {
@@ -480,7 +491,7 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 scale-[0.98]"
-                class="s-pop absolute right-0 top-full z-50 mt-1.5 w-80 p-3"
+                class="s-pop absolute right-0 top-full z-[88] mt-1.5 w-80 p-3"
             >
                 @if($draftMode)
                     {{-- Unpublished changes --}}
@@ -613,7 +624,7 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 scale-[0.98]"
-                class="s-pop absolute left-0 top-full z-50 mt-1.5 w-[268px]"
+                class="s-pop absolute left-0 top-full z-[88] mt-1.5 w-[268px]"
                 role="menu"
             >
                 <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2">
@@ -649,7 +660,7 @@
                         <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
                         <span class="flex min-w-0 flex-1 flex-col">
                             <span class="text-ink">Developer mode</span>
-                            <span class="mt-px text-[11px] leading-snug text-faint" x-text="$store.studio.devMode ? 'Code mode, the Assistant, source lines and bindings are on' : 'Content editing only — nothing that reads as code'"></span>
+                            <span class="mt-px text-[11px] leading-snug text-faint" x-text="$store.studio.devMode ? 'Code, the Assistant, source lines and bindings are on' : 'Content editing only — nothing that reads as code'"></span>
                         </span>
                         <span class="s-switch mt-0.5" :class="$store.studio.devMode && 'is-on'" aria-hidden="true"></span>
                     </button>
@@ -701,10 +712,10 @@
     {{-- The flyout — Pages and Media, over the canvas                 --}}
     {{-- ============================================================ --}}
     <x-slot:flyout>
-        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'pages'">
+        <div x-data data-drawer="pages" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'pages'">
             <livewire:studio::pages-panel :page-slug="$page->slug" />
         </div>
-        <div x-data class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'media'" x-cloak>
+        <div x-data data-drawer="media" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'media'" x-cloak>
             <livewire:studio::media-panel />
         </div>
     </x-slot:flyout>
@@ -774,8 +785,12 @@
                 // Quick-open: in the Code view, the workspace files join
                 // the list so ⌘K doubles as a file switcher.
                 if (studio.view === 'code') {
-                    ($store.code.nodes || []).filter((node) => node.type === 'file').forEach((node) => {
-                        all.push({ label: node.path, hint: 'File', run: () => $store.code.openFile(node.path) });
+                    // Every file of the site, and whatever else the tree has read so far
+                    [...new Set([
+                        ...($store.code.index || []),
+                        ...($store.code.nodes || []).filter((node) => node.type === 'file' && !node.inert).map((node) => node.path),
+                    ])].forEach((path) => {
+                        all.push({ label: path, hint: 'File', run: () => $store.code.openFile(path) });
                     });
                 }
                 @endif
@@ -906,7 +921,7 @@
                         ['Command palette', ['⌘', 'K']],
                         ['Toggle the side panel', ['⌘', 'B']],
                         ['Page settings', ['⌘', ',']],
-                        ['Canvas width: desktop / tablet / mobile', ['⌥', '1–3']],
+                        ['Desktop / tablet / phone width', ['⌥', '1–3']],
                         ['This list', ['?']],
                     ],
                     'Selected section' => [
@@ -1217,7 +1232,7 @@
                                 class="s-menu-item justify-between capitalize"
                                 :class="category === @js($categoryName) && 'bg-wash !text-ink'"
                             >
-                                {{ str_replace('-', ' ', $categoryName) }}
+                                {{ ['cta' => 'CTA', 'faq' => 'FAQ', 'faqs' => 'FAQs', 'seo' => 'SEO'][$categoryName] ?? str_replace('-', ' ', $categoryName) }}
                                 <span class="text-[10.5px] text-faint">{{ $components->count() }}</span>
                             </button>
                         @endforeach
@@ -1446,7 +1461,7 @@
         };
 
         /* ------------------------------------------------------------------
-           Code mode's workspace: the file tree in the sidebar and the editor
+           The Code view's workspace: the docked file tree and the editor
            pane both read and write this store. Monaco itself is not loaded
            until the first file is opened.
            ------------------------------------------------------------------ */
@@ -1455,6 +1470,17 @@
            on) them — so the buffers live out here, and only plain, printable
            state goes in the store. */
         const studioCodeBuffers = { editor: null, models: {}, saved: {}, mounting: null };
+
+        // Files written from outside the Code view: its open tabs catch up
+        window.addEventListener('studio:files-changed', () => window.Alpine?.store('code')?.syncFromDisk());
+
+        // A file edited and not saved lives only in this window: leaving it
+        // (a reload, another page, closing the tab) asks first
+        window.addEventListener('beforeunload', (event) => {
+            if (!Object.values(window.Alpine?.store('code')?.dirty || {}).some(Boolean)) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
 
         document.addEventListener('alpine:init', () => {
             Alpine.store('code', {
@@ -1465,13 +1491,21 @@
                 tabs: [],
                 active: null,
 
+                // The application's files, a folder at a time: the root
+                // at boot, each folder's children when it is first opened
                 nodes: [],
-                // 'designer' — just the site (resources/designer and
-                // public/designer); 'laravel' — the whole app, the site's
-                // folders tinted.
-                view: localStorage.getItem('studio.code-view') === 'laravel' ? 'laravel' : 'designer',
+                // Every text file of the site, whether its folder has been
+                // opened or not — what the palette's quick-open searches
+                index: [],
+                // The app root on disk (Copy path) and the folders the site
+                // lives in (they, and what holds them, cannot be renamed)
+                root: @js(rtrim(base_path(), '/')),
+                siteRoots: @js(app(\Designer\Studio\Services\CodeWorkspace::class)->siteRoots()),
                 openFolders: (() => {
-                    try { return JSON.parse(localStorage.getItem('studio.code-folders') || '{}') } catch (e) { return {} }
+                    try {
+                        // A first visit opens on the site's own folder
+                        return JSON.parse(localStorage.getItem('studio.code-folders') || 'null') || { resources: true, 'resources/designer': true };
+                    } catch (e) { return {} }
                 })(),
 
                 booted: false,
@@ -1479,26 +1513,31 @@
                 treeGeneration: 0,   // bumped per reload, so a stale folder fetch lands nowhere
                 saving: false,
                 creating: false,
+                busy: false,         // a tree write is in flight
                 error: '',
+                // The row the tree's actions act on: the last one clicked
+                selected: null,
+                // A file or folder being named before it exists:
+                // { kind: 'file' | 'dir', parent, depth, value }
+                draft: null,
+                // The row being renamed in place, and its field
+                renaming: null,
+                renameValue: '',
+                // The row whose Delete is waiting for a second click
                 confirmDelete: null,
+                // The context menu: where, and for which row (null: the tree itself)
+                menu: { open: false, x: 0, y: 0, path: null },
                 newSectionOpen: false,
                 newName: '',
                 newCategory: '',
                 newLabel: '',
 
-                /** Entering Code mode: show the tree and take the sidebar. */
+                /** Entering the Code view: load the tree, once. */
                 boot() {
                     if (!this.booted) {
                         this.booted = true;
                         this.loadTree();
                     }
-                },
-
-                setView(view) {
-                    if (this.view === view) return;
-                    this.view = view;
-                    localStorage.setItem('studio.code-view', view);
-                    this.loadTree();
                 },
 
                 async loadTree() {
@@ -1508,15 +1547,7 @@
                         const data = await this.fetchTree();
                         if (generation !== this.treeGeneration) return;
                         this.nodes = data.nodes;
-                        // The Designer view is small enough to open down to its
-                        // two designer/ folders; the Laravel view starts
-                        // collapsed, like any file explorer.
-                        if (this.view === 'designer') {
-                            this.nodes.filter((n) => n.depth <= 1 && n.type === 'dir').forEach((n) => {
-                                if (!(n.path in this.openFolders)) this.openFolders[n.path] = true;
-                            });
-                            this.persistFolders();
-                        }
+                        this.index = data.index || [];
                         await this.expandOpen(generation);
                     } catch (e) {
                         this.error = e.message;
@@ -1524,9 +1555,9 @@
                     if (generation === this.treeGeneration) this.loading = false;
                 },
 
-                /** One tree request: the whole Designer view, or one Laravel folder (the root without `dir`). */
+                /** One tree request: one folder's entries (the root without `dir`). */
                 async fetchTree(dir = null) {
-                    const query = new URLSearchParams({ view: this.view });
+                    const query = new URLSearchParams();
                     if (dir) query.set('dir', dir);
                     const response = await fetch(`${this.base}/tree?${query}`, { headers: { 'Accept': 'application/json' } });
                     const data = await response.json().catch(() => ({}));
@@ -1562,14 +1593,40 @@
                     }
                 },
 
-                /** Flat list → tree: a node shows when every ancestor is open. */
+                /**
+                 * Flat list → tree: a node shows when every ancestor is open.
+                 * A file or folder being named (`draft`) is a row of its own,
+                 * first inside the folder it will land in.
+                 */
                 get visibleNodes() {
                     const shown = {};
-                    return this.nodes.filter((node) => {
+                    const rows = this.nodes.filter((node) => {
                         const visible = node.depth === 0 || (shown[node.parent] && !!this.openFolders[node.parent]);
                         if (node.type === 'dir') shown[node.path] = visible;
                         return visible;
                     });
+
+                    if (this.draft) {
+                        const at = this.draft.parent ? rows.findIndex((n) => n.path === this.draft.parent) + 1 : 0;
+                        rows.splice(at, 0, { type: 'draft', path: '\u0000draft', kind: this.draft.kind, depth: this.draft.depth, parent: this.draft.parent });
+                    }
+
+                    return rows;
+                },
+
+                node(path) { return path ? this.nodes.find((n) => n.path === path) || null : null },
+
+                /** Where something new goes: the folder itself, a file's folder, or the root (null). */
+                folderFor(path) {
+                    const node = this.node(path);
+                    if (!node) return null;
+                    return node.type === 'dir' ? node.path : (node.parent || null);
+                },
+
+                /** A folder that has to stay where it is: a top-level one, or one the site stands on. */
+                locked(node) {
+                    return node?.type === 'dir'
+                        && (node.depth === 0 || this.siteRoots.some((root) => root === node.path || root.startsWith(node.path + '/')));
                 },
 
                 toggleFolder(path) {
@@ -1580,8 +1637,255 @@
                     if (open) this.expandOpen(this.treeGeneration);
                 },
 
+                collapseAll() {
+                    this.openFolders = {};
+                    this.persistFolders();
+                },
+
                 persistFolders() {
                     try { localStorage.setItem('studio.code-folders', JSON.stringify(this.openFolders)) } catch (e) { /* private mode */ }
+                },
+
+                /** Open a folder and every folder above it, fetching what has not been read yet. */
+                async reveal(dir) {
+                    if (!dir) return;
+                    let path = '';
+                    for (const part of dir.split('/')) {
+                        path = path ? path + '/' + part : part;
+                        this.openFolders = { ...this.openFolders, [path]: true };
+                        await this.loadChildren(path, this.treeGeneration);
+                    }
+                    this.persistFolders();
+                },
+
+                /** Read one folder again from disk (the whole tree without a path). */
+                async reloadFolder(path = null) {
+                    const folder = this.node(path);
+                    if (!folder) return this.loadTree();
+                    this.nodes = this.nodes.filter((n) => !n.path.startsWith(path + '/'));
+                    this.node(path).lazy = true;
+                    this.openFolders = { ...this.openFolders, [path]: true };
+                    await this.expandOpen(this.treeGeneration);
+                    // The palette's index of the site moves with it
+                    this.fetchTree().then((data) => { this.index = data.index || this.index }).catch(() => {});
+                },
+
+                /* --- writes: create, rename, duplicate, delete ----------- */
+
+                async request(method, endpoint, body) {
+                    const response = await fetch(this.base + endpoint, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(body),
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || (data.errors ? Object.values(data.errors).flat()[0] : null) || 'That did not work.');
+                    }
+                    return data;
+                },
+
+                // A change inside the site has already been re-read on the
+                // server; the editor's own documents follow
+                afterWrite(data) {
+                    if (data.synced) window.Livewire?.dispatch('studio:code-saved');
+                },
+
+                /** New file / New folder: a row to type its name into, inside the selected folder. */
+                async startCreate(kind, at = this.selected) {
+                    this.closeMenu();
+                    this.renaming = null;
+                    this.confirmDelete = null;
+                    const parent = this.folderFor(at);
+                    if (this.node(parent)?.inert) return;
+                    await this.reveal(parent);
+                    this.draft = { kind, parent, depth: parent ? parent.split('/').length : 0, value: '' };
+                },
+
+                cancelCreate() { this.draft = null },
+
+                async commitCreate() {
+                    const draft = this.draft;
+                    if (!draft || this.busy) return;
+                    const name = draft.value.trim().replace(/^\/+|\/+$/g, '');
+                    if (!name) { this.draft = null; return; }
+
+                    this.busy = true;
+                    try {
+                        const data = await this.request('POST', '/file', { path: (draft.parent ? draft.parent + '/' : '') + name, type: draft.kind });
+                        this.draft = null;
+                        await this.reloadFolder(draft.parent);
+                        this.selected = data.path;
+                        if (data.type === 'file') await this.openFile(data.path);
+                        else this.toggleFolder(data.path);
+                        this.afterWrite(data);
+                    } catch (e) {
+                        // The row stays, so the name can be put right
+                        window.Studio.toast(e.message, 'error', 5000);
+                    }
+                    this.busy = false;
+                },
+
+                startRename(path) {
+                    this.closeMenu();
+                    const node = this.node(path);
+                    if (!node || node.inert || this.locked(node)) return;
+                    this.draft = null;
+                    this.confirmDelete = null;
+                    this.renameValue = node.name;
+                    this.renaming = path;
+                },
+
+                cancelRename() { this.renaming = null },
+
+                async commitRename() {
+                    const from = this.renaming;
+                    const node = this.node(from);
+                    if (!from || this.busy) return;
+                    const name = this.renameValue.trim();
+                    if (!node || !name || name === node.name) { this.renaming = null; return; }
+
+                    this.busy = true;
+                    try {
+                        const data = await this.request('PATCH', '/file', { path: from, to: (node.parent ? node.parent + '/' : '') + name });
+                        this.renaming = null;
+                        (data.moved || []).forEach((move) => this.remap(move.from, move.to, move.to === data.path ? data.language : null));
+                        await this.reloadFolder(node.parent);
+                        this.selected = data.path;
+                        this.afterWrite(data);
+                    } catch (e) {
+                        window.Studio.toast(e.message, 'error', 5000);
+                    }
+                    this.busy = false;
+                },
+
+                /**
+                 * A path changed on disk: every open buffer at it — or under
+                 * it, when it was a folder — moves with it, unsaved edits and all.
+                 */
+                remap(from, to, language = null) {
+                    const moved = (path) => to + path.slice(from.length);
+                    const under = (path) => path === from || path.startsWith(from + '/');
+
+                    Object.keys(studioCodeBuffers.models).filter(under).forEach((path) => {
+                        const next = moved(path);
+                        const old = studioCodeBuffers.models[path];
+                        const model = window.StudioMonaco.model(next, (path === from && language) || old.getLanguageId(), old.getValue());
+
+                        studioCodeBuffers.models[next] = model;
+                        studioCodeBuffers.saved[next] = studioCodeBuffers.saved[path];
+                        delete studioCodeBuffers.models[path];
+                        delete studioCodeBuffers.saved[path];
+
+                        if (this.active === path) {
+                            this.active = next;
+                            studioCodeBuffers.editor?.setModel(model);
+                        }
+
+                        old.dispose();
+                    });
+
+                    this.tabs = this.tabs.map((tab) => under(tab.path) ? { path: moved(tab.path), name: moved(tab.path).split('/').pop(), display: moved(tab.path) } : tab);
+                    this.dirty = Object.fromEntries(Object.entries(this.dirty).map(([path, value]) => [under(path) ? moved(path) : path, value]));
+                    this.openFolders = Object.fromEntries(Object.entries(this.openFolders).map(([path, value]) => [under(path) ? moved(path) : path, value]));
+                    this.persistFolders();
+                },
+
+                async duplicate(path) {
+                    this.closeMenu();
+                    const node = this.node(path);
+                    if (!node || node.type !== 'file' || node.inert || this.busy) return;
+
+                    this.busy = true;
+                    try {
+                        const data = await this.request('POST', '/duplicate', { path });
+                        await this.reloadFolder(node.parent);
+                        this.selected = data.path;
+                        await this.openFile(data.path);
+                        this.afterWrite(data);
+                    } catch (e) {
+                        window.Studio.toast(e.message, 'error', 5000);
+                    }
+                    this.busy = false;
+                },
+
+                /** Delete: armed by the first ask, done by the second (the row shows the pair of buttons). */
+                askDelete(path) {
+                    this.closeMenu();
+                    const node = this.node(path);
+                    if (!node || node.inert || this.locked(node)) return;
+                    this.renaming = null;
+                    this.confirmDelete = path;
+                },
+
+                async remove(path) {
+                    this.confirmDelete = null;
+                    const node = this.node(path);
+                    if (!node || this.busy) return;
+
+                    this.busy = true;
+                    try {
+                        const data = await this.request('DELETE', '/file', { path });
+
+                        // A section is a pair — both halves leave together;
+                        // a folder takes every open buffer under it
+                        (data.removed || [path]).forEach((gone) => {
+                            Object.keys(studioCodeBuffers.models)
+                                .filter((open) => open === gone || open.startsWith(gone + '/'))
+                                .forEach((open) => {
+                                    studioCodeBuffers.models[open]?.dispose?.();
+                                    delete studioCodeBuffers.models[open];
+                                    delete studioCodeBuffers.saved[open];
+                                    this.dirty = { ...this.dirty, [open]: false };
+                                    this.closeTab(open);
+                                });
+                        });
+
+                        if (this.selected === path) this.selected = null;
+                        await this.reloadFolder(node.parent);
+                        this.afterWrite(data);
+                        window.Studio.toast(node.type === 'dir' ? `Deleted the folder “${node.name}”` : `Deleted “${node.name}”`);
+                    } catch (e) {
+                        window.Studio.toast(e.message, 'error', 5000);
+                    }
+                    this.busy = false;
+                },
+
+                /** The path on the clipboard: from the project root, or from the disk's. */
+                copyPath(path, absolute = false) {
+                    this.closeMenu();
+                    const text = absolute ? this.root + (path ? '/' + path : '') : (path || '.');
+                    const done = () => window.Studio.toast(absolute ? 'Path copied' : 'Relative path copied');
+                    // navigator.clipboard only exists in secure contexts
+                    // (https/localhost); plain-http dev domains fall back
+                    const fallback = () => {
+                        const el = document.createElement('textarea');
+                        el.value = text;
+                        el.setAttribute('readonly', '');
+                        el.style.position = 'fixed';
+                        el.style.opacity = '0';
+                        document.body.appendChild(el);
+                        el.select();
+                        try { document.execCommand('copy') && done(); } finally { el.remove(); }
+                    };
+                    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(fallback);
+                    else fallback();
+                },
+
+                /* --- the context menu ------------------------------------ */
+
+                openMenu(event, path = null) {
+                    this.confirmDelete = null;
+                    if (path) this.selected = path;
+                    this.menu = { open: true, x: event.clientX, y: event.clientY, path };
+                },
+
+                closeMenu() {
+                    if (this.menu.open) this.menu = { ...this.menu, open: false };
                 },
 
                 /** Load Monaco on demand and keep one editor for every tab. */
@@ -1644,8 +1948,6 @@
 
                         await this.mount();
 
-                        // A file has one path in both views, so opening it
-                        // from either lands on the same buffer.
                         const key = data.path || path;
 
                         if (!studioCodeBuffers.models[key]) {
@@ -1656,6 +1958,7 @@
 
                         this.addTab(key, data.display);
                         this.activate(key);
+                        this.selected = key;
                     } catch (e) {
                         this.error = e.message;
                     }
@@ -1697,6 +2000,59 @@
                         studioCodeBuffers.editor.setModel(model);
                         studioCodeBuffers.editor.layout();
                         studioCodeBuffers.editor.focus();
+                    }
+                    this.showInTree(path);
+                },
+
+                /**
+                 * The file in the editor is the row lit in the tree: however
+                 * it was opened (a tab, ⌘K, a field's source line), its
+                 * folders open and its row comes into view.
+                 */
+                async showInTree(path) {
+                    this.selected = path;
+                    await this.reveal(path.split('/').slice(0, -1).join('/'));
+                    setTimeout(() => {
+                        if (this.active !== path) return;
+                        document.querySelector('.s-tree [data-row=' + JSON.stringify(path) + ']')?.scrollIntoView({ block: 'center' });
+                    }, 60);
+                },
+
+                /**
+                 * Files changed underneath the editor (the Assistant wrote
+                 * them, or the section-source modal did). The tree is read
+                 * again, and every open file that has no unsaved edits takes
+                 * what is on disk now. One that does is left alone — the
+                 * edits are the user's — and named, because saving it would
+                 * write over the change.
+                 */
+                async syncFromDisk() {
+                    if (this.booted) this.loadTree();
+
+                    const kept = [];
+
+                    for (const path of Object.keys(studioCodeBuffers.models)) {
+                        try {
+                            const response = await fetch(`${this.base}/file?path=${encodeURIComponent(path)}`, { headers: { 'Accept': 'application/json' } });
+                            const data = await response.json().catch(() => ({}));
+                            if (!response.ok || !data.success || data.contents === studioCodeBuffers.saved[path]) continue;
+
+                            if (this.dirty[path]) {
+                                kept.push(path.split('/').pop());
+                                continue;
+                            }
+
+                            studioCodeBuffers.saved[path] = data.contents;
+                            studioCodeBuffers.models[path].setValue(data.contents);
+                            this.dirty = { ...this.dirty, [path]: false };
+                        } catch (e) { /* the file is gone or unreadable: its tab keeps what it had */ }
+                    }
+
+                    if (kept.length) {
+                        window.Studio.toast({
+                            title: kept.length === 1 ? `${kept[0]} changed on disk` : `${kept.length} open files changed on disk`,
+                            description: 'Your unsaved edits are kept. Saving will overwrite the newer version.',
+                        }, 'warning', 9000);
                     }
                 },
 
@@ -1782,7 +2138,8 @@
                         this.newName = '';
                         this.newCategory = '';
                         this.newLabel = '';
-                        await this.loadTree();
+                        await this.reveal(data.path.split('/').slice(0, -1).join('/'));
+                        await this.reloadFolder(data.path.split('/').slice(0, -1).join('/'));
                         await this.openFile(data.path);
                         window.Studio.toast(`Created ${data.name} — it is in the section library now`);
                     } catch (e) {
@@ -1790,38 +2147,6 @@
                     }
 
                     this.creating = false;
-                },
-
-                async deleteFile(path) {
-                    this.confirmDelete = null;
-                    this.error = '';
-
-                    try {
-                        const response = await fetch(`${this.base}/file`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify({ path }),
-                        });
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not delete that file.');
-
-                        // A section is a pair — both halves leave together
-                        (data.removed || [path]).forEach((gone) => {
-                            studioCodeBuffers.models[gone]?.dispose?.();
-                            delete studioCodeBuffers.models[gone];
-                            delete studioCodeBuffers.saved[gone];
-                            this.closeTab(gone);
-                        });
-
-                        await this.loadTree();
-                        window.Studio.toast('Deleted');
-                    } catch (e) {
-                        this.error = e.message;
-                    }
                 },
             });
         });
@@ -1907,6 +2232,7 @@
                         const data = await response.json().catch(() => ({}));
                         if (!response.ok || !data.success) throw new Error(data.message || 'Could not save the source files.');
                         window.Studio.toast('Section source saved — every section using it is updated');
+                        window.dispatchEvent(new CustomEvent('studio:files-changed', { detail: { paths: Object.values(this.paths) } }));
                         // EditorPanel re-syncs, then reloads the canvas
                         window.Livewire?.dispatch('studio:code-saved');
                     } catch (e) {

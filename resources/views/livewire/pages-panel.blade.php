@@ -65,7 +65,9 @@
                             <span class="min-w-0 flex-1 truncate text-[12.5px] {{ $row['current'] ? 'font-medium text-ink' : 'text-ink/85' }}">{{ $row['title'] }}</span>
                             <span class="shrink-0 font-mono text-[10.5px] text-faint">{{ $row['path'] }}</span>
                             @if($row['home'])
-                                <span class="s-chip shrink-0" title="Home page">Home</span>
+                                <span class="shrink-0 text-faint" title="The home page">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" role="img" aria-label="Home page"><path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd"/></svg>
+                                </span>
                             @endif
                         </button>
                     @endif
@@ -73,7 +75,7 @@
                     {{-- Row actions --}}
                     <button
                         type="button"
-                        class="s-icon-btn !h-6 !w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                        class="s-icon-btn !h-6 !w-6 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
                         wire:click="startRename('{{ $row['slug'] }}')"
                         title="Rename"
                         aria-label="Rename page"
@@ -83,7 +85,7 @@
                     <div class="relative shrink-0" @click.outside="menu = false">
                         <button
                             type="button"
-                            class="s-icon-btn !h-6 !w-6 opacity-0 transition-opacity group-hover:opacity-100"
+                            class="s-icon-btn !h-6 !w-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
                             :class="menu && '!opacity-100'"
                             @click="menu = !menu"
                             title="Page actions"

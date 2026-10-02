@@ -33,16 +33,15 @@ class CodeController extends Controller
     {
         abort_unless(DevMode::enabled(), 404);
 
-        $view = $request->query('view') === 'laravel' ? 'laravel' : 'designer';
-        $dir = $view === 'laravel' && is_string($request->query('dir')) ? $request->query('dir') : null;
+        $dir = is_string($request->query('dir')) ? $request->query('dir') : null;
 
-        // The Laravel view arrives a folder at a time: the root, then `dir`
+        // The tree arrives a folder at a time: the root, then `dir`. The
+        // root also carries the site's file index, for the palette's quick-open.
         return $this->guard(fn () => [
             'success' => true,
-            'view' => $view,
             'dir' => $dir,
-            'nodes' => $this->workspace->tree($view, $dir),
-        ]);
+            'nodes' => $this->workspace->tree($dir),
+        ] + ($dir === null ? ['index' => $this->workspace->siteFiles()] : []));
     }
 
     public function show(Request $request)
@@ -99,6 +98,64 @@ class CodeController extends Controller
             $this->mirror->sync();
 
             return array_merge(['success' => true, 'synced' => true], $created);
+        });
+    }
+
+    /** A new, empty file or folder. */
+    public function create(Request $request)
+    {
+        abort_unless(DevMode::enabled(), 404);
+
+        $validated = $request->validate([
+            'path' => 'required|string|max:512',
+            'type' => 'required|in:file,dir',
+        ]);
+
+        return $this->guard(function () use ($validated) {
+            $result = $this->workspace->create($validated['path'], $validated['type']);
+
+            return array_merge(['success' => true, 'synced' => $this->resync($result['path'])], $result);
+        });
+    }
+
+    /** Rename a file or a folder (a section's two files together). */
+    public function rename(Request $request)
+    {
+        abort_unless(DevMode::enabled(), 404);
+
+        $validated = $request->validate([
+            'path' => 'required|string|max:512',
+            'to' => 'required|string|max:512',
+        ]);
+
+        return $this->guard(function () use ($validated) {
+            $result = $this->workspace->rename($validated['path'], $validated['to']);
+
+            // Either end of the move may be the site's
+            $synced = $this->workspace->isDesignPath(trim($validated['path'], '/'))
+                || $this->workspace->isDesignPath($result['path']);
+
+            if ($synced) {
+                $this->mirror->sync();
+            }
+
+            return array_merge(['success' => true, 'synced' => $synced], $result);
+        });
+    }
+
+    /** A copy of a file beside it (a section's two files together). */
+    public function duplicate(Request $request)
+    {
+        abort_unless(DevMode::enabled(), 404);
+
+        $validated = $request->validate([
+            'path' => 'required|string|max:512',
+        ]);
+
+        return $this->guard(function () use ($validated) {
+            $result = $this->workspace->duplicate($validated['path']);
+
+            return array_merge(['success' => true, 'synced' => $this->resync($result['path'])], $result);
         });
     }
 
