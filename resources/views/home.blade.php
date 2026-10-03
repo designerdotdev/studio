@@ -630,7 +630,7 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 scale-[0.98]"
-                class="s-pop absolute left-0 top-full z-[88] mt-1.5 w-[268px]"
+                class="s-pop absolute left-0 top-full z-[88] mt-2 w-[268px]"
                 role="menu"
             >
                 <div class="flex items-center gap-2.5 px-2.5 pb-2 pt-2">
