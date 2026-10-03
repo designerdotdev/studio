@@ -14,6 +14,9 @@ use Illuminate\Support\Str;
  * Thread shape:
  *   { id, title, engine, session_id, created_at, updated_at,
  *     messages: [{ id, role: user|assistant, text, activity: [{kind,label,path}], files: [path], at, failed? }] }
+ *
+ * A user message's context.attachments are media-library URLs;
+ * context.attachment_previews maps each to its stored copy (see Attachments).
  */
 class Threads
 {

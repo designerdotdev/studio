@@ -158,7 +158,7 @@ class Engines
             return $found;
         }
 
-        foreach ($fallbacks as $path) {
+        foreach ([...$fallbacks, ...$this->nodeBins($engine)] as $path) {
             $expanded = $this->expand($path);
 
             if (is_executable($expanded)) {
@@ -169,10 +169,30 @@ class Engines
         return null;
     }
 
+    /**
+     * Where `npm i -g` puts a CLI under a Node version manager. PHP-FPM's
+     * PATH has none of these, so a binary found in a terminal is invisible
+     * to the web request without looking here. Newest Node version first.
+     *
+     * @return string[]
+     */
+    protected function nodeBins(string $engine): array
+    {
+        $paths = ['~/.volta/bin/' . $engine, '~/.bun/bin/' . $engine, '~/.npm-global/bin/' . $engine];
+
+        foreach (['~/Library/Application Support/Herd/config/nvm/versions/node', '~/.nvm/versions/node', '~/.local/share/fnm/node-versions'] as $root) {
+            $found = glob($this->expand($root) . '/*/{bin,installation/bin}/' . $engine, GLOB_BRACE) ?: [];
+            usort($found, fn ($a, $b) => version_compare(basename(dirname($b, str_contains($b, '/installation/') ? 3 : 2)), basename(dirname($a, str_contains($a, '/installation/') ? 3 : 2))));
+            $paths = [...$paths, ...$found];
+        }
+
+        return $paths;
+    }
+
     protected function expand(string $path): string
     {
         if (str_starts_with($path, '~/')) {
-            $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '';
+            $home = $_SERVER['HOME'] ?? getenv('HOME') ?: (function_exists('posix_getpwuid') ? (posix_getpwuid(posix_geteuid())['dir'] ?? '') : '');
 
             return $home . substr($path, 1);
         }

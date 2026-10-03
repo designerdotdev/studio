@@ -16,7 +16,8 @@
             --ts: 2.15s;                         /* when the wipe and the move start */
             --sd: .95s;                          /* how long they take */
             --t0: 2.95s;                         /* when the text starts */
-            --guide: .45;                        /* the guides and the compass arm: ink at this opacity */
+            --guide: .45;                        /* the compass arm: ink at this opacity */
+            --grid: .22;                         /* the guide lines of the grid: half of that */
             --dot: color-mix(in srgb, var(--color-ink) 24%, transparent);   /* a dot at the middle of the spotlight */
         }
 
@@ -54,7 +55,7 @@
         .intro-plan { transform: translateY(var(--lift, 150px)) scale(var(--big)); }
         .intro-plan .intro-guides-svg { inset: -32% auto auto -36.11%; width: 172.22%; height: 164%; }   /* viewBox -26 -24 124 123 over the mark's 72 x 75 */
         .intro-guides { opacity: 0; }
-        .intro-g { fill: none; stroke: currentColor; stroke-opacity: var(--guide); stroke-width: calc(var(--sw) * .7); stroke-dasharray: 1 2; }
+        .intro-g { fill: none; stroke: currentColor; stroke-opacity: var(--grid); stroke-width: calc(var(--sw) * .7); stroke-dasharray: 1 2; }
 
         .intro-o, .intro-radius { fill: none; stroke: currentColor; stroke-width: var(--sw); }
         .intro-o { stroke-dasharray: 1 2; opacity: 0; }   /* the long gap keeps a closed shape from leaving a speck at its start point */

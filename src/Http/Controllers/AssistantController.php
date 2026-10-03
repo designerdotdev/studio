@@ -2,6 +2,7 @@
 
 namespace Designer\Studio\Http\Controllers;
 
+use Designer\Studio\Services\Assistant\Attachments;
 use Designer\Studio\Services\Assistant\Engines;
 use Designer\Studio\Services\Assistant\Threads;
 use Designer\Studio\Services\Assistant\TurnRunner;
@@ -98,6 +99,19 @@ class AssistantController extends Controller
             'Cache-Control' => 'no-cache, no-transform',
             'X-Accel-Buffering' => 'no',
             'Connection' => 'keep-alive',
+        ]);
+    }
+
+    /** The small copy of an attached image, kept when its message was sent */
+    public function attachment(string $name, Attachments $attachments)
+    {
+        abort_unless($path = $attachments->path($name), 404);
+
+        return response()->file($path, [
+            'Cache-Control' => 'private, max-age=31536000, immutable',
+            // An SVG copied from the library is served as a picture, never as a document
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

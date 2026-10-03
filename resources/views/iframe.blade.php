@@ -2,6 +2,18 @@
     @push('iframe-head')
         <style>
             /* ---- Designer Studio editing overlay (never shipped to production pages) ---- */
+            /* The canvas's scrollbar is hidden until used: no native bar, and
+               StudioScrollThumb (studio.js) draws one over the edge while the
+               page scrolls */
+            html {
+                scrollbar-width: none;
+            }
+
+            html::-webkit-scrollbar,
+            body::-webkit-scrollbar {
+                display: none;
+            }
+
             .studio-section {
                 position: relative;
                 --studio-rail-h: 50px;

@@ -4805,6 +4805,28 @@ window.Studio = {
         });
     },
 
+    /**
+     * Ask Codex for variations of an image. Opens the variations modal
+     * (partials/variations-modal) and resolves with the URL of the one that
+     * was kept — already in the media library — or null when it is closed.
+     */
+    variations(url) {
+        return new Promise((resolve) => {
+            if (typeof url !== 'string' || !url) { resolve(null); return; }
+
+            const id = (window.crypto?.randomUUID?.() || String(Date.now() + Math.random()));
+
+            const onPicked = (event) => {
+                if (event.detail?.id !== id) return;
+                window.removeEventListener('studio:variations-picked', onPicked);
+                resolve(event.detail.url ?? null);
+            };
+
+            window.addEventListener('studio:variations-picked', onPicked);
+            window.dispatchEvent(new CustomEvent('studio:variations', { detail: { id, url } }));
+        });
+    },
+
     async upload(file, { url, csrf }) {
         const sizeMb = file.size / (1024 * 1024);
         if (sizeMb > this.maxUploadMb) {
@@ -4848,6 +4870,77 @@ window.Studio = {
     },
 };
 
+// Scrollbars that are hidden until used: the native bar is switched off in
+// CSS (the canvas document, and everything in the right column) and one
+// thumb per document is drawn over the scroller's right edge while it
+// scrolls, then fades. It takes no room and no pointer. Styled inline, since
+// the canvas document carries none of the chrome's CSS.
+const StudioScrollThumb = {
+    el: null,
+    target: null,
+    timer: null,
+
+    init(scope) {
+        this.scope = scope;   // null = the document's own scroller only
+        document.addEventListener('scroll', (e) => this.onScroll(e), { capture: true, passive: true });
+        window.addEventListener('resize', () => this.hide(true));
+    },
+
+    scroller(e) {
+        if (e.target === document) return document.scrollingElement;
+        return this.scope && e.target.closest?.(this.scope) ? e.target : null;
+    },
+
+    onScroll(e) {
+        const el = this.scroller(e);
+        if (!el || el.scrollHeight <= el.clientHeight + 1) return;
+        this.target = el;
+        requestAnimationFrame(() => this.paint());
+    },
+
+    paint() {
+        const el = this.target;
+        if (!el || !el.isConnected) return this.hide(true);
+
+        const root = el === document.scrollingElement;
+        const box = root
+            ? { top: 0, right: document.documentElement.clientWidth, height: window.innerHeight }
+            : el.getBoundingClientRect();
+        const inset = 3;
+        const track = box.height - inset * 2;
+        const size = Math.max(28, track * (el.clientHeight / el.scrollHeight));
+        const travel = el.scrollHeight - el.clientHeight;
+        const top = box.top + inset + (travel > 0 ? (el.scrollTop / travel) * (track - size) : 0);
+
+        const thumb = this.el ??= this.create();
+        thumb.style.height = `${size}px`;
+        thumb.style.transform = `translate(${box.right - 6 - inset}px, ${top}px)`;
+        thumb.style.transitionDuration = '80ms';
+        thumb.style.opacity = '1';
+
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.hide(), 900);
+    },
+
+    hide(now = false) {
+        if (!this.el) return;
+        clearTimeout(this.timer);
+        this.el.style.transitionDuration = now ? '0ms' : '400ms';
+        this.el.style.opacity = '0';
+    },
+
+    create() {
+        const thumb = document.createElement('div');
+        thumb.setAttribute('aria-hidden', 'true');
+        thumb.setAttribute('data-studio-scroll-thumb', '');
+        thumb.style.cssText = 'position:fixed;left:0;top:0;width:6px;border-radius:99px;'
+            + 'background:rgba(0,0,0,.42);box-shadow:0 0 0 1px rgba(255,255,255,.3);'
+            + 'opacity:0;transition:opacity 400ms linear;pointer-events:none;z-index:2147483646;';
+        document.body.appendChild(thumb);
+        return thumb;
+    },
+};
+
 // Auto-boot depending on which document loaded the bundle
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
@@ -4858,8 +4951,10 @@ if (document.readyState === 'loading') {
 function boot() {
     if (window.__studioPreview) {
         StudioPreview.init(window.__studioPreview);
+        StudioScrollThumb.init(null);
     } else if (document.getElementById('studio-canvas-frame')) {
         StudioEditor.init();
+        StudioScrollThumb.init('.s-inspector');
     }
 }
 

@@ -7,6 +7,10 @@
     // The server-side gate. The Code view and the Assistant need this AND the
     // user's developer-mode switch.
     $devModeAvailable = \Designer\Studio\Support\DevMode::enabled();
+    // Image fields offer AI variations where Codex can draw them: on this
+    // machine, behind the same server gate. Not a developer-only surface —
+    // it is a picture button, so the menu's switch does not hide it.
+    $variationsAvailable = $devModeAvailable && app(\Designer\Studio\Services\Assistant\ImageVariations::class)->available();
     // The top bar's "open in a new tab": the draft preview, or the live page
     $openUrl = $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl;
     $openLabel = $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab';
@@ -245,6 +249,8 @@
                     // the app — so it exists only in developer mode: the
                     // server's gate AND the menu's switch. The top bar's
                     // button (⌘J) opens it in the right column, in any view.
+                    // Image fields show the variations button (Codex is installed here)
+                    variations: @js($variationsAvailable),
                     assistant: devModeAvailable && localStorage.getItem('studio.devmode') === '1' && localStorage.getItem('studio.assistant') === '1',
                     get chatAvailable() { return this.developer },
                     // On screen — open, and not behind an edit
@@ -1444,6 +1450,10 @@
             </div>
     </div>
 
+    @if($variationsAvailable)
+        @include('studio::partials.variations-modal')
+    @endif
+
     {{-- ============================================================ --}}
     {{-- Dev mode — section source editor                              --}}
     {{-- ============================================================ --}}
@@ -2159,6 +2169,7 @@
                 tab: 'html',
                 loading: false,
                 saving: false,
+                menu: false,
                 error: '',
                 paths: { html: '', yaml: '' },
                 editors: null,
@@ -2209,11 +2220,35 @@
 
                 close() {
                     this.open = false;
+                    this.menu = false;
                     window.Studio.codeModalOpen = false;
                 },
 
-                async save() {
+                // The Save button's menu: Save, or Save and close
+                toggleMenu(focusLast = false) {
+                    this.menu = !this.menu;
+                    if (this.menu) this.$nextTick(() => {
+                        const items = this.$refs.saveMenu.querySelectorAll('[role=menuitem]');
+                        items[focusLast ? items.length - 1 : 0]?.focus();
+                    });
+                },
+
+                closeMenu(refocus = false) {
+                    if (!this.menu) return;
+                    this.menu = false;
+                    if (refocus) this.$refs.saveMore.focus();
+                },
+
+                stepMenu(by) {
+                    const items = [...this.$refs.saveMenu.querySelectorAll('[role=menuitem]')];
+                    const at = items.indexOf(document.activeElement);
+                    items[(at + by + items.length) % items.length]?.focus();
+                },
+
+                // A failed save keeps the modal open, with the error in the footer
+                async save(andClose = false) {
                     if (this.saving || this.loading || !this.ref || !this.editors) return;
+                    this.menu = false;
                     this.saving = true;
                     this.error = '';
                     try {
@@ -2235,6 +2270,7 @@
                         window.dispatchEvent(new CustomEvent('studio:files-changed', { detail: { paths: Object.values(this.paths) } }));
                         // EditorPanel re-syncs, then reloads the canvas
                         window.Livewire?.dispatch('studio:code-saved');
+                        if (andClose) this.close();
                     } catch (e) {
                         this.error = e.message;
                     }
@@ -2242,8 +2278,8 @@
                 }
             }"
             @studio:open-code-editor.window="openEditor($event.detail)"
-            @keydown.escape.window="close()"
-            @keydown.window="if (open && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S')) { $event.preventDefault(); save(); }"
+            @keydown.escape.window="menu ? closeMenu(true) : close()"
+            @keydown.window="if (open && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S')) { $event.preventDefault(); save($event.shiftKey); }"
             x-show="open"
             x-cloak
             class="fixed inset-0 z-[90] flex items-center justify-center p-4 lg:p-8"
@@ -2290,17 +2326,61 @@
                 </div>
 
                 {{-- Footer --}}
-                <div class="flex shrink-0 items-center gap-3 border-t border-line px-4 py-2.5">
+                <div class="relative z-[60] flex shrink-0 items-center gap-3 border-t border-line px-4 py-2.5">
                     <p class="min-w-0 flex-1 truncate text-[11.5px] text-faint">
                         <span x-show="!error">Sections must stay inside the supported Blade subset — see <span class="font-mono">docs/authoring-sections.md</span>. Saving updates every page using this section.</span>
                         <span x-show="error" x-cloak class="text-danger" x-text="error"></span>
                     </p>
                     <button @click="close()" class="s-btn-ghost">Cancel</button>
-                    <button @click="save()" :disabled="saving || loading" class="s-btn-accent">
-                        <span x-show="!saving">Save</span>
-                        <span x-show="saving" x-cloak>Saving…</span>
-                        <span class="s-kbd !border-line-strong !bg-transparent !text-white/80">⌘S</span>
-                    </button>
+                    {{-- Save is the button; the chevron beside it opens the
+                         other way to save. The menu rises from the footer. --}}
+                    <div class="s-split" @click.outside="closeMenu()">
+                        <button @click="save()" :disabled="saving || loading" class="s-btn-accent s-split-main">
+                            <span x-show="!saving">Save</span>
+                            <span x-show="saving" x-cloak>Saving…</span>
+                            <span class="s-kbd">⌘S</span>
+                        </button>
+                        <button
+                            x-ref="saveMore"
+                            @click="toggleMenu()"
+                            @keydown.down.prevent="menu || toggleMenu()"
+                            @keydown.up.prevent="menu || toggleMenu(true)"
+                            :disabled="saving || loading"
+                            :aria-expanded="menu ? 'true' : 'false'"
+                            aria-haspopup="menu"
+                            aria-label="More ways to save"
+                            class="s-btn-accent s-split-more"
+                        >
+                            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4.5 6.25 3.5 3.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+
+                        <div
+                            x-ref="saveMenu"
+                            x-show="menu"
+                            x-cloak
+                            x-transition:enter="transition duration-150 ease-[cubic-bezier(.21,1.02,.47,1)]"
+                            x-transition:enter-start="translate-y-1 scale-[0.97] opacity-0"
+                            x-transition:enter-end="translate-y-0 scale-100 opacity-100"
+                            x-transition:leave="transition duration-100 ease-in"
+                            x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            @keydown.down.prevent.stop="stepMenu(1)"
+                            @keydown.up.prevent.stop="stepMenu(-1)"
+                            @keydown.tab.prevent="closeMenu(true)"
+                            role="menu"
+                            aria-label="Save"
+                            class="s-pop s-split-menu"
+                        >
+                            <button role="menuitem" class="s-menu-item" @click="save()">
+                                <span class="flex-1">Save</span>
+                                <span class="s-kbd">⌘S</span>
+                            </button>
+                            <button role="menuitem" class="s-menu-item" @click="save(true)">
+                                <span class="flex-1">Save and close</span>
+                                <span class="s-kbd">⇧⌘S</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
     </div>

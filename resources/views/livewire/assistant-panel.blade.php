@@ -304,10 +304,10 @@
                                         @if(!empty($message['context']['element']['path']) || !empty($message['context']['section']['ref']) || ($message['context']['mode'] ?? '') === 'ask')
                                             <span class="mb-1.5 flex flex-wrap items-center gap-1">
                                                 @if(($message['context']['mode'] ?? '') === 'ask')
-                                                    <span class="inline-flex items-center rounded-md bg-black/25 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">Ask</span>
+                                                    <span class="inline-flex items-center rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">Ask</span>
                                                 @endif
                                                 @if(!empty($message['context']['element']['path']) || !empty($message['context']['section']['ref']))
-                                                    <span class="inline-flex max-w-full items-center gap-1 rounded-md bg-black/25 px-1.5 py-0.5 font-mono text-[10px]">
+                                                    <span class="inline-flex max-w-full items-center gap-1 rounded-md bg-white/20 px-1.5 py-0.5 font-mono text-[10px]">
                                                         <svg class="h-2.5 w-2.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3.5a.75.75 0 0 1 1.14-.64l12 7a.75.75 0 0 1-.09 1.33l-4.2 1.72-1.72 4.2a.75.75 0 0 1-1.33.09l-7-12A.75.75 0 0 1 3 3.5Z"/></svg>
                                                         <span class="truncate">{{ $message['context']['section']['ref'] ?? '' }}{{ !empty($message['context']['element']['path']) ? ' › ' . $message['context']['element']['path'] : '' }}</span>
                                                     </span>
@@ -316,9 +316,29 @@
                                         @endif
                                         <p class="whitespace-pre-wrap break-words">{{ $message['text'] }}</p>
                                         @if(!empty($message['context']['attachments']))
+                                            {{-- Each image shows from the copy kept when the message was sent; the original may be gone by now --}}
                                             <span class="mt-2 flex flex-wrap gap-1.5">
                                                 @foreach($message['context']['attachments'] as $attachment)
-                                                    <img src="{{ $attachment }}" alt="" class="h-12 w-12 rounded-md object-cover ring-1 ring-white/20">
+                                                    @php
+                                                        $attachmentName = basename(parse_url($attachment, PHP_URL_PATH) ?: $attachment);
+                                                        $attachmentLive = app(\Designer\Studio\Services\Assistant\Attachments::class)->original($attachment) !== null;
+                                                        $attachmentPreview = $message['context']['attachment_previews'][$attachment] ?? null;
+                                                        $attachmentSrc = $attachmentPreview ? route('studio.api.assistant.attachment', $attachmentPreview) : ($attachmentLive ? $attachment : null);
+                                                    @endphp
+                                                    @if($attachmentSrc && $attachmentLive)
+                                                        <a href="{{ $attachment }}" target="_blank" rel="noopener" class="s-chat-attachment" title="{{ $attachmentName }}">
+                                                            <img src="{{ $attachmentSrc }}" alt="{{ $attachmentName }}" loading="lazy">
+                                                        </a>
+                                                    @elseif($attachmentSrc)
+                                                        <span class="s-chat-attachment" title="{{ $attachmentName }} — no longer in the media library">
+                                                            <img src="{{ $attachmentSrc }}" alt="{{ $attachmentName }}" loading="lazy">
+                                                        </span>
+                                                    @else
+                                                        <span class="s-chat-attachment is-missing" title="{{ $attachmentName }} — no longer in the media library">
+                                                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="m3.5 13.5 3.6-3.6a1 1 0 0 1 1.4 0L12 13.4"/><path d="M3 3l14 14"/></svg>
+                                                            <span>{{ $attachmentName }}</span>
+                                                        </span>
+                                                    @endif
                                                 @endforeach
                                             </span>
                                         @endif

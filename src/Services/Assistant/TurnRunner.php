@@ -80,6 +80,12 @@ class TurnRunner
         $context = $input['context'] ?? [];
         // The transcript shows which kind of turn each message was
         $context['mode'] = $mode;
+        // Keep a small copy of each attached image, so the transcript still
+        // shows it after the original leaves the media library
+        unset($context['attachment_previews']);
+        if (!empty($context['attachments'])) {
+            $context['attachment_previews'] = app(Attachments::class)->snapshot((array) $context['attachments']);
+        }
 
         $thread = $this->threads->find($input['thread']);
 
@@ -157,6 +163,13 @@ class TurnRunner
 
         $turn['status'] = 'running';
         $this->save($turn);
+
+        // A turn runs for minutes, and the reply is only recorded when it
+        // ends: PHP's execution limit (30s by default) must not cut the
+        // request off mid-turn, and a closed browser tab must reach the
+        // connection_aborted() check below rather than end the script.
+        @set_time_limit(0);
+        ignore_user_abort(true);
 
         $thread = $this->threads->find($turn['thread']);
         $session = $thread['session_id'] ?? null;
@@ -462,6 +475,14 @@ class TurnRunner
             'NO_COLOR' => '1',
             'CI' => '1',
         ];
+
+        // A CLI installed through a Node version manager is a script that
+        // needs the `node` sitting beside it
+        foreach ($this->engines->available() as $engine) {
+            if ($engine['bin'] && !str_contains($env['PATH'], dirname($engine['bin']))) {
+                $env['PATH'] = dirname($engine['bin']) . ':' . $env['PATH'];
+            }
+        }
 
         if (!str_contains($env['PATH'], $env['HOME'] . '/.local/bin')) {
             $env['PATH'] = $env['HOME'] . '/.local/bin:' . $env['PATH'];

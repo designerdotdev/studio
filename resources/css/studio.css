@@ -140,6 +140,18 @@ html.studio-light,
         background: transparent;
     }
 
+    /* The right column's scrollbars are hidden until used: no native bar,
+       and StudioScrollThumb (studio.js) draws one over the edge while it
+       scrolls */
+    .s-inspector,
+    .s-inspector * {
+        scrollbar-width: none;
+    }
+
+    .s-inspector *::-webkit-scrollbar {
+        display: none;
+    }
+
     .studio-app input,
     .studio-app textarea,
     .studio-app select,
@@ -235,6 +247,70 @@ html.studio-light,
 
     .s-btn-danger:hover {
         background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+    }
+
+    /* A split button: the action, and a chevron beside it that opens the
+       other ways to do it. One pill — the two halves share the radius and
+       a hairline of the label's colour, and each lights on its own. */
+    .s-split {
+        @apply relative inline-flex shrink-0;
+    }
+
+    .s-split-main {
+        @apply rounded-r-none pr-2;
+    }
+
+    .s-split-more {
+        @apply w-6 rounded-l-none px-0;
+        box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.24);
+    }
+
+    .s-split-main:active,
+    .s-split-more:active {
+        transform: none;
+    }
+
+    .s-split-main:active,
+    .s-split-more:active,
+    .s-split-more[aria-expanded='true'] {
+        background: color-mix(in srgb, var(--color-accent-hover) 88%, black);
+    }
+
+    /* Above the menu's shadow, which would otherwise fall across the
+       button it opens from and dim it */
+    .s-split > button {
+        position: relative;
+        z-index: 1;
+    }
+
+    .s-split > button:focus-visible {
+        z-index: 2;
+    }
+
+    .s-split-more svg {
+        width: 14px;
+        height: 14px;
+        transition: transform 180ms cubic-bezier(.21, 1.02, .47, 1);
+    }
+
+    .s-split-more[aria-expanded='true'] svg {
+        transform: rotate(180deg);
+    }
+
+    .s-split-main .s-kbd {
+        border-color: rgba(255, 255, 255, 0.28);
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Its menu rises from the button, right edges in line */
+    .s-split-menu {
+        @apply absolute bottom-full right-0 mb-1.5 w-52 origin-bottom-right p-1;
+    }
+
+    .s-split-menu .s-menu-item:focus-visible {
+        @apply bg-wash text-ink;
+        outline: none;
     }
 
     .s-icon-btn {
@@ -777,7 +853,7 @@ html.studio-light,
     }
 
     .s-publish .s-dirty-pip {
-        @apply absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent;
+        @apply absolute -right-px -top-px h-2 w-2 rounded-full bg-accent;
         box-shadow: 0 0 0 2px var(--color-frame);
     }
 
@@ -1762,6 +1838,129 @@ html.studio-light,
             0 32px 80px -16px rgba(0, 0, 0, 0.8);
     }
 
+    /* --- image variations (partials/variations-modal) ----------------- */
+
+    /* The sparkle button on an image field: the one place the accent says "AI" */
+    .s-vary-btn {
+        color: var(--color-accent);
+    }
+
+    .s-vary-btn:hover {
+        background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+        border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+    }
+
+    /* The prompt and its controls read as one field */
+    .s-vary-composer {
+        @apply rounded-lg border border-line-strong bg-raised;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .s-vary-composer:focus-within {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+    }
+
+    .s-vary-composer.is-busy {
+        opacity: 0.7;
+    }
+
+    .s-vary-prompt {
+        @apply block w-full resize-none bg-transparent px-3 pb-1.5 pt-2.5 text-[13px] leading-relaxed text-ink;
+        field-sizing: content;
+        min-height: 3.4em;
+        max-height: 9em;
+    }
+
+    .s-vary-prompt::placeholder {
+        @apply text-faint;
+    }
+
+    .s-vary-prompt:focus {
+        outline: none;
+    }
+
+    .s-vary-kbd {
+        @apply ml-1.5 rounded px-1 font-sans text-[10px] font-medium;
+        background: color-mix(in srgb, currentColor 14%, transparent);
+    }
+
+    /* A tile per image asked for: a shimmer until its image lands */
+    .s-vary-tile {
+        @apply relative block w-full cursor-pointer overflow-hidden rounded-lg border border-line bg-shell;
+        transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    }
+
+    .s-vary-tile:not(.is-empty):hover {
+        border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+    }
+
+    .s-vary-tile:not(.is-empty):active {
+        transform: scale(0.99);
+    }
+
+    .s-vary-tile.is-selected {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
+    }
+
+    .s-vary-tile.is-empty {
+        cursor: default;
+    }
+
+    .s-vary-tile.is-waiting::before {
+        content: '';
+        @apply absolute inset-0;
+        background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--color-ink) 7%, transparent) 50%, transparent 70%);
+        background-size: 220% 100%;
+        animation: s-vary-sweep 1.6s ease-in-out infinite;
+    }
+
+    .s-vary-tile.is-waiting:nth-child(2)::before { animation-delay: 0.2s; }
+    .s-vary-tile.is-waiting:nth-child(3)::before { animation-delay: 0.4s; }
+    .s-vary-tile.is-waiting:nth-child(4)::before { animation-delay: 0.6s; }
+
+    /* Generated images are often cut-outs: a checkerboard shows what is transparent */
+    .s-vary-img {
+        @apply block h-full w-full object-contain;
+        background:
+            repeating-conic-gradient(color-mix(in srgb, var(--color-ink) 6%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+        animation: s-vary-in 320ms cubic-bezier(.21, 1.02, .47, 1) both;
+    }
+
+    .s-vary-index {
+        @apply absolute left-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded px-1 font-mono text-[10px] text-white/90;
+        background: rgb(0 0 0 / 0.55);
+        backdrop-filter: blur(4px);
+    }
+
+    .s-vary-tile.is-empty .s-vary-index {
+        @apply text-faint;
+        background: transparent;
+        backdrop-filter: none;
+    }
+
+    .s-vary-check {
+        @apply absolute right-1.5 top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent text-white;
+    }
+
+    @keyframes s-vary-sweep {
+        from { background-position: 120% 0; }
+        to { background-position: -120% 0; }
+    }
+
+    @keyframes s-vary-in {
+        from { opacity: 0; transform: scale(1.03); filter: blur(6px); }
+        to { opacity: 1; transform: none; filter: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .s-vary-tile.is-waiting::before,
+        .s-vary-img {
+            animation: none;
+        }
+    }
+
     /* --- library preview cards --------------------------------------- */
 
     .s-preview-card {
@@ -2228,7 +2427,48 @@ html.studio-light .s-modal-backdrop {
 
     /* Messages */
     .s-chat-msg-user {
-        @apply ml-6 rounded-xl rounded-br-sm bg-wash-strong px-3 py-2 text-[12.5px] leading-relaxed text-ink;
+        @apply ml-6 rounded-xl rounded-br-sm px-3 py-2 text-[12.5px] leading-relaxed text-white;
+        /* The one saturated surface in the panel: the same blue in both themes */
+        background: #2f6bf2;
+    }
+
+    .s-chat-msg-user ::selection {
+        background: rgb(255 255 255 / 0.35);
+    }
+
+    /* An attached image, shown from the copy kept with the conversation */
+    .s-chat-attachment {
+        @apply block h-12 w-12 shrink-0 overflow-hidden rounded-md;
+        background: rgb(255 255 255 / 0.92);
+        box-shadow: 0 0 0 1px rgb(255 255 255 / 0.35);
+    }
+
+    a.s-chat-attachment {
+        transition: box-shadow 150ms ease;
+    }
+
+    a.s-chat-attachment:hover {
+        box-shadow: 0 0 0 2px rgb(255 255 255 / 0.8);
+    }
+
+    .s-chat-attachment > img {
+        @apply h-full w-full object-cover;
+    }
+
+    /* The original is gone and no copy was kept: say so, with its name */
+    .s-chat-attachment.is-missing {
+        @apply flex h-auto w-auto max-w-full items-center gap-1.5 px-2 py-1 text-[11px];
+        background: rgb(255 255 255 / 0.16);
+        box-shadow: none;
+        color: rgb(255 255 255 / 0.85);
+    }
+
+    .s-chat-attachment.is-missing > svg {
+        @apply h-3.5 w-3.5 shrink-0;
+    }
+
+    .s-chat-attachment.is-missing > span {
+        @apply truncate;
     }
 
     .s-chat-msg {

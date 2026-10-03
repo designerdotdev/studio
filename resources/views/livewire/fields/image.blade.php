@@ -56,6 +56,20 @@
         >
             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 0 1 3.25 3h13.5A2.25 2.25 0 0 1 19 5.25v9.5A2.25 2.25 0 0 1 16.75 17H3.25A2.25 2.25 0 0 1 1 14.75v-9.5Zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 0 0 .75-.75v-2.69l-2.22-2.219a.75.75 0 0 0-1.06 0l-1.91 1.909.47.47a.75.75 0 1 1-1.06 1.06l-6.97-6.97a.75.75 0 0 0-1.06 0l-3.69 3.69v.001ZM12 7a1 1 0 1 1 2 0 1 1 0 0 1-2 0Z" clip-rule="evenodd"/></svg>
         </button>
+        @if($value)
+            {{-- Variations drawn by Codex; shown where it is installed, for an image of this site --}}
+            <button
+                type="button"
+                class="s-btn-outline s-vary-btn shrink-0 !px-2.5"
+                title="Create variations with AI"
+                aria-label="Create variations with AI"
+                x-show="$store.studio.variations && @js(str_starts_with((string) $value, '/'))"
+                x-cloak
+                x-on:click="window.Studio.variations(@js($value)).then((url) => { if (!url) return; preview('{{ $sectionId }}', '{{ $key }}', url); $wire.setVariable('{{ $sectionId }}', '{{ $key }}', url); })"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5a.75.75 0 0 1 .72.54l1.2 4.1a2.75 2.75 0 0 0 1.87 1.87l4.1 1.2a.75.75 0 0 1 0 1.44l-4.1 1.2a2.75 2.75 0 0 0-1.87 1.87l-1.2 4.1a.75.75 0 0 1-1.44 0l-1.2-4.1a2.75 2.75 0 0 0-1.87-1.87l-4.1-1.2a.75.75 0 0 1 0-1.44l4.1-1.2a2.75 2.75 0 0 0 1.87-1.87l1.2-4.1A.75.75 0 0 1 10 1.5Z"/></svg>
+            </button>
+        @endif
         <label class="s-btn-outline relative shrink-0 cursor-pointer !px-2.5" :class="uploading && 'pointer-events-none opacity-60'" title="Upload an image">
             <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" class="sr-only" x-on:change="pick($event)">
             <svg x-show="!uploading" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" clip-rule="evenodd"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
