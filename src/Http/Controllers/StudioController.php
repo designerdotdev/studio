@@ -476,10 +476,10 @@ class StudioController extends Controller
     {
         $slug = $slug ?: SiteUrls::homeSlug();
 
-        $page = $this->pages->find($slug);
+        $page = preg_match('/^[a-z0-9-]+$/', $slug) ? $this->pages->find($slug) : null;
 
         if (!$page) {
-            abort(404);
+            return $this->previewCodePage($slug);
         }
 
         $regions = app(\Designer\Studio\Services\Storage\LayoutRepository::class)->regions($page->layout_ref);
@@ -520,6 +520,26 @@ class StudioController extends Controller
             'noindex' => true,
             'preview' => true,
         ]);
+    }
+
+    /**
+     * A page Studio has no document for (a [collection.field] page, a nested
+     * or hand-written one): its file, rendered with the draft's data, under
+     * the same link rewriting and badge as every other preview page.
+     */
+    protected function previewCodePage(string $path)
+    {
+        $html = app(\Designer\Studio\Services\Site\CodePagePreview::class)->render($path);
+
+        if ($html === null) {
+            abort(404);
+        }
+
+        $chrome = view('studio::partials.draft-preview')->render();
+        $at = strripos($html, '</body>');
+
+        return response($at === false ? $html . $chrome : substr_replace($html, $chrome, $at, 0))
+            ->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
     public function publishStatus()

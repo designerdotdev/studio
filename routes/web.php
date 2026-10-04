@@ -30,10 +30,11 @@ Route::group([
     Route::get('/preview/block/{slug}', [StudioController::class, 'blockPreview'])->where('slug', '[a-z0-9-]+')->name('preview.block');
     Route::get('/preview/thumbnail/{name}', [StudioController::class, 'templateThumbnail'])->where('name', '[a-z0-9-]+')->name('preview.thumbnail');
 
-    // Draft site preview (page slugs never contain '/', so these can't
-    // shadow the two-segment preview routes above)
+    // Draft site preview. A path with more segments is a page the site serves
+    // from a file of its own (/blog/{slug}); registered after the two-segment
+    // preview routes above, so it can't shadow them
     Route::get('/preview', [StudioController::class, 'previewPage'])->name('preview.home');
-    Route::get('/preview/{slug}', [StudioController::class, 'previewPage'])->where('slug', '[a-z0-9-]+')->name('preview.page');
+    Route::get('/preview/{slug}', [StudioController::class, 'previewPage'])->where('slug', '[A-Za-z0-9_-]+(/[A-Za-z0-9_][A-Za-z0-9._-]*)*')->name('preview.page');
 
     // API endpoints
     Route::prefix('api')->group(function () {
