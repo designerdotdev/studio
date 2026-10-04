@@ -124,6 +124,30 @@
     </div>
 
     <div class="s-topbar-group is-end">
+        {{-- Undo and redo: one history for the whole site (Services/History),
+             whoever made the change. Always in view — dimmed when there is
+             nothing to take back or bring back; the tooltip names the step. --}}
+        <button
+            type="button"
+            class="s-tb-btn s-tip"
+            :disabled="!$store.studio.history.undo || $store.studio.historyBusy"
+            :data-tip="$store.studio.history.undo ? 'Undo ' + $store.studio.history.undo + '  ⌘Z' : 'Nothing to undo'"
+            aria-label="Undo"
+            @click="$store.studio.undo()"
+        >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        </button>
+        <button
+            type="button"
+            class="s-tb-btn s-tip"
+            :disabled="!$store.studio.history.redo || $store.studio.historyBusy"
+            :data-tip="$store.studio.history.redo ? 'Redo ' + $store.studio.history.redo + '  ⇧⌘Z' : 'Nothing to redo'"
+            aria-label="Redo"
+            @click="$store.studio.redo()"
+        >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+        </button>
+
         {{-- One responsive button: a click cycles Desktop → Tablet → Phone.
              The icon is the current device; the tooltip names the next one. --}}
         <button

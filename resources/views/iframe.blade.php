@@ -1012,9 +1012,22 @@
                 color: #c4b5fd;
             }
 
-            .studio-tb-btn.is-ai:hover {
+            .studio-tb-btn.is-ai:hover,
+            .studio-tb-btn.is-ai.is-open {
                 background: rgba(139, 92, 246, 0.24);
                 color: #ede9fe;
+            }
+
+            /* It opens a menu: Ask, Improve, Variations */
+            .studio-tb-btn.is-ai {
+                padding-right: 5px;
+            }
+
+            .studio-tb-btn .studio-tb-caret {
+                width: 12px;
+                height: 12px;
+                margin-left: -2px;
+                opacity: 0.7;
             }
 
             /* Edit — filled, in the section's scope colour */
@@ -1599,6 +1612,8 @@
             csrf: @js(csrf_token()),
             paths: @js($componentPaths),
             contracts: @js($componentContracts),
+            // The Ask AI menu offers Variations where a section can be drawn and redrawn
+            designVariations: @js(\Designer\Studio\Support\DevMode::enabled() && app(\Designer\Studio\Services\Assistant\ImageVariations::class)->sectionsAvailable()),
         };
     </script>
 
@@ -1711,7 +1726,7 @@
                         </span>
                     @endif
 
-                    {{-- Toolbar: ··· · ↑ ↓ · Ask AI · Edit --}}
+                    {{-- Toolbar: ··· · ↑ ↓ · Ask AI (a menu: Ask, Improve, Variations) · Edit --}}
                     <div class="studio-toolbar" onclick="event.stopPropagation()">
                         <button type="button" class="studio-tb-btn is-more" onclick="Studio.preview.moreMenu('{{ $section['id'] }}', event)" title="More" aria-label="More actions" aria-haspopup="menu">
                             <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></svg>
@@ -1731,9 +1746,10 @@
                         @endif
                         @if(\Designer\Studio\Support\DevMode::enabled())
                             <span class="studio-tb-sep studio-devmode-only"></span>
-                            <button type="button" class="studio-tb-btn is-ai studio-devmode-only" onclick="Studio.preview.askAi('{{ $section['id'] }}', event)" title="Ask the Assistant about this section (A)">
+                            <button type="button" class="studio-tb-btn is-ai studio-devmode-only" onclick="Studio.preview.aiMenu('{{ $section['id'] }}', event)" title="Ask the Assistant about this section (A)" aria-haspopup="menu">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
                                 Ask AI
+                                <svg class="studio-tb-caret" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.72a.75.75 0 0 1 1.06 0L10 11.44l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.78a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                             </button>
                         @endif
                         <span class="studio-tb-sep"></span>

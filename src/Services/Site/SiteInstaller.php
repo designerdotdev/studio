@@ -93,6 +93,9 @@ class SiteInstaller
 
         $this->mirror->rebuild();
 
+        // Another site: nothing of the old one's history applies
+        app(\Designer\Studio\Services\History::class)->reset();
+
         // A fresh copy of the linked template is, by definition, in step with it
         if (($linked = $this->link->directory()) !== null && realpath($linked) === realpath($dir)) {
             $this->link->baseline(app(TemplateExporter::class)->fingerprint($dir));

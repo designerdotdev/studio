@@ -19,6 +19,13 @@ use Symfony\Component\Process\Process;
  * the media library's uploads and hands back its URL.
  *
  * Codex is the only engine that can draw; without it the feature is off.
+ *
+ * A job has a `kind`: `image` varies a picture from the media library;
+ * `section` varies the design of a page section, from a snapshot of it
+ * (SectionSnapshot) — the snapshot is a job folder of its own (status
+ * `snapshot`, never run) that each generation copies its source from, and
+ * nothing of a section job is kept: the chosen concept goes to the Assistant
+ * as an attachment, beside the snapshot, to be built.
  */
 class ImageVariations
 {
@@ -26,17 +33,26 @@ class ImageVariations
 
     public const DEFAULT_PROMPT = 'Create a few variations of this';
 
+    public const DEFAULT_SECTION_PROMPT = 'Create a few variations of this design';
+
     protected const EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'];
 
     public function __construct(
         protected StudioStorage $storage,
         protected Engines $engines,
         protected Attachments $attachments,
+        protected SectionSnapshot $snapshots,
     ) {}
 
     public function available(): bool
     {
         return $this->engines->isAvailable(Engines::CODEX);
+    }
+
+    /** Design variations also need the snapshot they start from. */
+    public function sectionsAvailable(): bool
+    {
+        return $this->available() && $this->snapshots->available();
     }
 
     protected function root(): string
@@ -78,10 +94,6 @@ class ImageVariations
      */
     public function start(string $url, string $prompt, int $count): array
     {
-        if (!$this->available()) {
-            throw new \RuntimeException('Codex is not installed on this machine.');
-        }
-
         $original = $this->attachments->original($url);
 
         if (!$original) {
@@ -94,20 +106,87 @@ class ImageVariations
             throw new \RuntimeException('Variations cannot be made from a .' . $extension . ' file.');
         }
 
+        return $this->create('image', $original, pathinfo($original, PATHINFO_FILENAME), $prompt, $count);
+    }
+
+    /**
+     * Take the picture a section's variations start from. The folder it
+     * lands in is a job that never runs: startSection() copies from it.
+     *
+     * @param  string  $origin  the running site, where the section's styles and images load from
+     *
+     * @throws \RuntimeException with a message worth showing
+     */
+    public function snapshot(string $page, string $section, string $origin): array
+    {
+        if (!$this->sectionsAvailable()) {
+            throw new \RuntimeException('Design variations need Codex and Playwright on this machine.');
+        }
+
+        if (!$document = $this->snapshots->document($page, $section)) {
+            throw new \RuntimeException('That section is no longer on the page.');
+        }
+
         $this->prune();
 
         $job = [
             'id' => (string) Str::uuid(),
-            'source' => 'source.' . $extension,
-            'name' => pathinfo($original, PATHINFO_FILENAME),
-            'prompt' => trim($prompt) !== '' ? trim($prompt) : self::DEFAULT_PROMPT,
+            'kind' => 'section',
+            'source' => 'source.png',
+            'name' => $document['title'],
+            'ref' => $document['ref'],
+            'status' => 'snapshot',
+            'created_at' => now()->toIso8601String(),
+        ];
+
+        File::makeDirectory($this->dir($job['id']), 0755, true);
+
+        try {
+            $this->snapshots->capture($document['html'], $origin, $this->dir($job['id']) . '/' . $job['source']);
+        } catch (\RuntimeException $e) {
+            File::deleteDirectory($this->dir($job['id']));
+
+            throw $e;
+        }
+
+        $this->save($job);
+
+        return $job;
+    }
+
+    /** Record a pending job for a section's snapshot. */
+    public function startSection(string $snapshot, string $prompt, int $count): array
+    {
+        $from = $this->find($snapshot);
+
+        if (!$from || ($from['status'] ?? '') !== 'snapshot' || !is_file($this->dir($snapshot) . '/' . $from['source'])) {
+            throw new \RuntimeException('The picture of this section has expired. Close this and open it again.');
+        }
+
+        return $this->create('section', $this->dir($snapshot) . '/' . $from['source'], $from['name'], $prompt, $count);
+    }
+
+    protected function create(string $kind, string $source, string $name, string $prompt, int $count): array
+    {
+        if (!$this->available()) {
+            throw new \RuntimeException('Codex is not installed on this machine.');
+        }
+
+        $this->prune();
+
+        $job = [
+            'id' => (string) Str::uuid(),
+            'kind' => $kind,
+            'source' => 'source.' . strtolower(pathinfo($source, PATHINFO_EXTENSION)),
+            'name' => $name,
+            'prompt' => trim($prompt) !== '' ? trim($prompt) : ($kind === 'section' ? self::DEFAULT_SECTION_PROMPT : self::DEFAULT_PROMPT),
             'count' => max(1, min(self::MAX, $count)),
             'status' => 'pending',
             'created_at' => now()->toIso8601String(),
         ];
 
         File::makeDirectory($this->dir($job['id']), 0755, true);
-        File::copy($original, $this->dir($job['id']) . '/' . $job['source']);
+        File::copy($source, $this->dir($job['id']) . '/' . $job['source']);
         $this->save($job);
 
         return $job;
@@ -163,7 +242,7 @@ class ImageVariations
             $process->setIdleTimeout(null);
             $process->start();
 
-            $emit('activity', ['label' => 'Looking at the image…']);
+            $emit('activity', ['label' => ($job['kind'] ?? 'image') === 'section' ? 'Looking at the section…' : 'Looking at the image…']);
 
             while ($process->isRunning()) {
                 $buffer .= $process->getIncrementalOutput();
@@ -235,16 +314,20 @@ class ImageVariations
         }
     }
 
-    /** A generated image's path, for serving it to the picker. */
+    /** The path of a job's image — one it drew, or the one it started from — for serving it. */
     public function path(string $id, string $file): ?string
     {
         $job = $this->find($id);
 
-        if (!$job || !in_array($file, $this->images($this->dir($id), $job), true)) {
+        if (!$job) {
             return null;
         }
 
-        return $this->dir($id) . '/' . $file;
+        $known = $file === $job['source']
+            ? is_file($this->dir($id) . '/' . $file)
+            : in_array($file, $this->images($this->dir($id), $job + ['count' => self::MAX]), true);
+
+        return $known ? $this->dir($id) . '/' . $file : null;
     }
 
     /** Move one result into the media library; returns its URL. */
@@ -255,6 +338,12 @@ class ImageVariations
         }
 
         $job = $this->find($id);
+
+        // A section's concepts are briefs for the Assistant, never site images
+        if (($job['kind'] ?? 'image') !== 'image') {
+            return null;
+        }
+
         $directory = SitePaths::public(SitePaths::UPLOADS);
 
         if (!File::isDirectory($directory)) {
@@ -319,6 +408,27 @@ class ImageVariations
     protected function prompt(array $job): string
     {
         $names = implode(', ', array_map(fn ($n) => "variation-{$n}.png", range(1, $job['count'])));
+
+        if (($job['kind'] ?? 'image') === 'section') {
+            return implode("\n", [
+                "You are a web designer exploring new directions for one section of a website. The attached image, `{$job['source']}` in the current folder, is a screenshot of that section (\"{$job['name']}\") as it looks now, " . SectionSnapshot::WIDTH . 'px wide.',
+                '',
+                "Use your image generation tool to make exactly {$job['count']} " . Str::plural('mockup', $job['count']) . ' of the same section, redesigned. What the user asked for:',
+                '',
+                '"""',
+                $job['prompt'],
+                '"""',
+                '',
+                'Rules:',
+                '- Each mockup is a distinct design direction: a different layout, composition or visual treatment — not the original with small changes, and not the same idea twice.',
+                '- Unless the request says otherwise, keep what the section says and shows: the same headings, copy, buttons, logos and pictures, and the same brand — its colours, typefaces and tone — so the redesign still belongs on this site.',
+                '- Each one is a flat, straight-on screenshot of the section alone, edge to edge, in the same landscape proportions as the original: no browser window, no device, no perspective, no annotations or labels, no surrounding page.',
+                '- Keep it buildable in HTML and CSS: real text set in type, plain shapes, a sensible grid. Text must be legible and spelled as in the original.',
+                "- Generate them one at a time, and save each to the current folder as soon as it is made, as: {$names}.",
+                '- Write nothing else: no other files, no edits to the source, no code.',
+                '- Do not ask questions. When all are saved, reply with one short line.',
+            ]);
+        }
 
         return implode("\n", [
             "You are making image variations for a website's media library. The attached image is `{$job['source']}` in the current folder.",

@@ -617,6 +617,14 @@ html.studio-light,
         transform: scale(0.94);
     }
 
+    /* Nothing to do (undo with no history): there, and plainly off */
+    .s-tb-btn:disabled {
+        @apply cursor-default text-faint;
+        background: transparent;
+        transform: none;
+        opacity: 0.45;
+    }
+
     .s-tb-btn:focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 1px;
@@ -1928,6 +1936,17 @@ html.studio-light,
         animation: s-vary-in 320ms cubic-bezier(.21, 1.02, .47, 1) both;
     }
 
+    /* A design is opaque and wide: no checkerboard, and its top edge is what matters (section-variations-modal) */
+    .s-vary-img.is-design {
+        @apply object-cover object-top;
+        background: none;
+    }
+
+    /* The section as it is now sits first, as a link to the full picture */
+    .s-vary-tile.is-now:not(.is-empty) {
+        cursor: zoom-in;
+    }
+
     .s-vary-index {
         @apply absolute left-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded px-1 font-mono text-[10px] text-white/90;
         background: rgb(0 0 0 / 0.55);
@@ -2474,6 +2493,12 @@ html.studio-light .s-modal-backdrop {
     .s-chat-msg {
         @apply mr-6 rounded-xl rounded-bl-sm border border-line bg-raised px-3 py-2 text-[12.5px] leading-relaxed;
         color: color-mix(in srgb, var(--color-ink) 90%, transparent);
+    }
+
+    /* On the white column a reply is a flat light grey, not an outlined card */
+    :is(html.studio-light, .s-light) .s-chat-msg {
+        border-color: transparent;
+        background: #e8e8e8;
     }
 
     /* --- the folded part: status + composer --------------------------- */

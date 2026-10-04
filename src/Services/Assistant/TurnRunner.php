@@ -130,6 +130,12 @@ class TurnRunner
         return $turn;
     }
 
+    /** Whether a connection should run this turn (true) or follow the one that is. */
+    public function pending(string $id): bool
+    {
+        return ($this->find($id)['status'] ?? null) === 'pending';
+    }
+
     public function stop(string $id): void
     {
         if ($this->find($id)) {
@@ -163,6 +169,30 @@ class TurnRunner
 
         $turn['status'] = 'running';
         $this->save($turn);
+
+        // The turn belongs to no connection. Every event is written to the
+        // turn's log before it is sent, so a stream that drops (a proxy's
+        // timeout, a laptop lid, a reload) loses nothing: the turn runs on,
+        // and the next connection follows the log from where the last one
+        // stopped (follow()). Only Stop ends a turn early.
+        $log = $this->events($id);
+        File::put($log, '');
+        $client = $emit;
+        $n = 0;
+
+        $emit = function (string $event, array $payload) use ($client, $log, &$n): void {
+            if ($event === 'ping') {
+                // The log's age is how a follower knows the turn is alive
+                @touch($log);
+                $client($event, $payload);
+
+                return;
+            }
+
+            $n++;
+            File::append($log, json_encode(['n' => $n, 'event' => $event, 'data' => $payload], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+            $client($event, $payload, $n);
+        };
 
         // A turn runs for minutes, and the reply is only recorded when it
         // ends: PHP's execution limit (30s by default) must not cut the
@@ -208,8 +238,33 @@ class TurnRunner
 
         try {
             $process->start();
+            $quiet = microtime(true);
 
-            foreach ($process as $type => $chunk) {
+            // Non-blocking, so the loop turns while the CLI says nothing: a
+            // model composing a long edit can be silent for minutes, and a
+            // web server gives up on a stream that sends nothing for one
+            // (nginx: 60s). A ping every few seconds keeps the stream open,
+            // and lets Stop land without waiting for output.
+            foreach ($process->getIterator(Process::ITER_NON_BLOCKING) as $type => $chunk) {
+                if ($chunk === '') {
+                    if (microtime(true) - $quiet >= 5) {
+                        $emit('ping', []);
+                        $quiet = microtime(true);
+                    }
+
+                    if ($this->stopped($id)) {
+                        $process->stop(2);
+                        $state['error'] = $state['error'] ?? 'Stopped.';
+                        break;
+                    }
+
+                    usleep(100000);
+
+                    continue;
+                }
+
+                $quiet = microtime(true);
+
                 if ($type !== Process::OUT) {
                     $state['stderr'] = ($state['stderr'] ?? '') . $chunk;
 
@@ -227,7 +282,7 @@ class TurnRunner
                     }
                 }
 
-                if (connection_aborted() || $this->stopped($id)) {
+                if ($this->stopped($id)) {
                     $process->stop(2);
                     $state['error'] = $state['error'] ?? 'Stopped.';
                     break;
@@ -249,6 +304,74 @@ class TurnRunner
     }
 
     /** Finish: persist the assistant message + session, emit done/error */
+    /**
+     * Follow a turn another connection is running (or ran): send what its
+     * log holds past `$after`, then whatever arrives, until it ends.
+     *
+     * @param  int  $after  the last event the client already has
+     * @param  callable(string $event, array $payload, ?int $n): void  $emit
+     */
+    public function follow(string $id, int $after, callable $emit): void
+    {
+        @set_time_limit(0);
+
+        $log = $this->events($id);
+        $quiet = microtime(true);
+        $ended = false;
+
+        while (!connection_aborted()) {
+            foreach (is_file($log) ? file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [] as $line) {
+                $entry = json_decode($line, true);
+
+                if (!is_array($entry) || ($entry['n'] ?? 0) <= $after) {
+                    continue;
+                }
+
+                $after = $entry['n'];
+                $emit($entry['event'], $entry['data'] ?? [], $after);
+
+                if (in_array($entry['event'], ['done', 'error'], true)) {
+                    return;
+                }
+            }
+
+            // Over without a last word in the log (one more read, in case it was just being written)
+            if ($ended) {
+                $emit('error', ['message' => 'The turn ended without a reply.']);
+
+                return;
+            }
+
+            clearstatcache(true, $log);
+            $status = $this->find($id)['status'] ?? null;
+
+            if ($status !== 'running') {
+                $ended = true;
+
+                continue;
+            }
+
+            // Running, but the process behind it is gone (the server was restarted mid-turn)
+            if (!is_file($log) || time() - filemtime($log) > 90) {
+                $emit('error', ['message' => 'The assistant stopped responding. Anything it had already changed is still in place.']);
+
+                return;
+            }
+
+            if (microtime(true) - $quiet >= 5) {
+                $emit('ping', []);
+                $quiet = microtime(true);
+            }
+
+            usleep(300000);
+        }
+    }
+
+    protected function events(string $id): string
+    {
+        return $this->dir() . '/' . $id . '.events';
+    }
+
     protected function finish(array $turn, callable $emit, array $state): void
     {
         $text = $state['result'] ?? $state['text'] ?? '';
@@ -264,10 +387,15 @@ class TurnRunner
             'activity' => $state['activity'] ?? [],
             'files' => $state['files'] ?? [],
             'failed' => $error !== null,
+            // Why it stopped, kept beside whatever it had said by then
+            'error' => $error,
         ]);
 
         $turn['status'] = $error ? 'failed' : 'done';
         $this->save($turn);
+
+        // Whatever the CLI changed is one step of history, named for the request
+        app(\Designer\Studio\Services\History::class)->mark('Assistant · ' . \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', (string) ($turn['prompt'] ?? ''))), 48), 'assistant');
         File::delete($this->dir() . '/' . $turn['id'] . '.stop');
 
         if ($error) {

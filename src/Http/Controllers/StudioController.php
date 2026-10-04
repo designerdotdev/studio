@@ -55,6 +55,11 @@ class StudioController extends Controller
         // fresh deploy with empty storage) and re-sync the section library.
         $this->mirror->sync();
 
+        // Undo needs somewhere to go back to: the site as the editor found
+        // it is the first entry — or, when files changed since the last
+        // visit, a step of its own
+        app(\Designer\Studio\Services\History::class)->mark();
+
         // Self-heal: sites published while the stock welcome route still
         // owned '/' get claimed here.
         $homeClaimed = $this->pruner()->claimHome();
@@ -563,6 +568,9 @@ class StudioController extends Controller
             ], 500);
         }
 
+        // The live site moved: undo never takes that back, so history starts again here
+        app(\Designer\Studio\Services\History::class)->reset();
+
         return response()->json([
             'success' => true,
             'published' => $published['items'],
@@ -588,6 +596,9 @@ class StudioController extends Controller
                 'message' => 'Discard failed — check that storage/studio is writable.',
             ], 500);
         }
+
+        // Written around StudioStorage, so the step is marked by hand
+        app(\Designer\Studio\Services\History::class)->mark('Discard changes', 'discard');
 
         return response()->json([
             'success' => true,

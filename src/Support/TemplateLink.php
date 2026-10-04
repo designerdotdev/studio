@@ -111,6 +111,12 @@ final class TemplateLink
         $this->pending = true;
     }
 
+    /** Whether a write to the site is waiting for the end of the request. */
+    public function pending(): bool
+    {
+        return $this->pending;
+    }
+
     public function consumePending(): bool
     {
         $pending = $this->pending;

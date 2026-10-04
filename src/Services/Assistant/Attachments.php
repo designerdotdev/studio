@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\File;
 
 /**
  * Small copies of the images attached to assistant messages, kept under
- * storage/studio/assistant/attachments/. An attachment is only a URL into
- * the media library, and that file can be renamed, moved or deleted later;
+ * storage/studio/assistant/attachments/. An attachment is only a URL — into
+ * the media library, or to an image of a variations job, which is thrown
+ * away after a day — and that file can be renamed, moved or deleted later;
  * the copy taken when the message is sent keeps the conversation readable.
  *
  * Copies are named by a hash of the original's contents, so the same image
@@ -38,9 +39,17 @@ class Attachments
         return $dir;
     }
 
-    /** The file an attachment URL points at, or null when it is gone or outside the site's public files. */
+    /**
+     * The file an attachment URL points at, or null when it is gone or is
+     * not one an attachment may be: a public file of the site, or an image
+     * of a variations job (a section's snapshot and the concept chosen for it).
+     */
     public function original(string $url): ?string
     {
+        if (preg_match('#/api/assistant/variations/([a-f0-9-]{36})/([A-Za-z0-9._-]+)$#', parse_url($url, PHP_URL_PATH) ?: '', $m)) {
+            return app(ImageVariations::class)->path($m[1], $m[2]);
+        }
+
         $public = rtrim(SitePaths::public(), '/');
         $relative = ltrim(preg_replace('#^/designer/#', '', parse_url($url, PHP_URL_PATH) ?: ''), '/');
         $absolute = $relative !== '' ? realpath($public . '/' . $relative) : false;

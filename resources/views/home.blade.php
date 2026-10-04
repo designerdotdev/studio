@@ -11,6 +11,8 @@
     // machine, behind the same server gate. Not a developer-only surface —
     // it is a picture button, so the menu's switch does not hide it.
     $variationsAvailable = $devModeAvailable && app(\Designer\Studio\Services\Assistant\ImageVariations::class)->available();
+    // A section's Ask AI menu offers Variations where its picture can be taken too
+    $designVariationsAvailable = $variationsAvailable && app(\Designer\Studio\Services\Assistant\ImageVariations::class)->sectionsAvailable();
     // The top bar's "open in a new tab": the draft preview, or the live page
     $openUrl = $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl;
     $openLabel = $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab';
@@ -283,6 +285,90 @@
                         toIframe('studio:select', { sectionId, scroll: false });
                         this.focusChat();
                     },
+                    // The other two entries of a section's Ask AI menu write
+                    // the message themselves and send it as a Build turn
+                    // (studio:chat-send, heard by the Assistant's composer).
+                    tellAssistant(sectionId, prompt, attachments = []) {
+                        if (!this.chatAvailable || !sectionId) return;
+                        this.askAi(sectionId);
+                        window.dispatchEvent(new CustomEvent('studio:chat-send', { detail: { sectionId, prompt, attachments, mode: 'build' } }));
+                    },
+                    // Improve: a polish of the block as it stands
+                    improveSection(sectionId) {
+                        this.tellAssistant(sectionId, 'Improve this section. Clean up anything rough in this block: spacing and alignment, type hierarchy, contrast, how it holds together at phone, tablet and desktop widths, and markup that is redundant or out of step with the rest of the site. Keep its content, its fields and its overall design — this is a polish, not a redesign.');
+                    },
+                    // Variations: the modal draws redesign concepts from a snapshot of the section…
+                    designVariations(sectionId) {
+                        if (!this.chatAvailable || !sectionId) return;
+                        this.setView('design');
+                        window.dispatchEvent(new CustomEvent('studio:section-variations', { detail: { sectionId } }));
+                    },
+                    // …and the one chosen is built: the snapshot and the concept go along as attachments
+                    redesignSection(sectionId, current, concept) {
+                        const name = (url) => url.split('/').pop();
+                        this.tellAssistant(sectionId, `Redesign this section to the new concept. Two images are attached: \`${name(current)}\` is the section as it looks now at 1440px wide, and \`${name(concept)}\` is the concept to build. Rebuild the section's markup to match the concept's layout and treatment. Keep its content and its fields (the same yml keys wherever they still apply), use the site's own theme tokens and typefaces rather than colours sampled from the image, and make it hold together at phone and tablet widths too.`, [current, concept]);
+                    },
+
+                    /* --- undo / redo --------------------------------------
+                       One history for the whole site (Services/History): a
+                       step is whatever a request changed, recorded once it
+                       is done — so what the buttons offer is asked for a
+                       moment after each save (`refreshHistory`), and ⌘Z
+                       works whether or not they have caught up. */
+                    history: { undo: null, redo: null },
+                    historyBusy: false,
+                    historyTimer: null,
+                    refreshHistory(delay = 450) {
+                        clearTimeout(this.historyTimer);
+                        this.historyTimer = setTimeout(async () => {
+                            try {
+                                const data = await (await fetch(@js(route('studio.api.history')), { headers: { 'Accept': 'application/json' } })).json();
+                                if (!this.historyBusy) this.history = { undo: data.undo ?? null, redo: data.redo ?? null };
+                            } catch (e) { /* keep what was known */ }
+                        }, delay);
+                    },
+                    undo() { return this.stepHistory('undo') },
+                    redo() { return this.stepHistory('redo') },
+                    async stepHistory(direction) {
+                        if (this.historyBusy) return;
+                        this.historyBusy = true;
+                        clearTimeout(this.historyTimer);
+
+                        let data;
+                        try {
+                            const response = await fetch(direction === 'undo' ? @js(route('studio.api.history.undo')) : @js(route('studio.api.history.redo')), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                                body: JSON.stringify({ page: window.__studioPageSlug }),
+                            });
+                            data = await response.json();
+                            if (!response.ok) throw new Error();
+                        } catch (e) {
+                            this.historyBusy = false;
+                            window.Studio.toast(direction === 'undo' ? 'Could not undo' : 'Could not redo', 'error');
+                            return;
+                        }
+
+                        this.history = { undo: data.undo ?? null, redo: data.redo ?? null };
+                        this.historyBusy = false;
+
+                        if (!data.success) {
+                            window.Studio.toast(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo', 'info', 1600);
+                            return;
+                        }
+
+                        // The page being edited went with the step, or the chrome
+                        // was built from something that changed: load again
+                        if (!data.exists) { window.location.href = @js(route('studio.index')); return; }
+                        if (data.reload) { window.location.reload(); return; }
+
+                        // The documents are back as they were: the panels load them again, then the canvas
+                        window.Livewire?.dispatch('studio:history-restored');
+                        if (data.content) window.Livewire?.dispatch('studio:collection-changed');
+                        if (data.files?.length) window.dispatchEvent(new CustomEvent('studio:files-changed', { detail: { paths: data.files } }));
+                        window.dispatchEvent(new CustomEvent('studio:status', { detail: { state: 'saved' } }));
+                        window.Studio.toast({ title: direction === 'undo' ? 'Undone' : 'Redone', description: data.label }, 'info', 2200);
+                    },
 
                     // The top bar's one responsive button steps Desktop → Tablet → Phone
                     cycleDevice() {
@@ -354,6 +440,14 @@
                         store.closeInspector({ fromServer: true });
                     }
                 });
+                // What undo and redo offer moves with every change: ask again
+                // once a save has settled, after the Assistant or the Code
+                // view wrote files, and when the window comes back
+                studio.refreshHistory(0);
+                window.addEventListener('studio:status', (event) => { if (event.detail?.state === 'saved') studio.refreshHistory() });
+                window.addEventListener('studio:files-changed', () => studio.refreshHistory(900));
+                window.addEventListener('focus', () => studio.refreshHistory(0));
+
                 // Page settings closed from inside the panel
                 window.addEventListener('studio:page-settings-closed', () => {
                     const store = Alpine.store('studio');
@@ -771,6 +865,8 @@
                     @if($draftMode)
                     { label: 'Publish…', hint: 'Site', run: () => window.dispatchEvent(new CustomEvent('studio:open-publish')) },
                     @endif
+                    { label: studio.history.undo ? 'Undo — ' + studio.history.undo : 'Undo', hint: '⌘Z', when: !!studio.history.undo, run: () => studio.undo() },
+                    { label: studio.history.redo ? 'Redo — ' + studio.history.redo : 'Redo', hint: '⇧⌘Z', when: !!studio.history.redo, run: () => studio.redo() },
                     { label: 'Assistant', hint: '⌘J', when: studio.chatAvailable, run: () => studio.focusChat() },
                     { label: 'Pages', hint: 'Panel', run: () => { studio.setView('design'); studio.openDrawer('pages') } },
                     { label: 'Media', hint: 'Panel', run: () => studio.openDrawer('media') },
@@ -928,6 +1024,8 @@
                         ['Toggle the side panel', ['⌘', 'B']],
                         ['Page settings', ['⌘', ',']],
                         ['Desktop / tablet / phone width', ['⌥', '1–3']],
+                        ['Undo', ['⌘', 'Z']],
+                        ['Redo', ['⇧', '⌘', 'Z']],
                         ['This list', ['?']],
                     ],
                     'Selected section' => [
@@ -1452,6 +1550,10 @@
 
     @if($variationsAvailable)
         @include('studio::partials.variations-modal')
+    @endif
+
+    @if($designVariationsAvailable)
+        @include('studio::partials.section-variations-modal')
     @endif
 
     {{-- ============================================================ --}}

@@ -22,6 +22,12 @@ class StudioStorage
      */
     protected bool $liveChanged = false;
 
+    /**
+     * Set when any site document, draft or live, was written this request:
+     * the provider records a step of history once the request is done.
+     */
+    protected bool $siteChanged = false;
+
     public function __construct()
     {
         $this->basePath = config('studio.storage_path', storage_path('studio'));
@@ -92,15 +98,21 @@ class StudioStorage
         return $changed;
     }
 
+    /** Whether a site document changed this request, in either workspace; resets the flag. */
+    public function consumeSiteChanges(): bool
+    {
+        $changed = $this->siteChanged;
+        $this->siteChanged = false;
+
+        return $changed;
+    }
+
     protected function touch(string $path): void
     {
-        if ($this->workspace !== '') {
-            return;
-        }
-
         foreach (self::WORKSPACE_TREES as $tree) {
             if ($path === $tree || str_starts_with($path, $tree . '/')) {
-                $this->liveChanged = true;
+                $this->siteChanged = true;
+                $this->liveChanged = $this->liveChanged || $this->workspace === '';
 
                 return;
             }

@@ -27,6 +27,7 @@
 
         prompt: '',
         busy: false,
+        sending: false,
         turn: null,
         source: null,
         live: { text: '', activity: null, files: [] },
@@ -34,7 +35,7 @@
         picking: false,
         // Ask reads and answers; Build edits files. Remembered.
         mode: localStorage.getItem('studio.chat-mode') === 'build' ? 'build' : 'ask',
-        // Images from the media library, sent with the next message
+        // Images sent with the next message: from the media library, or a section's snapshot and concept
         attachments: [],
         attaching: false,
         count: @js(count($messages)),
@@ -51,6 +52,8 @@
                 $store.studio.setAssistant(true);
                 this.$nextTick(() => this.$refs.composer?.focus());
             });
+            // A message written elsewhere (a section's Improve, a chosen design variation)
+            window.addEventListener('studio:chat-send', (e) => this.deliver(e.detail));
             // A reloaded canvas has forgotten what was marked on it
             window.addEventListener('studio:canvas-loaded', () => this.syncContext());
             // Esc (in the editor or the canvas) and the banner's Cancel
@@ -124,11 +127,40 @@
             this.$refs.composer?.blur();
         },
 
-        async send() {
-            const text = this.prompt.trim();
-            if (!text || this.busy) return;
+        // A message the editor wrote for the user, sent as if typed. The
+        // section it is about arrives as the chip through Livewire, so wait
+        // for it; while a turn is running the message waits in the composer.
+        async deliver({ sectionId, prompt, attachments = [], mode = 'build' }) {
+            this.element = null;
+            this.prompt = prompt;
+            this.attachments = [...attachments];
+            this.$nextTick(() => this.grow());
 
-            const threadId = await $wire.ensureThread();
+            if (this.busy) {
+                window.Studio.toast({ title: 'The Assistant is still working', description: 'The message is in the composer — send it when this turn is done.' }, 'info');
+                return;
+            }
+
+            for (let i = 0; i < 60 && sectionId && $wire.selected?.id !== sectionId; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+
+            // Still what was delivered: nothing was typed over it while waiting
+            if (this.prompt === prompt) await this.send(mode);
+        },
+
+        // `as` sends this one message in a mode other than the composer's
+        async send(as = null) {
+            const text = this.prompt.trim();
+            // `sending` covers the wait for the thread below, before `busy` is set:
+            // two calls in the same moment would otherwise both start a turn
+            if (!text || this.busy || this.sending) return;
+            this.sending = true;
+            const mode = as === 'build' || as === 'ask' ? as : this.mode;
+
+            let threadId;
+            try { threadId = await $wire.ensureThread(); } finally { this.sending = false; }
+            if (this.busy) return;
             const section = $wire.get('selected');
             const context = { page: this.page };
             if (section) context.section = section;
@@ -158,7 +190,7 @@
                 const response = await fetch(this.urls.turn, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': this.csrf },
-                    body: JSON.stringify({ thread: threadId, engine: $wire.engine, prompt: text, context, mode: this.mode }),
+                    body: JSON.stringify({ thread: threadId, engine: $wire.engine, prompt: text, context, mode }),
                 });
                 data = await response.json();
                 if (!response.ok || !data.success) throw new Error(data.message || 'Could not start the assistant.');
@@ -182,15 +214,25 @@
         listen(turn) {
             const source = new EventSource(this.urls.stream.replace('__TURN__', turn));
             this.source = source;
+            let drops = 0;
 
             source.addEventListener('text', (e) => { this.live.text += JSON.parse(e.data).delta; this.scrollToEnd(); });
             source.addEventListener('activity', (e) => { this.live.activity = JSON.parse(e.data).label; });
             source.addEventListener('files', (e) => { this.live.files = JSON.parse(e.data).paths; });
             source.addEventListener('done', (e) => { const d = JSON.parse(e.data); this.finish(false, d); });
+            source.addEventListener('open', () => { drops = 0; });
             source.addEventListener('error', (e) => {
                 if (e.data) { const d = JSON.parse(e.data); this.finish(true, d); return; }
-                // Connection dropped without a server event
-                if (this.busy) this.finish(true, { message: 'Lost the connection to the assistant.' });
+                if (!this.busy || source !== this.source) return;
+                // The connection dropped; the turn runs on without it. The
+                // browser reconnects by itself and the stream resumes from the
+                // last event it had — give up only when it cannot get back.
+                drops += 1;
+                if (source.readyState === EventSource.CLOSED || drops > 20) {
+                    this.finish(true, { message: 'Lost the connection to the assistant. The turn may still be running — reload in a moment to see its reply.' });
+                    return;
+                }
+                this.live.activity = 'Reconnecting…';
             });
         },
 
@@ -346,6 +388,10 @@
                                 @else
                                     <div class="s-chat-msg {{ $message['failed'] ? 'text-danger' : '' }}">
                                         <p class="whitespace-pre-wrap break-words">{{ $message['text'] !== '' ? $message['text'] : ($message['failed'] ? 'The assistant failed.' : 'Done.') }}</p>
+                                        {{-- Cut off part way: say why, under what it had got to --}}
+                                        @if($message['failed'] && !empty($message['error']) && $message['error'] !== $message['text'])
+                                            <p class="mt-1.5 text-[11px] opacity-80">{{ $message['error'] === 'Stopped.' ? 'Stopped before it finished.' : $message['error'] }}</p>
+                                        @endif
                                         @if(!empty($message['files']) || !empty($message['activity']))
                                             <details class="mt-2 border-t border-line pt-1.5 text-[11px] text-faint">
                                                 <summary class="cursor-pointer select-none hover:text-soft">More details{{ !empty($message['files']) ? ' · ' . count($message['files']) . ' ' . Str::plural('file', count($message['files'])) : '' }}</summary>

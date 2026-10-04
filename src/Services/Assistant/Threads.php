@@ -147,6 +147,7 @@ class Threads
             'files' => array_values(array_unique($message['files'] ?? [])),
             'context' => $message['context'] ?? null,
             'failed' => (bool) ($message['failed'] ?? false),
+            'error' => $message['error'] ?? null,
             'at' => now()->toIso8601String(),
         ];
 

@@ -299,6 +299,17 @@ const StudioEditor = {
                     window.Alpine?.store('studio')?.askAi?.(data.sectionId);
                     break;
 
+                // The Ask AI menu's other two entries
+                case 'studio:ai-improve':
+                    this.selectedId = data.sectionId;
+                    window.Alpine?.store('studio')?.improveSection?.(data.sectionId);
+                    break;
+
+                case 'studio:ai-variations':
+                    this.selectedId = data.sectionId;
+                    window.Alpine?.store('studio')?.designVariations?.(data.sectionId);
+                    break;
+
                 case 'studio:deselected':
                     this.selectedId = null;
                     window.Livewire?.dispatch('studio:deselect-section');
@@ -529,16 +540,26 @@ const StudioEditor = {
                 code: event.code,
                 meta: event.metaKey || event.ctrlKey,
                 alt: event.altKey,
+                shift: event.shiftKey,
                 typing: isTyping(),
                 preventDefault: () => event.preventDefault(),
             });
         });
     },
 
-    handleShortcut({ key, code = '', meta, alt = false, typing, preventDefault = () => {} }) {
+    handleShortcut({ key, code = '', meta, alt = false, shift = false, typing, preventDefault = () => {} }) {
         // The dev-mode code modal owns the keyboard while open (its own
         // window-level handlers run after this document-level one)
         if (window.Studio?.codeModalOpen) return;
+
+        // Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z (and Ctrl+Y) — the site's history.
+        // In a field or the code editor the key is the text's own undo.
+        if (meta && !alt && !typing && (key === 'z' || key === 'Z' || key === 'y' || key === 'Y')) {
+            preventDefault();
+            const studio = window.Alpine?.store('studio');
+            (shift || key === 'y' || key === 'Y') ? studio?.redo?.() : studio?.undo?.();
+            return;
+        }
 
         // Cmd/Ctrl+S — everything autosaves, so this is only reassurance.
         // Code mode is the exception: files there save explicitly, and the
@@ -1314,7 +1335,7 @@ const StudioPreview = {
         }
     },
 
-    init({ variables, bindings, refs, blocks, renderUrl, collectionsUrl, csrf, paths, contracts }) {
+    init({ variables, bindings, refs, blocks, renderUrl, collectionsUrl, csrf, paths, contracts, designVariations }) {
         this.variables = variables || {};
         // Per-section {field: 'collections.<name>'} — sent with every render
         // so bound repeaters keep reading the collection, not stale values
@@ -1322,6 +1343,7 @@ const StudioPreview = {
         this.refs = refs || {};
         this.blocks = blocks || {};
         this.renderUrl = renderUrl || null;
+        this.designVariations = !!designVariations;
         this.collectionsUrl = collectionsUrl || null;
         this.csrf = csrf || null;
 
@@ -1549,7 +1571,7 @@ const StudioPreview = {
                 || event.key === 'Delete'
                 // E edits the selection, A asks the Assistant about it (outside a field)
                 || (!(event.metaKey || event.ctrlKey) && ['e', 'E', 'a', 'A'].includes(event.key) && !isTyping(document))
-                || ((event.metaKey || event.ctrlKey) && ['b', 'B', 'd', 'D', 's', 'S', 'k', 'K', 'ArrowUp', 'ArrowDown'].includes(event.key));
+                || ((event.metaKey || event.ctrlKey) && ['b', 'B', 'd', 'D', 's', 'S', 'k', 'K', 'z', 'Z', 'y', 'Y', 'ArrowUp', 'ArrowDown'].includes(event.key));
 
             if (!relevant) return;
 
@@ -1560,6 +1582,7 @@ const StudioPreview = {
             this.post('studio:key', {
                 key: event.key,
                 meta: event.metaKey || event.ctrlKey,
+                shift: event.shiftKey,
                 typing: isTyping(document),
             });
         });
@@ -4002,6 +4025,42 @@ const StudioPreview = {
         this.post('studio:ask-ai', { sectionId });
     },
 
+    /**
+     * The toolbar's Ask AI is a menu: Ask (the chat, with this section as
+     * its context), Improve (the Assistant tidies the block as it stands) and
+     * Variations (redesign concepts drawn from a snapshot of it, one of which
+     * the Assistant then builds).
+     */
+    aiMenu(sectionId, event) {
+        if (event) event.stopPropagation();
+        if (this.mode === 'preview' || !sectionId) return;
+
+        const button = event?.currentTarget || null;
+
+        // Pressing it again closes the menu it opened
+        if (this.menu && this.menuOwner === button) {
+            this.closeMenu();
+            return;
+        }
+
+        this.closeMenu(true);
+        this.applySelection(sectionId, false);
+        this.post('studio:section-selected', { sectionId });
+
+        const items = [
+            { label: 'Ask…', icon: 'assistant', kbd: 'A', onClick: () => this.askAi(sectionId) },
+            { label: 'Improve', icon: 'improve', hint: 'Clean up this block', onClick: () => this.post('studio:ai-improve', { sectionId }) },
+        ];
+
+        if (this.designVariations) {
+            items.push({ label: 'Variations…', icon: 'variations', hint: 'Redesign concepts', onClick: () => this.post('studio:ai-variations', { sectionId }) });
+        }
+
+        const rect = button?.getBoundingClientRect();
+
+        this.openMenu(rect ? rect.right : event.clientX, rect ? rect.bottom + 6 : event.clientY, items, { align: 'right', owner: button });
+    },
+
     /** The toolbar's ··· — the section's less-frequent actions, anchored under the button. */
     moreMenu(sectionId, event) {
         if (event) event.stopPropagation();
@@ -4096,6 +4155,8 @@ const StudioPreview = {
         hide: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>',
         trash: '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193v-.443A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4Zm-1.586 4.914a.75.75 0 1 0-1.498.086l.5 8.5a.75.75 0 0 0 1.498-.086l-.5-8.5Zm4.67.086a.75.75 0 1 0-1.498-.086l-.5 8.5a.75.75 0 0 0 1.498.086l.5-8.5Z" clip-rule="evenodd"/></svg>',
         library: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>',
+        improve: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 16.5 8.25-8.25M13.5 6.5l1-1"/><path d="M14.5 10.5v2M13.5 11.5h2M7 3v2M6 4h2M15.5 2.5v2M14.5 3.5h2"/></svg>',
+        variations: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.75" y="3.25" width="6" height="6" rx="1.25"/><rect x="11.25" y="3.25" width="6" height="6" rx="1.25"/><rect x="2.75" y="11.25" width="6" height="5.5" rx="1.25"/><rect x="11.25" y="11.25" width="6" height="5.5" rx="1.25"/></svg>',
         assistant: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/><path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>',
     },
 

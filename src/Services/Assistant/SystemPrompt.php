@@ -65,24 +65,18 @@ class SystemPrompt
     }
 
     /**
-     * Images attached to the message from the media library. They are
-     * public files of the site, named by path so the CLI can open them
-     * with its own file tools; anything outside public/designer is dropped.
+     * Images attached to the message: public files of the site from the
+     * media library, or a section's snapshot and the concept chosen for it.
+     * They are named by path so the CLI can open them with its own file
+     * tools; anything Attachments does not recognise is dropped.
      */
     protected function attachmentContext(array $context): array
     {
-        $public = rtrim(SitePaths::public(), '/');
+        $attachments = app(Attachments::class);
         $paths = [];
 
         foreach ((array) ($context['attachments'] ?? []) as $url) {
-            if (!is_string($url)) {
-                continue;
-            }
-
-            $relative = ltrim(preg_replace('#^/designer/#', '', parse_url($url, PHP_URL_PATH) ?: ''), '/');
-            $absolute = realpath($public . '/' . $relative);
-
-            if ($relative !== '' && $absolute && str_starts_with($absolute, $public . '/') && is_file($absolute)) {
+            if (is_string($url) && ($absolute = $attachments->original($url))) {
                 $paths[] = $this->relative($absolute);
             }
         }
@@ -93,7 +87,7 @@ class SystemPrompt
 
         return [
             '## Attached images',
-            '- Look at each of these with your file tools before answering; the user attached them to this message:',
+            '- Look at each of these with your file tools before answering; the user attached them to this message, in this order:',
             ...array_map(fn ($path) => '  - `' . $path . '`', $paths),
             '',
         ];

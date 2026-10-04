@@ -95,6 +95,7 @@ Route::group([
         Route::get('/assistant/engines', [\Designer\Studio\Http\Controllers\AssistantController::class, 'engines'])->name('api.assistant.engines');
         Route::post('/assistant/turn', [\Designer\Studio\Http\Controllers\AssistantController::class, 'turn'])->middleware('throttle:60,1')->name('api.assistant.turn');
         Route::get('/assistant/stream/{turn}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'stream'])->where('turn', '[a-f0-9-]{36}')->name('api.assistant.stream');
+        Route::post('/assistant/variations/snapshot', [\Designer\Studio\Http\Controllers\ImageVariationController::class, 'snapshot'])->middleware('throttle:20,1')->name('api.variations.snapshot');
         Route::post('/assistant/variations', [\Designer\Studio\Http\Controllers\ImageVariationController::class, 'start'])->middleware('throttle:20,1')->name('api.variations.start');
         Route::get('/assistant/variations/{id}/stream', [\Designer\Studio\Http\Controllers\ImageVariationController::class, 'stream'])->where('id', '[a-f0-9-]{36}')->name('api.variations.stream');
         Route::post('/assistant/variations/{id}/keep', [\Designer\Studio\Http\Controllers\ImageVariationController::class, 'keep'])->where('id', '[a-f0-9-]{36}')->name('api.variations.keep');
@@ -102,6 +103,11 @@ Route::group([
         Route::delete('/assistant/variations/{id}', [\Designer\Studio\Http\Controllers\ImageVariationController::class, 'stop'])->where('id', '[a-f0-9-]{36}')->name('api.variations.stop');
         Route::get('/assistant/attachment/{name}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'attachment'])->where('name', '[a-f0-9]{40}\.[a-z]{3,4}')->name('api.assistant.attachment');
         Route::delete('/assistant/stream/{turn}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'stop'])->where('turn', '[a-f0-9-]{36}')->name('api.assistant.stop');
+
+        // Undo and redo
+        Route::get('/history', [\Designer\Studio\Http\Controllers\HistoryController::class, 'state'])->name('api.history');
+        Route::post('/history/undo', [\Designer\Studio\Http\Controllers\HistoryController::class, 'undo'])->middleware('throttle:120,1')->name('api.history.undo');
+        Route::post('/history/redo', [\Designer\Studio\Http\Controllers\HistoryController::class, 'redo'])->middleware('throttle:120,1')->name('api.history.redo');
 
         // Draft publishing
         Route::get('/publish/status', [StudioController::class, 'publishStatus'])->name('api.publish.status');

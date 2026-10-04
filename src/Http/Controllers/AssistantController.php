@@ -77,7 +77,9 @@ class AssistantController extends Controller
     {
         abort_unless($this->runner->find($turn), 404);
 
-        return response()->stream(function () use ($turn) {
+        $after = max(0, (int) request()->header('Last-Event-ID', 0));
+
+        return response()->stream(function () use ($turn, $after) {
             // Streaming must not be buffered by PHP, the server, or gzip
             @ini_set('output_buffering', '0');
             @ini_set('zlib.output_compression', '0');
@@ -85,7 +87,22 @@ class AssistantController extends Controller
                 ob_end_flush();
             }
 
-            $send = function (string $event, array $payload): void {
+            // An event carries its number in the turn's log as its id: a
+            // connection that drops comes back with it (Last-Event-ID) and
+            // is sent only what it missed
+            $send = function (string $event, array $payload, ?int $n = null): void {
+                // A ping is a comment: it keeps the connection warm and lets PHP see a closed one
+                if ($event === 'ping') {
+                    echo ": ping\n\n";
+                    flush();
+
+                    return;
+                }
+
+                if ($n !== null) {
+                    echo "id: {$n}\n";
+                }
+
                 echo "event: {$event}\n";
                 echo 'data: ' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
                 flush();
@@ -93,7 +110,9 @@ class AssistantController extends Controller
 
             $send('open', ['turn' => $turn]);
 
-            $this->runner->run($turn, $send);
+            $this->runner->pending($turn)
+                ? $this->runner->run($turn, $send)
+                : $this->runner->follow($turn, $after, $send);
         }, 200, [
             'Content-Type' => 'text/event-stream',
             'Cache-Control' => 'no-cache, no-transform',

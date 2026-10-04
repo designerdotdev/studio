@@ -390,6 +390,26 @@ class EditorPanel extends Component
         $this->dispatch('studio:refresh-preview');
     }
 
+    /**
+     * Undo or redo put the documents back (Services/History): load them
+     * again, as they are now. A section that no longer exists cannot stay
+     * selected.
+     */
+    #[On('studio:history-restored')]
+    public function refreshAfterHistory(): void
+    {
+        $this->lastDeleted = null;
+        $this->lastDeletedItem = null;
+        $this->loadPage();
+
+        if ($this->selectedId !== null && !in_array($this->selectedId, array_column([...$this->sections, ...$this->layoutSections], 'id'), true)) {
+            $this->selectedId = null;
+            $this->dispatch('studio:selection-changed', id: null);
+        }
+
+        $this->dispatch('studio:refresh-preview');
+    }
+
     /** Select from the layers list — also focus the section in the canvas */
     public function selectFromList(string $id): void
     {

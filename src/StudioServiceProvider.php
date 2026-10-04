@@ -58,6 +58,7 @@ class StudioServiceProvider extends ServiceProvider
         $this->app->singleton(SiteMirror::class);
         $this->app->singleton(\Designer\Studio\Services\Site\SiteInstaller::class);
         $this->app->singleton(\Designer\Studio\Support\TemplateLink::class);
+        $this->app->singleton(\Designer\Studio\Services\History::class);
         $this->app->singleton(\Designer\Studio\Services\Templates\TemplateExporter::class);
         $this->app->singleton(\Designer\Studio\Services\Site\RuntimeInstaller::class);
         $this->app->singleton(\Designer\Studio\Support\WelcomeRoutePruner::class);
@@ -162,6 +163,27 @@ class StudioServiceProvider extends ServiceProvider
             if ($this->app->resolved(StudioStorage::class) && $this->app->make(StudioStorage::class)->consumeLiveChanges()) {
                 $this->app->make(SiteMirror::class)->flush();
             }
+        });
+
+        // Undo and redo: a request that wrote to the site's documents or
+        // its files leaves a step of history behind. After the flush above,
+        // so the files a draft-mode-off edit produced are part of the step.
+        $this->app->terminating(function () {
+            $wrote = ($this->app->resolved(StudioStorage::class) && $this->app->make(StudioStorage::class)->consumeSiteChanges())
+                || ($this->app->resolved(\Designer\Studio\Support\TemplateLink::class) && $this->app->make(\Designer\Studio\Support\TemplateLink::class)->pending());
+
+            // A request that never touched the site (every public page view) stops here
+            if (!$wrote && !$this->app->resolved(\Designer\Studio\Services\History::class)) {
+                return;
+            }
+
+            $history = $this->app->make(\Designer\Studio\Services\History::class);
+
+            if ($wrote) {
+                $history->mark();
+            }
+
+            $history->commit();
         });
 
         // The site is linked to a template folder (studio:templates:link):
