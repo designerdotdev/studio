@@ -20,7 +20,7 @@
         });
         $watch(() => $store.studio.view, (view) => { if (view === 'code') $store.code.boot() });
     "
-    @keydown.window="if ($store.studio.view === 'code' && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S') && !window.Studio.codeModalOpen) { $event.preventDefault(); $store.code.save() }"
+    @keydown.window="if ($store.studio.view === 'code' && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S')) { $event.preventDefault(); $store.code.save() }"
 >
     {{-- Tab strip. Its hairline runs on from the files' header beside it. --}}
     <div class="s-code-tabs">

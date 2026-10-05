@@ -1,5 +1,6 @@
 import Sortable from 'sortablejs';
 import collapse from '@alpinejs/collapse';
+import sectionSource from './section-source.js';
 
 // Client-side Blade renderer (used by the preview iframe)
 
@@ -351,9 +352,16 @@ const StudioEditor = {
                     break;
 
                 case 'studio:open-code':
-                    window.dispatchEvent(new CustomEvent('studio:open-code-editor', {
-                        detail: { ref: data.ref, title: data.title },
-                    }));
+                    this.selectedId = data.sectionId;
+                    window.Livewire?.dispatch('studio:select-section', { id: data.sectionId });
+                    window.Alpine?.store('studio')?.openSectionCode?.(data.sectionId);
+                    break;
+
+                // The code panel's preview of unsaved source, and its Elements tab
+                case 'studio:source-ok':
+                case 'studio:source-error':
+                case 'studio:node-picked':
+                    window.dispatchEvent(new CustomEvent(type, { detail: data }));
                     break;
 
                 case 'studio:promote-field':
@@ -548,9 +556,17 @@ const StudioEditor = {
     },
 
     handleShortcut({ key, code = '', meta, alt = false, shift = false, typing, preventDefault = () => {} }) {
-        // The dev-mode code modal owns the keyboard while open (its own
-        // window-level handlers run after this document-level one)
-        if (window.Studio?.codeModalOpen) return;
+        // The inspector's code panel owns these while the caret is in it:
+        // Esc ends an in-place edit or a pick, ⌘Z is
+        // the buffer's own undo (⌘S is below: it saves from anywhere)
+        if (window.Studio?.codeFocus && (key === 'Escape' || (meta && /^[zy]$/i.test(key)))) return;
+
+        // Picking an element for the Elements tab: Esc from the canvas stands it down
+        if (key === 'Escape' && window.Studio?.nodePicking) {
+            preventDefault();
+            window.dispatchEvent(new CustomEvent('studio:node-pick-cancel'));
+            return;
+        }
 
         // Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z (and Ctrl+Y) — the site's history.
         // In a field or the code editor the key is the text's own undo.
@@ -567,6 +583,11 @@ const StudioEditor = {
         if (meta && (key === 's' || key === 'S')) {
             if (window.Alpine?.store('studio')?.mode === 'code') return;
             preventDefault();
+            // A section's code is the other exception: its files save here
+            if (window.Alpine?.store('studio')?.codeShowing) {
+                window.dispatchEvent(new CustomEvent('studio:section-code-save'));
+                return;
+            }
             toast('All changes save automatically', 'info', 2200);
             return;
         }
@@ -1310,6 +1331,9 @@ const StudioPreview = {
     renderInFlight: new Set(),
     renderQueued: new Set(),
     renderTimer: null,
+    // Unsaved source the code panel is previewing: ref → { html, yaml }.
+    // A section whose ref is here renders from it instead of the library.
+    sourceOverrides: {},
     renderPending: new Set(),
 
     // 'preview' | 'edit' | 'code' — mirrors $store.studio.mode in the editor
@@ -1441,8 +1465,30 @@ const StudioPreview = {
                 case 'studio:field-value':
                     this.applyIncomingValue(data);
                     break;
+
+                case 'studio:source-override':
+                    this.setSourceOverride(data);
+                    break;
+
+                case 'studio:node-hover':
+                    StudioNodes.hover(data.on ? { ref: data.ref, n: data.n } : null);
+                    break;
+
+                case 'studio:node-reveal':
+                    StudioNodes.reveal(data.ref, data.n);
+                    break;
+
+                case 'studio:node-attr':
+                    StudioNodes.setAttribute(data);
+                    break;
+
+                case 'studio:node-pick':
+                    StudioNodes.setPick(!!data.on);
+                    break;
             }
         });
+
+        StudioNodes.mount();
 
         // A link inside the canvas never navigates the iframe itself: in Edit
         // it does nothing, and in Preview it asks the editor to move to that
@@ -4095,7 +4141,7 @@ const StudioPreview = {
         items.push({ label: hidden ? 'Show' : 'Hide', icon: hidden ? 'show' : 'hide', onClick: () => this.action(sectionId, 'toggle-hidden') });
 
         if (devMode) {
-            items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.ref, d.title) });
+            items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.section, d.ref, d.title) });
         }
 
         items.push('sep', { label: 'Delete', icon: 'trash', kbd: '⌫', danger: true, onClick: () => this.action(sectionId, 'delete') });
@@ -4122,9 +4168,9 @@ const StudioPreview = {
         this.post('studio:add-section', { scope, index });
     },
 
-    openCode(ref, title, event) {
+    openCode(sectionId, ref, title, event) {
         if (event) event.stopPropagation();
-        this.post('studio:open-code', { ref, title });
+        this.post('studio:open-code', { sectionId, ref, title });
     },
 
     // The inspector, on request: the toolbar's Edit fields button, the
@@ -4421,7 +4467,7 @@ const StudioPreview = {
         }
 
         if (devMode) {
-            items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.ref, d.title) });
+            items.push({ label: 'Edit code', icon: 'code', onClick: () => this.openCode(d.section, d.ref, d.title) });
         }
 
         // Hand the exact element under the pointer to the Assistant — the
@@ -4660,6 +4706,7 @@ const StudioPreview = {
             ref: this.refs[id],
             variables: this.variables[id] || {},
             bindings: this.bindings[id] || {},
+            ...(this.sourceOverrides[this.refs[id]] ? { source: this.sourceOverrides[this.refs[id]] } : {}),
         }));
 
         ready.forEach((id) => this.renderInFlight.add(id));
@@ -4674,10 +4721,12 @@ const StudioPreview = {
             body: JSON.stringify({ sections }),
         })
             .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
-            .then(({ html }) => {
+            .then(({ html, errors }) => {
                 for (const [id, markup] of Object.entries(html || {})) {
                     this.paint(id, markup);
                 }
+
+                this.reportSources(sections, errors || {});
             })
             .catch(() => {
                 // A failed render leaves the last good markup in place — the
@@ -4701,6 +4750,41 @@ const StudioPreview = {
                     this.renderTimer = setTimeout(() => this.flushRenders(), 0);
                 }
             });
+    },
+
+    /**
+     * The code panel previews unsaved source through the same render
+     * pipeline: every section using that ref is rendered from the override
+     * until it is cleared (a save, a discard).
+     */
+    setSourceOverride({ ref, html, yaml, clear }) {
+        if (!ref) return;
+
+        if (clear) {
+            if (!this.sourceOverrides[ref]) return;
+            delete this.sourceOverrides[ref];
+        } else {
+            this.sourceOverrides[ref] = { html: html ?? '', yaml: yaml ?? '' };
+        }
+
+        for (const [id, sectionRef] of Object.entries(this.refs)) {
+            if (sectionRef === ref) this.render(id);
+        }
+    },
+
+    /** Tell the code panel how its source fared: rendered, or why not. */
+    reportSources(sections, errors) {
+        const seen = new Set();
+
+        for (const { id, ref, source } of sections) {
+            if (!source || seen.has(ref)) continue;
+
+            const error = errors[id];
+            seen.add(ref);
+
+            if (error) this.post('studio:source-error', { ref, ...error });
+            else this.post('studio:source-ok', { ref });
+        }
     },
 
     paint(sectionId, markup) {
@@ -4739,6 +4823,213 @@ const StudioPreview = {
     },
 };
 
+/**
+ * The Elements tab's half of the canvas.
+ *
+ * While the code panel previews a section, every element it renders carries
+ * `data-sn` — the number of the source tag that drew it. That is all the
+ * mapping there is: hovering a row in the tree lights every element with
+ * its number (a tag inside a loop lights each copy), and picking an element
+ * here answers with the number to reveal.
+ *
+ * The highlight is the browser inspector's: content in blue, padding in
+ * green, margin in orange, and a label with the tag, its classes and size.
+ * It is drawn in one fixed layer that takes no pointer, styled inline — the
+ * canvas loads no editor stylesheet.
+ */
+const StudioNodes = {
+    layer: null,
+    label: null,
+    target: null,   // { ref, n } from the tree, or { elements } from the pick tool
+    frame: 0,
+    flash: 0,
+    picking: false,
+
+    mount() {
+        // A double click on an element of a previewed section reveals its row
+        document.addEventListener('dblclick', (event) => {
+            const hit = this.hit(event.target);
+            if (hit) StudioPreview.post('studio:node-picked', hit);
+        }, true);
+    },
+
+    /** The numbered element under a target, if its section is being previewed from source. */
+    hit(target) {
+        const element = target?.closest?.('[data-sn]');
+        const section = element?.closest('[data-section]');
+
+        if (!section || !element.closest('[data-section-content]')) return null;
+        if (!StudioPreview.sourceOverrides[section.dataset.ref]) return null;
+
+        return { element, ref: section.dataset.ref, sectionId: section.dataset.section, n: Number(element.dataset.sn) };
+    },
+
+    elements({ ref, n, elements }) {
+        if (elements) return elements.filter((el) => el.isConnected);
+
+        return [...document.querySelectorAll(`[data-section][data-ref="${CSS.escape(ref)}"] [data-section-content] [data-sn="${Number(n)}"]`)];
+    },
+
+    hover(target) {
+        clearTimeout(this.flash);
+        this.target = target;
+        this.schedule();
+    },
+
+    /** A row was selected: bring what it draws into view and light it for a moment. */
+    reveal(ref, n) {
+        const first = this.elements({ ref, n }).find((el) => el.getClientRects().length);
+
+        if (!first) return;
+
+        first.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+        this.hover({ ref, n });
+        this.flash = setTimeout(() => this.hover(null), 1100);
+    },
+
+    /**
+     * An attribute as it is being typed in the tree, applied before the
+     * server has rendered it. Classes the page's own scripts added since the
+     * render (`is-visible`, an open menu) are kept: they are whatever is on
+     * the element and was not in the source value.
+     */
+    setAttribute({ ref, n, name, value, previous }) {
+        for (const el of this.elements({ ref, n })) {
+            if (name !== 'class') {
+                el.setAttribute(name, value);
+                continue;
+            }
+
+            const written = new Set(String(previous || '').split(/\s+/).filter(Boolean));
+            const next = String(value).split(/\s+/).filter(Boolean);
+            const added = [...el.classList].filter((token) => !written.has(token) && !next.includes(token));
+
+            el.setAttribute('class', [...next, ...added].join(' '));
+        }
+
+        this.schedule();
+    },
+
+    setPick(on) {
+        if (on === this.picking) return;
+
+        this.picking = on;
+        document.documentElement.style.cursor = on ? 'crosshair' : '';
+        this.pickStyle ??= Object.assign(document.createElement('style'), { textContent: 'html.studio-node-pick * { cursor: crosshair !important; }' });
+        on ? document.head.appendChild(this.pickStyle) : this.pickStyle.remove();
+        document.documentElement.classList.toggle('studio-node-pick', on);
+
+        if (on) {
+            this.onMove = (event) => {
+                const hit = this.hit(event.target);
+                this.hover(hit ? { elements: [hit.element] } : null);
+            };
+            this.onClick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const hit = this.hit(event.target);
+                if (!hit) return;
+
+                StudioPreview.post('studio:node-picked', { ref: hit.ref, sectionId: hit.sectionId, n: hit.n });
+            };
+            this.onPress = (event) => event.stopPropagation();
+
+            document.addEventListener('mousemove', this.onMove, true);
+            document.addEventListener('click', this.onClick, true);
+            document.addEventListener('mouseup', this.onPress, true);
+        } else {
+            document.removeEventListener('mousemove', this.onMove, true);
+            document.removeEventListener('click', this.onClick, true);
+            document.removeEventListener('mouseup', this.onPress, true);
+            this.hover(null);
+        }
+    },
+
+    schedule() {
+        if (this.frame) return;
+
+        this.frame = requestAnimationFrame(() => {
+            this.frame = 0;
+            this.draw();
+            // Follow the page while something is lit: a scroll, a reflow
+            // from the edit being typed, a re-render
+            if (this.target) this.schedule();
+        });
+    },
+
+    draw() {
+        const elements = this.target ? this.elements(this.target).filter((el) => el.getClientRects().length) : [];
+
+        if (!elements.length) {
+            this.layer?.remove();
+            return;
+        }
+
+        if (!this.layer) {
+            this.layer = document.createElement('div');
+            this.layer.setAttribute('aria-hidden', 'true');
+            this.layer.style.cssText = 'position:fixed;inset:0;z-index:2147483600;pointer-events:none;overflow:hidden;contain:strict;';
+            this.label = document.createElement('div');
+            this.label.style.cssText = 'position:absolute;display:flex;align-items:baseline;gap:10px;max-width:420px;padding:5px 8px;border-radius:5px;'
+                + 'background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 4px 14px rgba(0,0,0,.18);'
+                + 'font:500 11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#5f6368;white-space:nowrap;';
+        }
+
+        if (!this.layer.isConnected) document.body.appendChild(this.layer);
+
+        const px = (value) => Math.max(0, parseFloat(value) || 0);
+        const boxes = [];
+
+        for (const el of elements) {
+            const rect = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            const margin = [px(style.marginTop), px(style.marginRight), px(style.marginBottom), px(style.marginLeft)];
+            const inset = [
+                px(style.paddingTop) + px(style.borderTopWidth), px(style.paddingRight) + px(style.borderRightWidth),
+                px(style.paddingBottom) + px(style.borderBottomWidth), px(style.paddingLeft) + px(style.borderLeftWidth),
+            ];
+
+            // Margin: an orange frame around the box. Padding: a green frame
+            // inside it, with the content left blue.
+            boxes.push(
+                `<div style="position:absolute;box-sizing:border-box;left:${rect.left - margin[3]}px;top:${rect.top - margin[0]}px;`
+                + `width:${rect.width + margin[1] + margin[3]}px;height:${rect.height + margin[0] + margin[2]}px;`
+                + `border-style:solid;border-color:rgba(246,178,107,.5);border-width:${margin.map((m) => m + 'px').join(' ')};"></div>`
+                + `<div style="position:absolute;box-sizing:border-box;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`
+                + `border-style:solid;border-color:rgba(147,196,125,.5);border-width:${inset.map((m) => Math.min(m, rect.height / 2, rect.width / 2) + 'px').join(' ')};`
+                + `background:rgba(111,168,220,.5);background-clip:padding-box;"></div>`
+            );
+        }
+
+        const first = elements[0];
+        const rect = first.getBoundingClientRect();
+        const classes = (first.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean);
+        let name = classes.length ? '.' + classes.join('.') : '';
+        if (name.length > 46) name = name.slice(0, 45) + '…';
+
+        const escape = (text) => text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const round = (value) => Math.round(value * 100) / 100;
+
+        this.label.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis"><span style="color:#881280">${escape(first.tagName.toLowerCase())}</span>`
+            + `<span style="color:#1a1aa6">${escape(name)}</span></span>`
+            + `<span style="color:#5f6368;font-weight:400">${round(rect.width)} × ${round(rect.height)}`
+            + (elements.length > 1 ? ` · ${elements.length} copies` : '') + '</span>';
+
+        this.layer.innerHTML = boxes.join('');
+        this.layer.appendChild(this.label);
+
+        // Above the element where there is room, else below it, else inside its top edge
+        const size = this.label.getBoundingClientRect();
+        let top = rect.top - size.height - 8;
+        if (top < 4) top = rect.bottom + 8;
+        if (top + size.height > window.innerHeight - 4) top = Math.max(4, rect.top + 8);
+
+        this.label.style.top = top + 'px';
+        this.label.style.left = Math.min(Math.max(4, rect.left), Math.max(4, window.innerWidth - size.width - 4)) + 'px';
+    },
+};
+
 /* ------------------------------------------------------------------ */
 /*  Shared utilities                                                   */
 /* ------------------------------------------------------------------ */
@@ -4750,8 +5041,12 @@ window.Studio = {
     preview: StudioPreview,
     fields: StudioFields,
 
-    // Set by the dev-mode code modal so global shortcuts stand down
-    codeModalOpen: false,
+    // The caret is in the inspector's code panel — its keys are its own
+    codeFocus: false,
+    // The Elements tab's pick tool is armed
+    nodePicking: false,
+    // Blade source ⇄ tree (the Elements tab; see section-source.js)
+    sectionSource,
     // The Assistant's pick tool is armed (the editor's banner sets this)
     picking: false,
 

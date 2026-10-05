@@ -1138,14 +1138,43 @@ html.studio-light,
         border-radius: 0;
     }
 
-    .s-inspector > .s-panel-seam {
-        right: auto;
-        left: 0;
+    /* The right column's seam is the gutter itself: a zero-width item
+       before the column (its negative margin gives the row's gap back)
+       whose grab strip spans the gutter, with the line down its middle —
+       between the stage and the column, on neither. */
+    .s-gutter-seam {
+        position: relative;
+        z-index: 5;
+        flex: none;
+        width: 0;
+        margin-left: calc(-1 * var(--studio-gutter));
+        cursor: col-resize;
     }
 
-    .s-inspector > .s-panel-seam::after {
-        right: auto;
+    .s-gutter-seam::before,
+    .s-gutter-seam::after {
+        content: '';
+        position: absolute;
+        top: 10px;
+        bottom: 10px;
+    }
+
+    .s-gutter-seam::before {
         left: 0;
+        width: var(--studio-gutter);
+    }
+
+    .s-gutter-seam::after {
+        left: calc(var(--studio-gutter) / 2 - 1px);
+        width: 2px;
+        border-radius: 2px;
+        background: transparent;
+        transition: background-color 150ms ease;
+    }
+
+    .s-gutter-seam:hover::after,
+    .s-gutter-seam.is-dragging::after {
+        background: var(--color-accent);
     }
 
     /* The search-result preview's title, in a search engine's own link blue:
@@ -2688,5 +2717,270 @@ html.studio-light .s-modal-backdrop {
 
     @media (prefers-reduced-motion: reduce) {
         .s-chat-status-dot.is-live { animation: none; }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  A section's code, in the inspector (developer mode)                */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+
+    /* The header's Fields ⇄ code toggle */
+    .s-code-toggle {
+        position: relative;
+    }
+
+    .s-code-toggle.is-active {
+        color: var(--color-accent);
+        background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    }
+
+    .s-code-toggle-dot {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--color-warn);
+        box-shadow: 0 0 0 1.5px var(--color-panel);
+    }
+
+    /* The panel: laid over the fields, under the inspector's header. One
+       code surface — the toolbar, the tree and Monaco share --color-code. */
+    .s-sc {
+        --sc-tag: #5db0d7;
+        --sc-attr: #9bbbdc;
+        --sc-value: #f29766;
+        --sc-code: #c58af9;
+        --sc-comment: #7d8590;
+        --sc-select: color-mix(in srgb, var(--color-accent) 22%, transparent);
+        position: absolute;
+        inset: 40px 0 0;
+        z-index: 4;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        color: var(--color-ink);
+        background: var(--color-code);
+    }
+
+    html.studio-light .s-sc {
+        --sc-tag: #881280;
+        --sc-attr: #994500;
+        --sc-value: #1a1aa6;
+        --sc-code: #7b2fb5;
+        --sc-comment: #236e25;
+        --sc-select: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    }
+
+    .s-sc-bar {
+        @apply flex shrink-0 items-center gap-1.5 border-b border-line;
+        height: 40px;
+        padding: 0 8px;
+    }
+
+    .s-sc-tab {
+        width: auto;
+        padding: 0 9px;
+        font-size: 11.5px;
+        font-weight: 500;
+    }
+
+    .s-sc-bar .s-icon-btn.is-active {
+        color: var(--color-accent);
+        background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    }
+
+    .s-sc-unsaved {
+        @apply flex items-center gap-1.5 text-[11.5px] text-soft;
+        white-space: nowrap;
+    }
+
+    /* A narrow column keeps the dot and drops the word */
+    .s-sc-bar {
+        container-type: inline-size;
+    }
+
+    @container (max-width: 500px) {
+        .s-sc-unsaved {
+            font-size: 0;
+            gap: 0;
+        }
+    }
+
+    .s-sc-unsaved::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--color-warn);
+    }
+
+    /* The Elements tree */
+    .s-sc-tree {
+        position: absolute;
+        inset: 0;
+        overflow: auto;
+        padding: 6px 0 24px;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        line-height: 18px;
+        outline: none;
+        cursor: default;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    /* A tag too long for the column wraps under itself, one step in */
+    .s-sc-row {
+        position: relative;
+        padding-right: 10px;
+        text-indent: -14px;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    /* …except a closing tag, which goes back under its opening `<`
+       (the panel marks the ones that wrapped). Moved, not re-flowed: a
+       margin would change what fits on the line above. */
+    .s-sc-tail {
+        position: relative;
+        white-space: nowrap;
+    }
+
+    .s-sc-word {
+        white-space: nowrap;
+    }
+
+    .s-sc-tail.is-wrapped {
+        left: -14px;
+    }
+
+    .s-sc-row:hover {
+        background: var(--color-wash);
+    }
+
+    .s-sc-row.is-selected {
+        background: var(--sc-select);
+    }
+
+    .s-sc-tree:focus-visible .s-sc-row.is-selected {
+        box-shadow: inset 2px 0 0 var(--color-accent);
+    }
+
+    .s-sc-fold {
+        position: absolute;
+        top: 0;
+        width: 14px;
+        height: 18px;
+        cursor: pointer;
+        color: var(--color-faint);
+    }
+
+    .s-sc-fold::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        left: 4px;
+        border: 3.5px solid transparent;
+        border-left: 5px solid currentColor;
+        border-right-width: 0;
+        transition: transform 120ms ease;
+        transform-origin: 2.5px 3.5px;
+    }
+
+    .s-sc-fold.is-open::before {
+        transform: rotate(90deg);
+    }
+
+    .s-sc-fold:hover {
+        color: var(--color-ink);
+    }
+
+    .s-sc-p { color: var(--color-faint); }
+    .s-sc-tag { color: var(--sc-tag); }
+    .s-sc-attr { color: var(--sc-attr); }
+    .s-sc-val { color: var(--sc-value); }
+    .s-sc-code { color: var(--sc-code); }
+    .s-sc-comment { color: var(--sc-comment); }
+    .s-sc-text { color: var(--color-ink); }
+
+    .s-sc-more {
+        margin: 0 2px;
+        padding: 0 4px;
+        border-radius: 3px;
+        color: var(--color-faint);
+        background: var(--color-wash-strong);
+        cursor: pointer;
+    }
+
+    /* What a double click will edit */
+    .s-sc-row [data-edit] {
+        border-radius: 2px;
+        cursor: text;
+    }
+
+    .s-sc-row [data-edit]:hover {
+        background: var(--color-wash-strong);
+    }
+
+    .s-sc-row [data-edit].is-editing {
+        color: var(--color-ink);
+        background: var(--color-panel);
+        outline: none;
+        box-shadow: 0 0 0 1px var(--color-accent), 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+        user-select: text;
+        -webkit-user-select: text;
+    }
+
+    .s-sc-row [data-edit].is-refused {
+        box-shadow: 0 0 0 1px var(--color-danger), 0 0 0 3px color-mix(in srgb, var(--color-danger) 25%, transparent);
+        animation: s-sc-refuse 240ms ease;
+    }
+
+    @keyframes s-sc-refuse {
+        25% { transform: translateX(-3px); }
+        75% { transform: translateX(3px); }
+    }
+
+    .s-sc-empty {
+        @apply px-4 py-6 text-center text-[12px] text-faint;
+        font-family: var(--font-sans);
+        white-space: normal;
+    }
+
+    /* Save · Discard · Cancel — asked before unsaved source is left */
+    .s-sc-leave {
+        @apply flex shrink-0 items-center gap-1.5 border-t border-line text-[12px] text-ink;
+        padding: 8px 8px 8px 12px;
+        background: color-mix(in srgb, var(--color-warn) 10%, var(--color-code));
+    }
+
+    /* The status line: the file, or what is wrong with it */
+    .s-sc-foot {
+        @apply flex shrink-0 items-center gap-2 border-t border-line font-mono text-[11px] text-faint;
+        min-height: 28px;
+        padding: 5px 12px;
+    }
+
+    .s-sc-foot.is-error {
+        color: var(--color-danger);
+        align-items: flex-start;
+    }
+
+    .s-sc-foot > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .s-sc-foot.is-error > span {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        white-space: normal;
     }
 }

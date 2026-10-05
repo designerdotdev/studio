@@ -45,18 +45,33 @@
                     <span class="s-chip !text-warn">Hidden</span>
                 @endif
                 @if(\Designer\Studio\Support\DevMode::enabled())
+                    {{-- Fields ⇄ code (developer mode). The panel that shows
+                         the code is partials/section-code, laid over the
+                         fields; this tells it which section is open. --}}
+                    <span
+                        hidden
+                        x-data
+                        x-init="
+                            window.__studioInspectorSection = { id: @js($selectedId), ref: @js($selected['ref']), title: @js($selected['title']) };
+                            window.dispatchEvent(new CustomEvent('studio:inspector-section', { detail: window.__studioInspectorSection }));
+                        "
+                    ></span>
                     <button
                         x-data
-                        x-show="$store.studio.devMode"
+                        x-show="$store.studio.developer"
                         x-cloak
-                        @click="window.dispatchEvent(new CustomEvent('studio:open-code-editor', { detail: { ref: @js($selected['ref']), title: @js($selected['title']) } }))"
-                        class="s-icon-btn"
-                        title="Edit source code — .blade.php + .yml (developer mode)"
+                        @click="$store.studio.setInspectorCode(!$store.studio.inspectorCode)"
+                        class="s-icon-btn s-code-toggle"
+                        :class="$store.studio.inspectorCode && 'is-active'"
+                        :aria-pressed="$store.studio.inspectorCode ? 'true' : 'false'"
+                        :title="$store.studio.inspectorCode ? 'Back to the fields' : 'Edit code — .blade.php + .yml'"
+                        aria-label="Edit this section's code"
                     >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+                        <span class="s-code-toggle-dot" x-show="$store.studio.codeDirty" x-cloak title="Unsaved code"></span>
                     </button>
                 @endif
-                <button wire:click="closeInspector" class="s-icon-btn" title="Done (Esc)" aria-label="Close the editor">
+                <button x-data @click="$store.studio.guardCode(() => $wire.closeInspector())" class="s-icon-btn" title="Done (Esc)" aria-label="Close the editor">
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
                 </button>
             </div>

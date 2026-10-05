@@ -248,7 +248,7 @@ class DesignSyncService
     }
 
     /** Translate a template's field declarations into Studio's own. */
-    protected function fields(array $fields): array
+    public function fields(array $fields): array
     {
         $translated = [];
 

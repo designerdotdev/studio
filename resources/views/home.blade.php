@@ -83,6 +83,11 @@
                     setView(name) {
                         if (!this.views.includes(name) || name === this.view) return;
                         if (name === 'code' && !this.codeAvailable) return;
+                        // Unsaved section code is asked about before the page is left
+                        if (name !== 'design' && this.inspector === 'section' && this.codeDirty) {
+                            this.guardCode(() => this.setView(name));
+                            return;
+                        }
                         // The inspector edits the page, so it cannot outlive it
                         if (name !== 'design' && this.inspector) this.closeInspector();
                         this.closeDrawer();
@@ -200,11 +205,17 @@
                     },
                     // What stays drawn while the column slides away
                     rightShown: 'inspector',
-                    get rightWidth() { return this.rightShown === 'assistant' ? this.chatWidth : this.inspectorWidth },
+                    get rightWidth() {
+                        if (this.rightShown === 'assistant') return this.chatWidth;
+                        return this.codeWide ? Math.min(this.codePanelWidth, Math.max(420, Math.round(this.windowWidth * 0.6))) : this.inspectorWidth;
+                    },
                     setRightWidth(px) {
                         if (this.rightShown === 'assistant') {
                             this.chatWidth = Math.round(Math.min(640, Math.max(300, px)));
                             localStorage.setItem('studio.assistant-width', String(this.chatWidth));
+                        } else if (this.codeWide) {
+                            this.codePanelWidth = Math.round(Math.min(960, Math.max(420, px)));
+                            localStorage.setItem('studio.code-panel-width', String(this.codePanelWidth));
                         } else {
                             this.inspectorWidth = Math.round(Math.min(560, Math.max(300, px)));
                             localStorage.setItem('studio.inspector-width', String(this.inspectorWidth));
@@ -231,8 +242,14 @@
                     // comes back and the section is deselected. `fromServer`
                     // means Livewire already dropped the selection (its own
                     // close button, a delete) — no need to tell it again.
-                    closeInspector({ fromServer = false } = {}) {
+                    closeInspector({ fromServer = false, force = false } = {}) {
                         if (!this.inspector) return;
+                        // Unsaved section code: ask before the edit ends
+                        // (Livewire's own closes have already happened)
+                        if (!fromServer && !force && this.inspector === 'section' && this.codeDirty) {
+                            this.guardCode(() => this.closeInspector({ force: true }));
+                            return;
+                        }
                         const was = this.inspector;
                         this.inspector = null;
                         if (was === 'section') {
@@ -244,6 +261,39 @@
                             }
                         }
                         if (was === 'page' && !fromServer) window.Livewire?.dispatch('studio:close-page-settings');
+                    },
+
+                    /* --- a section's code --------------------------------- */
+                    // Developer mode: the inspector shows the section's
+                    // fields or its source (partials/section-code). The
+                    // choice is remembered, so a developer who works in
+                    // code stays in code from section to section. Code has
+                    // its own, wider, column width.
+                    inspectorCode: devModeAvailable && localStorage.getItem('studio.inspector-code') === '1',
+                    codePanelWidth: clamp(parseInt(localStorage.getItem('studio.code-panel-width'), 10), 420, 960, 560),
+                    windowWidth: window.innerWidth,
+                    // What the column's width follows — kept while the column slides shut
+                    codeWide: false,
+                    // The panel holds source that differs from the files
+                    codeDirty: false,
+                    get codeShowing() { return this.developer && this.inspectorCode && this.inspector === 'section' },
+                    setInspectorCode(on) {
+                        this.inspectorCode = !!on && this.devModeAvailable;
+                        localStorage.setItem('studio.inspector-code', this.inspectorCode ? '1' : '0');
+                    },
+                    // Edit code — the canvas toolbar's menu, the context menu
+                    openSectionCode(sectionId = null) {
+                        if (!this.developer) return;
+                        this.setInspectorCode(true);
+                        this.openInspector(sectionId);
+                    },
+                    // Run `next` now, or once the panel's Save / Discard has
+                    // settled what happens to unsaved source
+                    guardCode(next) {
+                        if (!this.codeDirty) return next();
+                        this.front = 'inspector';
+                        this.setInspectorCode(true);
+                        window.dispatchEvent(new CustomEvent('studio:code-leave', { detail: { next } }));
                     },
 
                     /* --- the Assistant ----------------------------------- */
@@ -418,6 +468,14 @@
                 // Whichever panel the right column showed last stays drawn
                 // while the column closes
                 Alpine.effect(() => { if (studio.rightPanel) studio.rightShown = studio.rightPanel; });
+
+                // …and so does its width: code's wider column is held until
+                // something else takes the column
+                Alpine.effect(() => {
+                    if (studio.inspector === 'section') studio.codeWide = studio.codeShowing;
+                    else if (studio.inspector === 'page') studio.codeWide = false;
+                });
+                window.addEventListener('resize', () => { studio.windowWidth = window.innerWidth; });
 
                 // Toasts rise at the stage's bottom right corner — beside the
                 // right column when it is open, never over the fields or the
@@ -824,8 +882,11 @@
     {{-- The right column — an edit, or the Assistant                  --}}
     {{-- ============================================================ --}}
     <x-slot:inspector>
-        <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rightShown !== 'assistant'">
+        <div x-data class="relative flex h-full min-h-0 flex-col" x-show="$store.studio.rightShown !== 'assistant'">
             <livewire:studio::editor-panel :page-slug="$page->slug" />
+            @if($devModeAvailable)
+                @include('studio::partials.section-code')
+            @endif
         </div>
         @if($devModeAvailable)
             <div x-data class="flex h-full min-h-0 flex-col" x-show="$store.studio.rightShown === 'assistant'" x-cloak>
@@ -1557,7 +1618,7 @@
     @endif
 
     {{-- ============================================================ --}}
-    {{-- Dev mode — section source editor                              --}}
+    {{-- Dev mode — Monaco's assets and the Code view's workspace      --}}
     {{-- ============================================================ --}}
     @if(\Designer\Studio\Support\DevMode::enabled())
     <script>
@@ -2263,228 +2324,5 @@
             });
         });
     </script>
-    <div
-            x-data="{
-                open: false,
-                ref: null,
-                title: '',
-                tab: 'html',
-                loading: false,
-                saving: false,
-                menu: false,
-                error: '',
-                paths: { html: '', yaml: '' },
-                editors: null,
-                _editorsPromise: null,
-                base: @js(url(trim(config('studio.path', 'studio'), '/') . '/api/dev/components')),
-
-                ensureEditors() {
-                    // Assigned synchronously so overlapping openEditor() calls
-                    // share one in-flight boot instead of double-creating
-                    // Monaco instances on the same hosts.
-                    if (!this._editorsPromise) {
-                        this._editorsPromise = (async () => {
-                            this.editors = {
-                                html: await window.Studio.codeEditor(this.$refs.htmlHost, { language: 'html' }),
-                                yaml: await window.Studio.codeEditor(this.$refs.yamlHost, { language: 'yaml' }),
-                            };
-                        })().catch((error) => {
-                            this._editorsPromise = null; // allow retry after a failed load
-                            throw error;
-                        });
-                    }
-                    return this._editorsPromise;
-                },
-
-                async openEditor(detail) {
-                    this.ref = detail.ref;
-                    this.title = detail.title || detail.ref;
-                    this.tab = 'html';
-                    this.error = '';
-                    this.open = true;
-                    this.loading = true;
-                    window.Studio.codeModalOpen = true;
-
-                    try {
-                        const response = await fetch(`${this.base}/${this.ref}`, { headers: { 'Accept': 'application/json' } });
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not load the source files.');
-                        await this.$nextTick();
-                        await this.ensureEditors();
-                        this.editors.html.setValue(data.html);
-                        this.editors.yaml.setValue(data.yaml);
-                        this.paths = data.paths;
-                    } catch (e) {
-                        this.error = e.message;
-                    }
-                    this.loading = false;
-                },
-
-                close() {
-                    this.open = false;
-                    this.menu = false;
-                    window.Studio.codeModalOpen = false;
-                },
-
-                // The Save button's menu: Save, or Save and close
-                toggleMenu(focusLast = false) {
-                    this.menu = !this.menu;
-                    if (this.menu) this.$nextTick(() => {
-                        const items = this.$refs.saveMenu.querySelectorAll('[role=menuitem]');
-                        items[focusLast ? items.length - 1 : 0]?.focus();
-                    });
-                },
-
-                closeMenu(refocus = false) {
-                    if (!this.menu) return;
-                    this.menu = false;
-                    if (refocus) this.$refs.saveMore.focus();
-                },
-
-                stepMenu(by) {
-                    const items = [...this.$refs.saveMenu.querySelectorAll('[role=menuitem]')];
-                    const at = items.indexOf(document.activeElement);
-                    items[(at + by + items.length) % items.length]?.focus();
-                },
-
-                // A failed save keeps the modal open, with the error in the footer
-                async save(andClose = false) {
-                    if (this.saving || this.loading || !this.ref || !this.editors) return;
-                    this.menu = false;
-                    this.saving = true;
-                    this.error = '';
-                    try {
-                        const response = await fetch(`${this.base}/${this.ref}`, {
-                            method: 'PUT',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                html: this.editors.html.getValue(),
-                                yaml: this.editors.yaml.getValue(),
-                            }),
-                        });
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok || !data.success) throw new Error(data.message || 'Could not save the source files.');
-                        window.Studio.toast('Section source saved — every section using it is updated');
-                        window.dispatchEvent(new CustomEvent('studio:files-changed', { detail: { paths: Object.values(this.paths) } }));
-                        // EditorPanel re-syncs, then reloads the canvas
-                        window.Livewire?.dispatch('studio:code-saved');
-                        if (andClose) this.close();
-                    } catch (e) {
-                        this.error = e.message;
-                    }
-                    this.saving = false;
-                }
-            }"
-            @studio:open-code-editor.window="openEditor($event.detail)"
-            @keydown.escape.window="menu ? closeMenu(true) : close()"
-            @keydown.window="if (open && ($event.metaKey || $event.ctrlKey) && ($event.key === 's' || $event.key === 'S')) { $event.preventDefault(); save($event.shiftKey); }"
-            x-show="open"
-            x-cloak
-            class="fixed inset-0 z-[90] flex items-center justify-center p-4 lg:p-8"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit section source code"
-        >
-            <div class="s-modal-backdrop" x-show="open" x-transition.opacity.duration.200ms @click="close()"></div>
-
-            <div
-                x-show="open"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 scale-[0.97] translate-y-2"
-                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0 scale-[0.98]"
-                class="s-modal flex h-[720px] max-h-[90vh] w-[1080px] max-w-full flex-col overflow-hidden"
-            >
-                {{-- Header --}}
-                <div class="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
-                    <div class="min-w-0">
-                        <h2 class="truncate text-[15px] font-semibold text-ink" x-text="title"></h2>
-                        <p class="truncate font-mono text-[11px] text-faint" x-text="tab === 'html' ? paths.html : paths.yaml"></p>
-                    </div>
-
-                    <div class="s-seg ml-auto">
-                        <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'html' && 'is-active'" @click="tab = 'html'">Blade</button>
-                        <button class="s-seg-btn !w-14 text-[11.5px] font-medium" :class="tab === 'yaml' && 'is-active'" @click="tab = 'yaml'">YAML</button>
-                    </div>
-
-                    <button @click="close()" class="s-icon-btn" title="Close (Esc)">
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
-                    </button>
-                </div>
-
-                {{-- Editors --}}
-                <div class="relative min-h-0 flex-1">
-                    <div x-show="loading" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-panel/70">
-                        <svg class="h-5 w-5 animate-spin text-soft" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1.5A10.5 10.5 0 0 0 1.5 12H4Z"/></svg>
-                    </div>
-                    <div x-ref="htmlHost" x-show="tab === 'html'" class="s-code-pane h-full"></div>
-                    <div x-ref="yamlHost" x-show="tab === 'yaml'" class="s-code-pane h-full"></div>
-                </div>
-
-                {{-- Footer --}}
-                <div class="relative z-[60] flex shrink-0 items-center gap-3 border-t border-line px-4 py-2.5">
-                    <p class="min-w-0 flex-1 truncate text-[11.5px] text-faint">
-                        <span x-show="!error">Sections must stay inside the supported Blade subset — see <span class="font-mono">docs/authoring-sections.md</span>. Saving updates every page using this section.</span>
-                        <span x-show="error" x-cloak class="text-danger" x-text="error"></span>
-                    </p>
-                    <button @click="close()" class="s-btn-ghost">Cancel</button>
-                    {{-- Save is the button; the chevron beside it opens the
-                         other way to save. The menu rises from the footer. --}}
-                    <div class="s-split" @click.outside="closeMenu()">
-                        <button @click="save()" :disabled="saving || loading" class="s-btn-accent s-split-main">
-                            <span x-show="!saving">Save</span>
-                            <span x-show="saving" x-cloak>Saving…</span>
-                            <span class="s-kbd">⌘S</span>
-                        </button>
-                        <button
-                            x-ref="saveMore"
-                            @click="toggleMenu()"
-                            @keydown.down.prevent="menu || toggleMenu()"
-                            @keydown.up.prevent="menu || toggleMenu(true)"
-                            :disabled="saving || loading"
-                            :aria-expanded="menu ? 'true' : 'false'"
-                            aria-haspopup="menu"
-                            aria-label="More ways to save"
-                            class="s-btn-accent s-split-more"
-                        >
-                            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4.5 6.25 3.5 3.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </button>
-
-                        <div
-                            x-ref="saveMenu"
-                            x-show="menu"
-                            x-cloak
-                            x-transition:enter="transition duration-150 ease-[cubic-bezier(.21,1.02,.47,1)]"
-                            x-transition:enter-start="translate-y-1 scale-[0.97] opacity-0"
-                            x-transition:enter-end="translate-y-0 scale-100 opacity-100"
-                            x-transition:leave="transition duration-100 ease-in"
-                            x-transition:leave-start="opacity-100"
-                            x-transition:leave-end="opacity-0"
-                            @keydown.down.prevent.stop="stepMenu(1)"
-                            @keydown.up.prevent.stop="stepMenu(-1)"
-                            @keydown.tab.prevent="closeMenu(true)"
-                            role="menu"
-                            aria-label="Save"
-                            class="s-pop s-split-menu"
-                        >
-                            <button role="menuitem" class="s-menu-item" @click="save()">
-                                <span class="flex-1">Save</span>
-                                <span class="s-kbd">⌘S</span>
-                            </button>
-                            <button role="menuitem" class="s-menu-item" @click="save(true)">
-                                <span class="flex-1">Save and close</span>
-                                <span class="s-kbd">⇧⌘S</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-    </div>
     @endif
 </x-studio::layouts.app>

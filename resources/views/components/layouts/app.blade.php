@@ -204,9 +204,41 @@
                          closing is one width transition. A light surface,
                          except beside the Code view, where it follows the
                          editor's theme. --}}
+                    {{-- The right column's resize seam lies in the gutter
+                         between the stage and the column, not on the
+                         column's own edge: a zero-width item whose grab
+                         strip is exactly the gutter. --}}
+                    <div
+                        class="s-gutter-seam"
+                        x-show="$store.studio.rightPanel"
+                        x-cloak
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label="Resize the column"
+                        @mousedown.prevent="
+                            const aside = $el.nextElementSibling;
+                            const shield = document.createElement('div');
+                            shield.className = 's-drag-shield';
+                            document.body.appendChild(shield);
+                            $el.classList.add('is-dragging');
+                            const move = (event) => $store.studio.setRightWidth(aside.getBoundingClientRect().right - event.clientX);
+                            const stop = () => {
+                                shield.remove();
+                                $el.classList.remove('is-dragging');
+                                document.removeEventListener('mousemove', move);
+                                document.removeEventListener('mouseup', stop);
+                                window.removeEventListener('blur', stop);
+                                document.body.classList.remove('select-none');
+                            };
+                            document.body.classList.add('select-none');
+                            document.addEventListener('mousemove', move);
+                            document.addEventListener('mouseup', stop);
+                            window.addEventListener('blur', stop);
+                        "
+                    ></div>
                     <aside
                         class="s-inspector"
-                        :class="{ 'is-collapsed': !$store.studio.rightPanel, 's-light': $store.studio.view !== 'code' }"
+                        :class="{ 'is-collapsed': !$store.studio.rightPanel, 's-light': $store.studio.view !== 'code' && !$store.studio.codeWide }"
                         :style="{ width: ($store.studio.rightPanel ? $store.studio.rightWidth : 0) + 'px' }"
                         :aria-hidden="!$store.studio.rightPanel"
                         :inert="!$store.studio.rightPanel"
@@ -214,29 +246,6 @@
                         <div class="s-column-inner" :style="{ width: $store.studio.rightWidth + 'px', minWidth: $store.studio.rightWidth + 'px' }">
                             {{ $inspector }}
                         </div>
-                        <div
-                            class="s-panel-seam"
-                            role="separator"
-                            aria-label="Resize the column"
-                            @mousedown.prevent="
-                                const aside = $el.closest('aside');
-                                const shield = document.createElement('div');
-                                shield.className = 's-drag-shield';
-                                document.body.appendChild(shield);
-                                const move = (event) => $store.studio.setRightWidth(aside.getBoundingClientRect().right - event.clientX);
-                                const stop = () => {
-                                    shield.remove();
-                                    document.removeEventListener('mousemove', move);
-                                    document.removeEventListener('mouseup', stop);
-                                    window.removeEventListener('blur', stop);
-                                    document.body.classList.remove('select-none');
-                                };
-                                document.body.classList.add('select-none');
-                                document.addEventListener('mousemove', move);
-                                document.addEventListener('mouseup', stop);
-                                window.addEventListener('blur', stop);
-                            "
-                        ></div>
                     </aside>
                 </div>
             @else

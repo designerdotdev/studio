@@ -80,6 +80,18 @@ class SectionRenderer
     }
 
     /**
+     * Render source that is still being written — the inspector's code panel
+     * previewing its unsaved buffer. Unlike every other path, a failure is
+     * thrown: the caller keeps the last good render on the canvas and shows
+     * the message beside the code. The compiled view is not kept, since a
+     * buffer changes with every keystroke.
+     */
+    public function renderDraft(string $html, array $fields, array $variables): string
+    {
+        return NestedBlade::render($this->source($html, $fields, true), $this->context($variables), deleteCachedView: true);
+    }
+
+    /**
      * The source to compile. Canvas renders get inline-editing sentinels
      * woven in; every other path gets the section exactly as written.
      *
