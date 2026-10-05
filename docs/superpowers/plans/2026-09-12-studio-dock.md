@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the editor's topbar, activity bar and permanent sidebar with one floating, draggable dock; open panels as anchored popovers or centred sheets; open the inspector only from the section toolbar.
+**Goal:** Replace the editor's topbar, activity bar and permanent sidebar with one floating, draggable dock; open panels as anchored popovers or centered sheets; open the inspector only from the section toolbar.
 
 **Architecture:** The layout (`components/layouts/app.blade.php`) renders the canvas full-window, then a scrim, a floating `<aside class="s-float">` that holds the unchanged Livewire panels, and the dock partial. All shell state lives in the `studio` Alpine store in `home.blade.php`; `rail` (which panel) and `sidebar` (a panel is open) keep their meaning, `dock {edge, along}` replaces `activityBar`. The canvas iframe gains one new postMessage, `studio:open-inspector`, and stops opening the panel on selection.
 
@@ -515,7 +515,7 @@ Replace everything from `<div class="flex h-dvh flex-col">` to its closing `</di
 
                 {{-- The floating surface: every panel lives here, one visible
                      at a time. Anchored to its dock button (popover) or
-                     centred (sheet). --}}
+                     centered (sheet). --}}
                 <aside
                     class="s-float"
                     :class="$store.studio.frame === 'sheet' && 'is-sheet'"

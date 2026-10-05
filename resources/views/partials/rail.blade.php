@@ -11,8 +11,9 @@
     <button
         type="button"
         class="s-tb-btn s-tip is-right"
-        data-tip="Add section"
+        :data-tip="$store.studio.entry ? 'A collection page has no sections of its own' : 'Add section'"
         aria-label="Add section"
+        :disabled="!!$store.studio.entry"
         @click="$store.studio.closeDrawer(); window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} }))"
     >
         <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5.25v13.5M5.25 12h13.5"/></svg>

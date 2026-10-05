@@ -18,7 +18,7 @@
         // Structure and the fields drawers are developer surfaces: turning the switch off puts them away
         if (!$store.studio.developer && ($wire.tab === 'structure' || ['schema', 'create'].includes($wire.drawer))) { $wire.drawer = null; $wire.setTab('data') }
     "
-    @studio:open-collection.window="$wire.open($event.detail.name)"
+    @studio:open-collection.window="const row = $event.detail.row; $wire.open($event.detail.name).then(() => row && $wire.edit(row))"
 >
     @if($doc)
         {{-- ============================ Toolbar ============================ --}}

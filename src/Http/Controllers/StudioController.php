@@ -86,6 +86,15 @@ class StudioController extends Controller
             $page = $this->pages->find($defaultSlug);
         }
 
+        // A collection's own pages (/blog/{slug}) are listed under the page
+        // at their folder's address, and ?entry= puts one on the canvas
+        $dynamic = app(\Designer\Studio\Services\Site\DynamicPages::class);
+        $entry = is_string($request->query('entry')) ? $dynamic->find($request->query('entry')) : null;
+
+        if ($entry && $entry['group']['parent']) {
+            $page = $this->pages->find($entry['group']['parent']) ?? $page;
+        }
+
         if (!$page) {
             abort(404);
         }
@@ -96,6 +105,8 @@ class StudioController extends Controller
         return view('studio::home', [
             'page' => $page,
             'pages' => $pages,
+            'dynamicPages' => $dynamic->groups(),
+            'entry' => $entry,
             'library' => $this->components->grouped(),
             'blocks' => $blocks->all()->map(fn ($block) => [
                 'slug' => $block['slug'],
@@ -540,7 +551,9 @@ class StudioController extends Controller
             abort(404);
         }
 
-        $chrome = view('studio::partials.draft-preview')->render();
+        // On the editor's canvas the page is an entry being looked at: no
+        // badge, and its links are the editor's to follow
+        $chrome = view(request()->boolean('canvas') ? 'studio::partials.entry-canvas' : 'studio::partials.draft-preview')->render();
         $at = strripos($html, '</body>');
 
         return response($at === false ? $html . $chrome : substr_replace($html, $chrome, $at, 0))

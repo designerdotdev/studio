@@ -488,6 +488,56 @@ html.studio-light,
         display: flex;
     }
 
+    /* A page that has a collection's entries under it: the chevron unfolds them */
+    .s-page-row-fold {
+        @apply flex shrink-0 cursor-pointer items-center justify-center rounded text-faint;
+        width: 24px;
+        height: 24px;
+    }
+
+    .s-page-row-fold:hover {
+        @apply text-ink;
+        background: var(--color-wash-strong);
+    }
+
+    .s-page-row-fold svg {
+        transition: rotate 150ms ease;
+    }
+
+    .s-page-row-fold.is-open svg {
+        rotate: 90deg;
+    }
+
+    /* The entries: a rule down the left ties them to their page */
+    .s-page-children {
+        @apply relative flex flex-col;
+        margin: 1px 0 3px 17px;
+        padding-left: 7px;
+        border-left: 1px solid var(--color-line-strong);
+    }
+
+    .s-page-child {
+        @apply flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[12.5px];
+        min-height: 28px;
+        color: var(--color-soft);
+        transition: background-color 100ms ease, color 100ms ease;
+    }
+
+    .s-page-child:hover {
+        color: var(--color-ink);
+        background: var(--color-wash);
+    }
+
+    .s-page-child.is-current {
+        color: var(--color-ink);
+        background: var(--color-wash-strong);
+    }
+
+    .s-page-child-path {
+        @apply shrink-0 truncate font-mono text-[10.5px] text-faint;
+        max-width: 45%;
+    }
+
     .s-menu-item {
         @apply flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] transition-colors duration-100;
         min-height: 30px;
@@ -1270,6 +1320,78 @@ html.studio-light,
         color: #c4b5fd;
     }
 
+    /* A collection's page on the canvas: what it is, and where it is edited */
+    .s-entry-bar {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        translate: -50% 0;
+        z-index: 35;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        max-width: calc(100% - 32px);
+        height: 38px;
+        padding: 0 6px 0 14px;
+        border-radius: 999px;
+        background: rgba(16, 16, 18, 0.94);
+        color: #f0f0f0;
+        font-size: 12.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        backdrop-filter: blur(10px);
+        box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.12),
+            0 14px 36px -10px rgba(0, 0, 0, 0.6);
+    }
+
+    .s-entry-bar > span:not(.s-entry-bar-dot) {
+        margin-right: 6px;
+        color: #c9c9cc;
+    }
+
+    .s-entry-bar strong {
+        color: #fff;
+        font-weight: 600;
+    }
+
+    .s-entry-bar-dot {
+        flex: none;
+        width: 7px;
+        height: 7px;
+        margin-right: 4px;
+        border-radius: 999px;
+        background: #2dd4bf;
+    }
+
+    .s-entry-bar-btn {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        height: 26px;
+        padding: 0 11px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.09);
+        color: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 120ms ease;
+    }
+
+    .s-entry-bar-btn:hover {
+        background: rgba(255, 255, 255, 0.17);
+    }
+
+    .s-entry-bar-btn.is-primary {
+        background: #fff;
+        color: #101012;
+        font-weight: 600;
+    }
+
+    .s-entry-bar-btn.is-primary:hover {
+        background: #e4e4e7;
+    }
+
     /* The composer's pick button: a labelled pill, violet while armed */
     .s-pick-btn {
         @apply inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 text-soft;
@@ -1487,11 +1609,14 @@ html.studio-light,
         opacity: 1;
     }
 
-    .s-section-row.is-ghost {
+    /* (a Pages row is dragged by its wrapper, which holds its entries too) */
+    .s-section-row.is-ghost,
+    .is-ghost > .s-section-row {
         opacity: 0.35;
     }
 
-    .s-section-row.is-chosen {
+    .s-section-row.is-chosen,
+    .is-chosen > .s-section-row {
         @apply bg-raised;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--color-line-strong);
     }
@@ -2727,19 +2852,31 @@ html.studio-light .s-modal-backdrop {
 @layer components {
 
     /* The header's Fields ⇄ code toggle */
+    /* Fields ⇄ code: the code mark beside a switch that is plainly on or off */
     .s-code-toggle {
-        position: relative;
+        @apply relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md text-faint;
+        height: 26px;
+        padding: 0 5px;
+        transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .s-code-toggle:hover {
+        @apply bg-wash text-soft;
     }
 
     .s-code-toggle.is-active {
         color: var(--color-accent);
-        background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    }
+
+    .s-code-toggle:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
     }
 
     .s-code-toggle-dot {
         position: absolute;
-        top: 3px;
-        right: 3px;
+        top: 1px;
+        right: 1px;
         width: 6px;
         height: 6px;
         border-radius: 50%;

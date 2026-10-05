@@ -16,10 +16,30 @@
     // The top bar's "open in a new tab": the draft preview, or the live page
     $openUrl = $draftMode ? route('studio.preview.page', ['slug' => $page->slug]) : $liveUrl;
     $openLabel = $draftMode ? 'Open the draft preview in a new tab' : 'Open the live page in a new tab';
+
+    // A collection's own pages (blog/[posts.slug]): each entry opens in the
+    // editor at ?entry=<its address>, under the page at its folder's address
+    $entryPath = $entry['path'] ?? null;
+    $entryRows = fn (array $group) => array_map(fn ($e) => [
+        'title' => $e['title'],
+        'path' => $e['path'],
+        'url' => route('studio.index', ['page' => $group['parent'] ?? $page->slug, 'entry' => $e['path']]),
+        'current' => $e['path'] === $entryPath,
+    ], $group['entries']);
+    $childrenOf = collect($dynamicPages)->whereNotNull('parent')->keyBy('parent');
+
+    if ($entry) {
+        // The canvas holds the entry, so the new-tab link opens it too
+        $openUrl = $draftMode ? route('studio.preview.page', ['slug' => ltrim($entry['path'], '/')]) : url($entry['path']);
+    }
+
+    $canvasUrl = $entry
+        ? route('studio.preview.page', ['slug' => ltrim($entry['path'], '/'), 'canvas' => 1])
+        : route('studio.page.iframe', ['slug' => $page->slug]);
 @endphp
 
 <x-studio::layouts.app :open-url="$openUrl" :open-label="$openLabel">
-    <x-slot:title>{{ $page->title }} — Designer Studio</x-slot:title>
+    <x-slot:title>{{ $entry['title'] ?? $page->title }} — Designer Studio</x-slot:title>
 
     {{-- ============================================================ --}}
     {{-- The store, and the top bar's actions (Publish)               --}}
@@ -39,13 +59,35 @@
                 'path' => $p->slug === $homeSlug ? '' : $p->slug,
             ])->values());
             // The top bar's page switcher and the palette read this list
+            // — a page carries the collection entries served under it as
+            // `children`, and a collection with no page at its folder's
+            // address closes the list as a row of its own (`slug: null`)
             window.__studioPageList = @js($pages->map(fn ($p) => [
                 'slug' => $p->slug,
                 'title' => $p->title,
                 'path' => $p->slug === $homeSlug ? '/' : '/' . $p->slug,
                 'home' => $p->slug === $homeSlug,
-                'current' => $p->slug === $page->slug,
-            ])->values());
+                'current' => $p->slug === $page->slug && !$entry,
+                'children' => $childrenOf->has($p->slug) ? $entryRows($childrenOf[$p->slug]) : [],
+            ])->values()->concat(collect($dynamicPages)->whereNull('parent')->map(fn ($g) => [
+                'slug' => null,
+                'title' => $g['label'],
+                'path' => $g['path'],
+                'home' => false,
+                'current' => false,
+                'children' => $entryRows($g),
+            ])->values()));
+            // Every entry by its address, for a link followed on the canvas
+            window.__studioEntries = window.__studioPageList.flatMap((p) => p.children);
+            // The entry on the canvas, when the editor is showing one
+            window.__studioEntry = @js($entry ? [
+                'title' => $entry['title'],
+                'path' => $entry['path'],
+                'id' => $entry['id'],
+                'collection' => $entry['group']['name'],
+                'label' => $entry['group']['label'],
+                'parent' => $entry['group']['parent'] ? ['slug' => $page->slug, 'title' => $page->title] : null,
+            ] : null);
 
             document.addEventListener('alpine:init', () => {
                 const devModeAvailable = @js($devModeAvailable);
@@ -64,6 +106,9 @@
                    developer switch and whether the Assistant is open —
                    never where the chrome sits. */
                 Alpine.store('studio', {
+                    // One of a collection's pages on the canvas (?entry=):
+                    // looked at, not edited — its words live in Content
+                    entry: window.__studioEntry,
                     device: 'desktop',
                     widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
 
@@ -871,7 +916,7 @@
     {{-- ============================================================ --}}
     <x-slot:flyout>
         <div x-data data-drawer="pages" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'pages'">
-            <livewire:studio::pages-panel :page-slug="$page->slug" />
+            <livewire:studio::pages-panel :page-slug="$page->slug" :entry-path="$entryPath" />
         </div>
         <div x-data data-drawer="media" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'media'" x-cloak>
             <livewire:studio::media-panel />
@@ -909,13 +954,18 @@
             get commands() {
                 const studio = $store.studio;
                 const all = [
-                    { label: 'Add section…', hint: 'Insert', run: () => window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} })) },
+                    { label: 'Add section…', hint: 'Insert', when: !studio.entry, run: () => window.dispatchEvent(new CustomEvent('studio:open-library', { detail: {} })) },
                     { label: 'New page…', hint: 'Create', run: () => window.dispatchEvent(new CustomEvent('studio:open-create-page')) },
                     { label: 'New layout…', hint: 'Create', when: studio.developer, run: () => { studio.openPageSettings(); window.Livewire?.dispatch('studio:new-layout') } },
                     // One per page, minus the open one
-                    ...(window.__studioPageList || []).filter((p) => !p.current).map((p) => ({
+                    ...(window.__studioPageList || []).filter((p) => p.slug && !p.current).map((p) => ({
                         label: 'Go to ' + p.title, hint: p.path,
                         run: () => { studio.leaveContent(); window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(p.slug) },
+                    })),
+                    // …and one per collection entry
+                    ...(window.__studioEntries || []).filter((e) => !e.current).map((e) => ({
+                        label: 'Go to ' + e.title, hint: e.path,
+                        run: () => { studio.leaveContent(); window.location.href = e.url },
                     })),
                     { label: 'Page settings', hint: 'Page', run: () => studio.openPageSettings() },
                     { label: 'Design', hint: 'View', when: studio.view !== 'design', run: () => studio.setView('design') },
@@ -1192,6 +1242,26 @@
         </button>
     </div>
 
+    {{-- A collection's page on the canvas (?entry=): a bar at the foot of
+         the stage says what it is and where its words are edited — Content. --}}
+    @if($entry)
+        <div class="s-entry-bar" x-data x-show="$store.studio.view === 'design'" x-cloak role="status">
+            <span class="s-entry-bar-dot" aria-hidden="true"></span>
+            <span class="truncate">From the <strong x-text="$store.studio.entry.label"></strong> collection</span>
+            <button
+                type="button"
+                class="s-entry-bar-btn is-primary"
+                @click="$store.studio.setView('content'); window.dispatchEvent(new CustomEvent('studio:open-collection', { detail: { name: $store.studio.entry.collection, row: $store.studio.entry.id } }))"
+            >Edit entry</button>
+            <a
+                class="s-entry-bar-btn"
+                x-show="$store.studio.entry.parent"
+                :href="window.__studioEditorUrl + '?page=' + encodeURIComponent($store.studio.entry.parent?.slug)"
+                x-text="'Back to ' + $store.studio.entry.parent?.title"
+            ></a>
+        </div>
+    @endif
+
     {{-- The stage. Design is the canvas; Content is the collections (their
          list docked on the left, the table beside it); Code is the files,
          the editor and — with the split open — the canvas again. Each fills
@@ -1261,7 +1331,7 @@
                         <iframe
                             id="studio-canvas-frame"
                             class="w-full flex-1 border-0 bg-white"
-                            src="{{ route('studio.page.iframe', ['slug' => $page->slug]) }}"
+                            src="{{ $canvasUrl }}"
                             title="Page preview"
                         ></iframe>
                     </div>

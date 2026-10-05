@@ -8,7 +8,7 @@ editor shell only. No runtime, storage, publishing, template, or inline-editing 
 The website fills the editor window, exactly like the draft preview does. One dark, pill-shaped,
 draggable **dock** floats over it, bottom-centre by default. Everything the topbar, the activity
 bar and the permanent sidebar do today happens from the dock. Panels open as popovers anchored to
-their dock button, or as centred sheets for the two data screens. The inspector is no longer
+their dock button, or as centered sheets for the two data screens. The inspector is no longer
 opened by selecting a section; it opens from a new "Edit fields" button on the section toolbar.
 
 The Livewire panels are not rewritten. The `<aside>` that holds them becomes a floating surface,
@@ -72,11 +72,11 @@ rail). It has two frames, chosen by the active rail:
 
 **Popover**: 320px wide (380 for the Assistant), `max-height: min(70vh, available)`. Anchored to
 the active dock button: above the dock for a bottom edge, below for top, beside it for left /
-right, centred on the button and clamped 12px inside the window. Position is recomputed from
+right, centered on the button and clamped 12px inside the window. Position is recomputed from
 `getBoundingClientRect()` on rail change, dock move, window resize, and after the dock's
 placement transition ends. `s-float` is `fixed`, `z-30`, `bg-panel`, 14px radius, hairline + shadow.
 
-**Sheet** (`is-sheet`): centred, `width: min(1100px, 88vw)`, `height: 80vh`, with a scrim
+**Sheet** (`is-sheet`): centered, `width: min(1100px, 88vw)`, `height: 80vh`, with a scrim
 (`s-scrim`, `z-20`) that closes on click. The dock stays above the scrim.
 
 `sidebar` (panel open) now defaults to **closed** on first run (`studio.sidebar` unset → false);

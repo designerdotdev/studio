@@ -123,7 +123,7 @@ class TemplateChrome
      * Some templates hang the page's width and padding on `<body>`; others
      * wrap everything in a container inside it. Studio renders sections as
      * direct children of `<body>`, so the wrapper's classes are folded in —
-     * without them a centred, narrow template renders edge to edge.
+     * without them a centered, narrow template renders edge to edge.
      */
     protected function bodyClass(string $source, array $siteData): string
     {

@@ -59,7 +59,15 @@
             x-data="{
                 open: false,
                 pages: window.__studioPageList || [],
-                get current() { return this.pages.find((p) => p.current) || { title: 'Page', path: '/' } },
+                // Which pages have their entries unfolded, by path; the one
+                // holding the entry on the canvas starts open
+                unfolded: Object.fromEntries((window.__studioPageList || []).filter((p) => p.children.some((c) => c.current)).map((p) => [p.path, true])),
+                // Rows without entries keep the chevron's room, so the paths line up
+                nested: (window.__studioPageList || []).some((p) => p.children.length),
+                get current() { return $store.studio.entry || this.pages.find((p) => p.current) || { title: 'Page', path: '/' } },
+                // An entry's own part of its address: /blog/first-post → /first-post
+                tail(page, child) { return page.path !== '/' && child.path.startsWith(page.path + '/') ? child.path.slice(page.path.length) : child.path },
+                goEntry(child) { $store.studio.leaveContent(); window.location.href = child.url },
                 // Choosing a page asks for the page: Content gives the stage back
                 go(slug) { $store.studio.leaveContent(); window.location.href = window.__studioEditorUrl + '?page=' + encodeURIComponent(slug) },
             }"
@@ -92,12 +100,15 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 scale-[0.98]"
-                class="s-pop absolute left-0 top-full z-[88] mt-1.5 w-72"
+                class="s-pop absolute left-1/2 top-full z-[88] mt-1.5 w-80 origin-top -translate-x-1/2"
                 role="menu"
             >
-                <template x-for="p in pages" :key="p.slug">
+                <div class="max-h-[min(64vh,560px)] overflow-y-auto overscroll-contain">
+                <template x-for="p in pages" :key="p.path">
+                    <div>
                     <div class="s-page-row" :class="p.current && 'is-current'">
-                        <button type="button" class="s-page-row-main" role="menuitem" @click="open = false; if (!p.current) go(p.slug)">
+                        {{-- A collection with no page at its address has nothing to open: its row only unfolds --}}
+                        <button type="button" class="s-page-row-main" role="menuitem" @click="if (!p.slug) { unfolded[p.path] = !unfolded[p.path]; return } open = false; if (!p.current) go(p.slug)">
                             <svg x-show="p.current" class="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/></svg>
                             <span x-show="!p.current" class="w-3 shrink-0"></span>
                             <span class="min-w-0 flex-1 truncate" x-text="p.title"></span>
@@ -106,8 +117,33 @@
                         <button x-show="p.current" type="button" class="s-page-row-action" title="Page settings" aria-label="Page settings" @click.stop="open = false; $store.studio.openPageSettings()">
                             <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg>
                         </button>
+                        <span x-show="nested && !p.children.length" class="w-6 shrink-0"></span>
+                        <button
+                            x-show="p.children.length"
+                            type="button"
+                            class="s-page-row-fold"
+                            :class="unfolded[p.path] && 'is-open'"
+                            :title="(unfolded[p.path] ? 'Hide' : 'Show') + ' the ' + p.children.length + (p.children.length === 1 ? ' entry' : ' entries')"
+                            :aria-label="(unfolded[p.path] ? 'Hide' : 'Show') + ' the entries under ' + p.title"
+                            :aria-expanded="!!unfolded[p.path]"
+                            @click.stop="unfolded[p.path] = !unfolded[p.path]"
+                        >
+                            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L10.94 10 7.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>
+
+                    {{-- The collection's entries served under this page --}}
+                    <div class="s-page-children" x-show="p.children.length && unfolded[p.path]" x-collapse.duration.150ms>
+                        <template x-for="c in p.children" :key="c.path">
+                            <button type="button" class="s-page-child" :class="c.current && 'is-current'" role="menuitem" :title="c.path" @click="open = false; if (!c.current) goEntry(c)">
+                                <span class="min-w-0 flex-1 truncate" x-text="c.title"></span>
+                                <span class="s-page-child-path" x-text="tail(p, c)"></span>
+                            </button>
+                        </template>
+                    </div>
                     </div>
                 </template>
+                </div>
 
                 <div class="s-pop-divider"></div>
 

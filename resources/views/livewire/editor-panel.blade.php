@@ -56,18 +56,22 @@
                             window.dispatchEvent(new CustomEvent('studio:inspector-section', { detail: window.__studioInspectorSection }));
                         "
                     ></span>
+{{-- A switch, so it reads as on or off at a glance --}}
                     <button
+                        type="button"
                         x-data
                         x-show="$store.studio.developer"
                         x-cloak
                         @click="$store.studio.setInspectorCode(!$store.studio.inspectorCode)"
-                        class="s-icon-btn s-code-toggle"
+                        class="s-code-toggle"
                         :class="$store.studio.inspectorCode && 'is-active'"
-                        :aria-pressed="$store.studio.inspectorCode ? 'true' : 'false'"
-                        :title="$store.studio.inspectorCode ? 'Back to the fields' : 'Edit code — .blade.php + .yml'"
+                        role="switch"
+                        :aria-checked="$store.studio.inspectorCode ? 'true' : 'false'"
+                        :title="$store.studio.inspectorCode ? 'Code is on — back to the fields' : 'Edit code — .blade.php + .yml'"
                         aria-label="Edit this section's code"
                     >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+                        <span class="s-switch" :class="$store.studio.inspectorCode && 'is-on'" aria-hidden="true"></span>
                         <span class="s-code-toggle-dot" x-show="$store.studio.codeDirty" x-cloak title="Unsaved code"></span>
                     </button>
                 @endif

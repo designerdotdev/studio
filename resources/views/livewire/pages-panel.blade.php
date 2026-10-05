@@ -34,12 +34,15 @@
             wire:ignore.self
         >
             @forelse($this->rows as $row)
+                {{-- A page and, folded under it, the collection entries served at its
+                     address. The key carries the filter: a filtered list is a new set
+                     of rows, each unfolded where its entries are the match --}}
                 <div
-                    wire:key="page-{{ $row['slug'] }}"
+                    wire:key="page-{{ $row['slug'] }}-{{ md5($filter) }}"
                     data-section-id="{{ $row['slug'] }}"
-                    class="s-section-row group {{ $row['current'] ? 'is-active' : '' }}"
-                    x-data="{ menu: false }"
+                    x-data="{ menu: false, unfolded: @js($row['unfolded']) }"
                 >
+                <div class="s-section-row group {{ $row['current'] ? 'is-active' : '' }}">
                     {{-- Drag handle --}}
                     <span class="s-drag-handle s-page-handle group-hover:opacity-100" title="Drag to reorder">
                         <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm0 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm0 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm8-12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm0 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm0 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
@@ -69,6 +72,24 @@
                                     <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" role="img" aria-label="Home page"><path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd"/></svg>
                                 </span>
                             @endif
+                        </button>
+                    @endif
+
+                    {{-- Rows without entries keep the chevron's room, so the paths line up --}}
+                    @if(!$row['children'] && collect($this->rows)->contains(fn ($r) => $r['children'] !== []))
+                        <span class="w-6 shrink-0" aria-hidden="true"></span>
+                    @endif
+                    @if($row['children'])
+                        <button
+                            type="button"
+                            class="s-page-row-fold"
+                            :class="unfolded && 'is-open'"
+                            :title="(unfolded ? 'Hide' : 'Show') + ' the {{ count($row['children']) }} {{ count($row['children']) === 1 ? 'entry' : 'entries' }}'"
+                            aria-label="Entries under {{ $row['title'] }}"
+                            :aria-expanded="unfolded"
+                            @click.stop="unfolded = !unfolded"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L10.94 10 7.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
                         </button>
                     @endif
 
@@ -123,9 +144,32 @@
                         </div>
                     </div>
                 </div>
+
+                @if($row['children'])
+                    @include('studio::livewire.pages-panel-entries', ['children' => $row['children']])
+                @endif
+                </div>
             @empty
-                <p class="px-2 py-6 text-center text-xs text-faint">No pages match.</p>
+                @unless($this->groups)
+                    <p class="px-2 py-6 text-center text-xs text-faint">No pages match.</p>
+                @endunless
             @endforelse
         </div>
+
+        {{-- Collections whose pages sit where no page is: a row that only unfolds --}}
+        @foreach($this->groups as $group)
+            <div wire:key="group-{{ $group['path'] }}-{{ md5($filter) }}" class="mt-0.5" x-data="{ unfolded: @js($group['unfolded']) }">
+                <div class="s-section-row" @click="unfolded = !unfolded">
+                    <span class="s-drag-handle invisible" aria-hidden="true"><svg class="h-3.5 w-3.5" viewBox="0 0 20 20"></svg></span>
+                    <span class="min-w-0 flex-1 truncate text-[12.5px] text-ink/85">{{ $group['title'] }}</span>
+                    <span class="shrink-0 font-mono text-[10.5px] text-faint">{{ $group['path'] }}</span>
+                    <button type="button" class="s-page-row-fold" :class="unfolded && 'is-open'" aria-label="Entries in {{ $group['title'] }}" :aria-expanded="unfolded" @click.stop="unfolded = !unfolded">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L10.94 10 7.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                    </button>
+                </div>
+
+                @include('studio::livewire.pages-panel-entries', ['children' => $group['children']])
+            </div>
+        @endforeach
     </div>
 </div>

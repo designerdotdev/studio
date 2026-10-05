@@ -1048,7 +1048,7 @@
             .studio-section.is-block .studio-tb-btn.is-edit { background: #14b8a6; }
             .studio-section.is-block .studio-tb-btn.is-edit:hover { background: #0f9b8e; }
 
-            /* A short section (a nav bar) keeps its chrome on itself, centred
+            /* A short section (a nav bar) keeps its chrome on itself, centered
                on its own height — hung below, it sat on the next section and
                read as that section's. `is-short` + --studio-h are set from JS
                on hover. */

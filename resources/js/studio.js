@@ -502,11 +502,19 @@ const StudioEditor = {
         const match = pages.find((page) => page.path === slug);
 
         if (!match) {
+            // One of a collection's pages (/blog/{slug}) is shown on the canvas
+            const entry = (window.__studioEntries || []).find((e) => e.path === '/' + slug);
+
+            if (entry) {
+                window.location.href = entry.url;
+                return;
+            }
+
             window.open(path, '_blank', 'noopener');
             return;
         }
 
-        if (match.slug === window.__studioPageSlug) {
+        if (match.slug === window.__studioPageSlug && !window.__studioEntry) {
             // Already here — a link back to the current page just scrolls up
             try { this.iframe.contentWindow.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* ignore */ }
             return;
@@ -4249,6 +4257,26 @@ const StudioPreview = {
 
         window.addEventListener('scroll', () => this.closeMenu(), { passive: true });
         window.addEventListener('resize', () => this.closeMenu());
+
+        // A double click on a section's own content is Edit. Not on its
+        // chrome (the chip, the toolbar, an add pill), and not while a
+        // section is already being edited — there a double click belongs
+        // to the code panel's tree (StudioNodes).
+        document.addEventListener('dblclick', (event) => {
+            const state = document.documentElement.classList;
+
+            // …nor while the Assistant's pick tool owns the click
+            if (this.mode === 'preview' || state.contains('studio-focus') || state.contains('studio-element-select')) return;
+
+            const content = event.target.closest ? event.target.closest('[data-section-content]') : null;
+            const wrapper = content?.closest('[data-section]');
+
+            if (!wrapper) return;
+
+            // The word the second click selected is not what was meant
+            window.getSelection()?.removeAllRanges();
+            this.openInspector(wrapper.dataset.section);
+        });
 
         // The canvas scrolls via the iframe's own documentElement, and
         // scroll doesn't bubble — capture it at the document so a nested
