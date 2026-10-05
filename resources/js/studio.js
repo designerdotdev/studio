@@ -1,6 +1,7 @@
 import Sortable from 'sortablejs';
 import collapse from '@alpinejs/collapse';
 import sectionSource from './section-source.js';
+import theme from './theme.js';
 
 // Client-side Blade renderer (used by the preview iframe)
 
@@ -207,6 +208,8 @@ function toast(message, type = 'success', duration = 3200, action = null) {
 const StudioEditor = {
     iframe: null,
     selectedId: null,
+    // The section under the pointer on the canvas, as the canvas reports it
+    hoverId: null,
 
     init() {
         this.iframe = document.getElementById('studio-canvas-frame');
@@ -314,6 +317,10 @@ const StudioEditor = {
                 case 'studio:deselected':
                     this.selectedId = null;
                     window.Livewire?.dispatch('studio:deselect-section');
+                    break;
+
+                case 'studio:section-hover':
+                    this.hoverId = data.sectionId || null;
                     break;
 
                 case 'studio:selection-released':
@@ -624,12 +631,12 @@ const StudioEditor = {
             return;
         }
 
-        // Option+1/2/3 — canvas width (⌘1-3 belong to the browser's tabs;
-        // `code` because Option changes `key` on a Mac keyboard)
-        if (alt && !meta && /^Digit[123]$/.test(code)) {
+        // Option+0/1/2/3 — canvas width: fit, desktop, tablet, phone (⌘1-3
+        // belong to the browser's tabs; `code` because Option changes `key`
+        // on a Mac keyboard)
+        if (alt && !meta && /^Digit[0123]$/.test(code)) {
             preventDefault();
-            const studio = window.Alpine?.store('studio');
-            if (studio) studio.device = { Digit1: 'desktop', Digit2: 'tablet', Digit3: 'mobile' }[code];
+            window.Alpine?.store('studio')?.setDevice({ Digit0: 'fit', Digit1: 'desktop', Digit2: 'tablet', Digit3: 'mobile' }[code]);
             return;
         }
 
@@ -684,40 +691,47 @@ const StudioEditor = {
             return;
         }
 
-        if (!this.selectedId) return;
+        // The section the shortcuts act on: the selected one (the section
+        // being edited, or the one a menu was opened for), else the one
+        // under the pointer while the page is being edited
+        const store = window.Alpine?.store('studio');
+        const target = this.selectedId || (store?.view === 'design' ? this.hoverId : null);
 
-        // E — edit the selected section
+        if (!target) return;
+
+        // E — edit the section
         if (!meta && (key === 'e' || key === 'E')) {
             preventDefault();
-            window.Livewire?.dispatch('studio:select-section', { id: this.selectedId });
-            window.Alpine?.store('studio')?.openInspector?.(this.selectedId);
+            window.Livewire?.dispatch('studio:select-section', { id: target });
+            store?.openInspector?.(target);
             return;
         }
 
-        // A — ask the Assistant about the selected section
+        // A — ask the Assistant about the section
         if (!meta && (key === 'a' || key === 'A')) {
             preventDefault();
-            window.Alpine?.store('studio')?.askAi?.(this.selectedId);
+            store?.askAi?.(target);
             return;
         }
 
         if (meta && (key === 'd' || key === 'D')) {
             preventDefault();
-            window.Livewire?.dispatch('studio:section-action', { id: this.selectedId, action: 'duplicate' });
+            window.Livewire?.dispatch('studio:section-action', { id: target, action: 'duplicate' });
             return;
         }
 
-        // Cmd/Ctrl+↑/↓ — reorder the selected section
+        // Cmd/Ctrl+↑/↓ — reorder the section
         if (meta && (key === 'ArrowUp' || key === 'ArrowDown')) {
             preventDefault();
             window.Livewire?.dispatch('studio:section-action', {
-                id: this.selectedId,
+                id: target,
                 action: key === 'ArrowUp' ? 'move-up' : 'move-down',
             });
             return;
         }
 
-        if (key === 'Backspace' || key === 'Delete') {
+        // Deleting takes more than a resting pointer: only a selected section
+        if ((key === 'Backspace' || key === 'Delete') && this.selectedId) {
             preventDefault();
             // Undoable via the toast — no confirm needed
             window.Livewire?.dispatch('studio:section-action', { id: this.selectedId, action: 'delete' });
@@ -1434,6 +1448,14 @@ const StudioPreview = {
                 case 'studio:corners':
                     this.setCorners(data);
                     break;
+
+                case 'studio:zoom': {
+                    // How far the editor has scaled this document down; the
+                    // chrome counters it (never past twice its size)
+                    const scale = Math.min(1, Math.max(0.2, Number(data.scale) || 1));
+                    document.documentElement.style.setProperty('--studio-unzoom', String(Math.min(2, 1 / scale)));
+                    break;
+                }
 
                 case 'studio:context':
                     this.setContext(data);
@@ -2749,6 +2771,15 @@ const StudioPreview = {
         }
 
         this.selection = { tier: 'section', sectionId: hitSectionId, path: null, key: null, index: null };
+
+        // A click on a section is Edit — looking at the page and using it
+        // is what the Preview view is for. Inside the section already being
+        // edited a click only keeps it selected.
+        if (!document.documentElement.classList.contains('studio-focus')) {
+            this.openInspector(hitSectionId);
+            return;
+        }
+
         this.applySelection(hitSectionId, false);
         this.post('studio:section-selected', { sectionId: hitSectionId });
     },
@@ -2787,6 +2818,10 @@ const StudioPreview = {
     pointerLeft(sectionId) {
         const was = this.pointerSection;
         this.pointerSection = sectionId;
+
+        // The editor's shortcuts (E, A, ⌘D, ⌘↑↓) act on the section the
+        // pointer is on — a click no longer stops at selecting one
+        if (was !== sectionId) this.post('studio:section-hover', { sectionId: this.mode === 'preview' ? null : sectionId });
 
         if (was && was !== sectionId && was === this.selectedId) this.releaseSelection();
     },
@@ -4245,7 +4280,10 @@ const StudioPreview = {
             if (wrapper && document.documentElement.classList.contains('studio-focus') && !wrapper.classList.contains('is-editing')) return;
 
             if (wrapper) {
-                this.select(wrapper.dataset.section);
+                // Marked, not opened: the menu is about this section
+                this.collection.close();
+                this.applySelection(wrapper.dataset.section, false);
+                this.post('studio:section-selected', { sectionId: wrapper.dataset.section });
                 this.openMenu(event.clientX, event.clientY, this.sectionMenuItems(wrapper, event));
             } else {
                 this.openMenu(event.clientX, event.clientY, [
@@ -4257,26 +4295,6 @@ const StudioPreview = {
 
         window.addEventListener('scroll', () => this.closeMenu(), { passive: true });
         window.addEventListener('resize', () => this.closeMenu());
-
-        // A double click on a section's own content is Edit. Not on its
-        // chrome (the chip, the toolbar, an add pill), and not while a
-        // section is already being edited — there a double click belongs
-        // to the code panel's tree (StudioNodes).
-        document.addEventListener('dblclick', (event) => {
-            const state = document.documentElement.classList;
-
-            // …nor while the Assistant's pick tool owns the click
-            if (this.mode === 'preview' || state.contains('studio-focus') || state.contains('studio-element-select')) return;
-
-            const content = event.target.closest ? event.target.closest('[data-section-content]') : null;
-            const wrapper = content?.closest('[data-section]');
-
-            if (!wrapper) return;
-
-            // The word the second click selected is not what was meant
-            window.getSelection()?.removeAllRanges();
-            this.openInspector(wrapper.dataset.section);
-        });
 
         // The canvas scrolls via the iframe's own documentElement, and
         // scroll doesn't bubble — capture it at the document so a nested
@@ -5075,6 +5093,8 @@ window.Studio = {
     nodePicking: false,
     // Blade source ⇄ tree (the Elements tab; see section-source.js)
     sectionSource,
+    // The Theme panel's palettes, accents, corners, type — and what a choice comes to
+    theme,
     // The Assistant's pick tool is armed (the editor's banner sets this)
     picking: false,
 

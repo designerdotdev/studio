@@ -628,6 +628,13 @@ html.studio-light,
         padding: 0 4px 0 2px;
         gap: 2px;
         user-select: none;
+        transition: padding-left 200ms ease;
+    }
+
+    /* The 2px on the left lines the menu up with the rail's buttons. Where
+       there is no rail (every view but Edit) the menu sits on the stage's edge */
+    .s-topbar.is-flush {
+        padding-left: 0;
     }
 
     .s-topbar-group {
@@ -718,8 +725,54 @@ html.studio-light,
         pointer-events: none;
     }
 
-    /* The view switch — Design · Content · Code. One well on the frame; a
-       thumb slides under the view that is showing. */
+    /* The canvas's width: Fit, Desktop, Tablet, Phone — one small well, the
+       chosen one lifted; the zoom the page is shown at sits before it */
+    .s-devices {
+        display: flex;
+        align-items: center;
+        margin: 0 4px;
+        padding: 2px;
+        border-radius: 8px;
+        background: var(--color-wash);
+    }
+
+    .s-device {
+        @apply relative flex shrink-0 cursor-pointer items-center justify-center text-faint;
+        width: 28px;
+        height: 24px;
+        border-radius: 6px;
+        transition: color 140ms ease, background-color 140ms ease;
+    }
+
+    .s-device:hover {
+        @apply text-ink;
+    }
+
+    .s-device.is-active {
+        @apply text-ink;
+        background: var(--color-wash-strong);
+        box-shadow: inset 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+
+    html.studio-light .s-device.is-active {
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .s-device:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 1px;
+    }
+
+    .s-devices-zoom {
+        @apply font-mono text-faint;
+        padding: 0 6px 0 7px;
+        font-size: 10.5px;
+    }
+
+    /* The view switch — Preview · Edit · Content · Code. One well on the
+       frame; a thumb slides under the view that is showing, the only one
+       that carries its name. */
     .s-views {
         position: relative;
         display: flex;
@@ -752,10 +805,10 @@ html.studio-light,
     }
 
     .s-view {
-        @apply relative flex shrink-0 cursor-pointer items-center text-soft;
+        @apply relative flex shrink-0 cursor-pointer items-center justify-center text-soft;
         height: 24px;
         gap: 6px;
-        padding: 0 10px 0 8px;
+        padding: 0 8px;
         border-radius: 6px;
         font-size: 12.5px;
         font-weight: 500;
@@ -772,6 +825,11 @@ html.studio-light,
     .s-view:hover,
     .s-view.is-active {
         @apply text-ink;
+    }
+
+    /* The one that is showing carries its name */
+    .s-view.is-active {
+        padding: 0 10px 0 8px;
     }
 
     .s-view.is-active svg {
@@ -1318,6 +1376,199 @@ html.studio-light,
         background: rgba(255, 255, 255, 0.08);
         border-color: rgba(255, 255, 255, 0.16);
         color: #c4b5fd;
+    }
+
+    /* --- the Theme flyout -------------------------------------------- */
+
+    .s-theme-sec {
+        padding: 12px 12px 14px;
+        border-bottom: 1px solid var(--color-line);
+    }
+
+    .s-theme-sec h3 {
+        @apply flex items-baseline text-faint;
+        margin-bottom: 9px;
+        font-size: 10.5px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .s-theme-sec h3 span {
+        @apply text-soft;
+        margin-left: auto;
+        font-size: 11.5px;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+
+    /* Palette: every scheme as a tiny page — ground, a heading bar, a line of copy, an accent and a card */
+    .s-theme-palettes {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+    }
+
+    .s-theme-pal {
+        position: relative;
+        display: block;
+        width: 100%;
+        aspect-ratio: 5 / 4;
+        border-radius: 7px;
+        cursor: pointer;
+        overflow: hidden;
+        background: var(--p-bg);
+        box-shadow: inset 0 0 0 1px var(--color-line-strong);
+        transition: scale 180ms cubic-bezier(0.21, 1.02, 0.47, 1), box-shadow 180ms ease;
+    }
+
+    .s-theme-pal:hover {
+        scale: 1.06;
+    }
+
+    .s-theme-pal[aria-pressed="true"],
+    .s-theme-acc[aria-pressed="true"] {
+        box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 0 0 2px var(--color-frame), 0 0 0 3.5px var(--color-accent);
+    }
+
+    .s-theme-pal i {
+        position: absolute;
+        left: 14%;
+        display: block;
+        border-radius: 99px;
+    }
+
+    .s-theme-pal .h { top: 24%; width: 52%; height: 14%; background: var(--p-fg); }
+    .s-theme-pal .t { top: 48%; width: 68%; height: 7%; background: var(--p-fg); opacity: 0.32; }
+    .s-theme-pal .a { top: 66%; width: 22%; height: 15%; border-radius: 3px; background: var(--p-accent); }
+    .s-theme-pal .c { top: 66%; left: 42%; width: 22%; height: 15%; border-radius: 3px; background: var(--p-card); box-shadow: inset 0 0 0 1px var(--p-border); }
+
+    /* Accent: dots. The template's own is drawn as a ring */
+    .s-theme-accents {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .s-theme-acc {
+        position: relative;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        cursor: pointer;
+        background: var(--a);
+        box-shadow: inset 0 0 0 1px var(--color-line-strong);
+        transition: scale 180ms cubic-bezier(0.21, 1.02, 0.47, 1), box-shadow 180ms ease;
+    }
+
+    .s-theme-acc:hover {
+        scale: 1.12;
+    }
+
+    .s-theme-acc.is-own::after {
+        content: '';
+        position: absolute;
+        inset: 7px;
+        border-radius: 50%;
+        background: var(--color-frame);
+        opacity: 0.6;
+    }
+
+    /* Corners: one segmented row */
+    .s-theme-seg {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        gap: 2px;
+        padding: 2px;
+        border-radius: 8px;
+        background: var(--color-wash);
+    }
+
+    .s-theme-seg button {
+        @apply inline-flex cursor-pointer items-center justify-center text-soft;
+        gap: 5px;
+        height: 26px;
+        padding: 0 4px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        transition: color 150ms ease, background-color 150ms ease;
+    }
+
+    .s-theme-seg button:hover {
+        @apply text-ink;
+    }
+
+    .s-theme-seg button[aria-pressed="true"] {
+        @apply text-ink;
+        background: var(--color-wash-strong);
+        box-shadow: inset 0 0 0 1px var(--color-line), 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+
+    html.studio-light .s-theme-seg button[aria-pressed="true"] {
+        background: #ffffff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .s-theme-seg .corner {
+        flex: none;
+        width: 11px;
+        height: 11px;
+        border: 1.5px solid currentColor;
+        border-right: 0;
+        border-bottom: 0;
+        border-top-left-radius: var(--r);
+    }
+
+    /* Type: each pairing set in its own face */
+    .s-theme-types {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+    }
+
+    .s-theme-type {
+        @apply flex cursor-pointer flex-col items-start text-left text-ink;
+        gap: 1px;
+        min-width: 0;
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: var(--color-wash);
+        transition: background-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .s-theme-type:hover {
+        background: var(--color-wash-strong);
+    }
+
+    .s-theme-type[aria-pressed="true"] {
+        background: var(--color-wash-strong);
+        box-shadow: inset 0 0 0 1.5px var(--color-accent);
+    }
+
+    .s-theme-type .sample {
+        @apply max-w-full truncate;
+        font-size: 14.5px;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+    }
+
+    .s-theme-type .who {
+        @apply text-faint;
+        font-size: 10.5px;
+        line-height: 1.2;
+    }
+
+    .s-theme-foot {
+        @apply shrink-0 border-t border-line text-faint;
+        padding: 10px 12px 12px;
+        font-size: 11.5px;
+        line-height: 1.45;
+    }
+
+    .s-theme-foot code {
+        @apply font-mono text-soft;
+        font-size: 10.5px;
     }
 
     /* A collection's page on the canvas: what it is, and where it is edited */
@@ -2854,9 +3105,9 @@ html.studio-light .s-modal-backdrop {
     /* The header's Fields ⇄ code toggle */
     /* Fields ⇄ code: the code mark beside a switch that is plainly on or off */
     .s-code-toggle {
-        @apply relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md text-faint;
+        @apply relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full text-faint;
         height: 26px;
-        padding: 0 5px;
+        padding: 0 5px 0 8px;
         transition: background-color 120ms ease, color 120ms ease;
     }
 
@@ -2875,8 +3126,8 @@ html.studio-light .s-modal-backdrop {
 
     .s-code-toggle-dot {
         position: absolute;
-        top: 1px;
-        right: 1px;
+        top: 0;
+        right: 2px;
         width: 6px;
         height: 6px;
         border-radius: 50%;

@@ -554,10 +554,36 @@ class StudioController extends Controller
         // On the editor's canvas the page is an entry being looked at: no
         // badge, and its links are the editor's to follow
         $chrome = view(request()->boolean('canvas') ? 'studio::partials.entry-canvas' : 'studio::partials.draft-preview')->render();
+        // The drafted theme, which the page's own stylesheet does not carry yet
+        $theme = \Designer\Studio\Support\SiteTheme::head(app(\Designer\Studio\Services\Storage\SiteRepository::class)->theme());
+
+        if ($theme !== '' && ($head = stripos($html, '</head>')) !== false) {
+            $html = substr_replace($html, $theme . "\n", $head, 0);
+        }
+
         $at = strripos($html, '</body>');
 
         return response($at === false ? $html . $chrome : substr_replace($html, $chrome, $at, 0))
             ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    /**
+     * The Theme panel saves here: the choices and the variables they come
+     * to, into the (draft) site document. An empty theme takes it away.
+     */
+    public function theme()
+    {
+        return response()->json(['theme' => app(\Designer\Studio\Services\Storage\SiteRepository::class)->theme()]);
+    }
+
+    public function updateTheme(Request $request)
+    {
+        $site = app(\Designer\Studio\Services\Storage\SiteRepository::class);
+        $theme = \Designer\Studio\Support\SiteTheme::clean($request->input('theme'));
+
+        $site->setTheme($theme);
+
+        return response()->json(['theme' => $theme]);
     }
 
     public function publishStatus()

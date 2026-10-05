@@ -1,6 +1,6 @@
 {{-- The top bar: the editor's one piece of chrome above the stage. Left,
-     the brand mark (the menu) and the view switch — Design, Content, Code
-     (developer mode) — which decides what the stage holds. Centre, the page
+     the brand mark (the menu) and the view switch — Preview, Edit, Content,
+     Code (developer mode) — which decides what the stage holds. Centre, the page
      switcher (a dark dropdown). Right, the device button (one control
      cycling Desktop → Tablet → Phone), the Assistant (developer mode), the
      open-in-new-tab link and Publish. The `menu` and `actions` slots come
@@ -11,7 +11,7 @@
      split). The device button is quiet (`s-tb-quiet`) — it fades in while
      the pointer is on the bar, and stays in view off desktop, because it
      explains what the stage shows. --}}
-<header class="s-topbar" aria-label="Editor">
+<header class="s-topbar" :class="$store.studio.view !== 'design' && 'is-flush'" aria-label="Editor">
     <div class="s-topbar-group is-start">
         {{ $menu ?? '' }}
 
@@ -37,17 +37,23 @@
         >
             <span class="s-views-thumb" :class="ready && 'is-ready'" :style="{ width: thumb.w + 'px', transform: 'translateX(' + thumb.x + 'px)' }" aria-hidden="true"></span>
 
-            <button type="button" class="s-view" data-view="design" :class="$store.studio.view === 'design' && 'is-active'" :aria-pressed="$store.studio.view === 'design'" @click="$store.studio.setView('design')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18"/></svg>
-                Design
+            {{-- Only the view that is showing carries its name; the others are
+                 their icon, named by a tooltip --}}
+            <button type="button" class="s-view s-tip" data-view="preview" :class="$store.studio.view === 'preview' && 'is-active'" :data-tip="$store.studio.view === 'preview' ? '' : 'Preview — use the page'" aria-label="Preview" :aria-pressed="$store.studio.view === 'preview'" @click="$store.studio.setView('preview')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.75 5.6 3.75 9S14.5 18.4 12 21c-2.5-2.6-3.75-5.6-3.75-9S9.5 5.6 12 3Z"/></svg>
+                <span x-show="$store.studio.view === 'preview'" x-cloak>Preview</span>
             </button>
-            <button type="button" class="s-view" data-view="content" :class="$store.studio.view === 'content' && 'is-active'" :aria-pressed="$store.studio.view === 'content'" @click="$store.studio.setView('content')">
+            <button type="button" class="s-view s-tip" data-view="design" :class="$store.studio.view === 'design' && 'is-active'" :data-tip="$store.studio.view === 'design' ? '' : 'Edit — click a section to edit it'" aria-label="Edit" :aria-pressed="$store.studio.view === 'design'" @click="$store.studio.setView('design')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5 11.4 20l2.3-6.3L20 11.4 5.5 4.5Z"/></svg>
+                <span x-show="$store.studio.view === 'design'" x-cloak>Edit</span>
+            </button>
+            <button type="button" class="s-view s-tip" data-view="content" :class="$store.studio.view === 'content' && 'is-active'" :data-tip="$store.studio.view === 'content' ? '' : 'Content — the collections'" aria-label="Content" :aria-pressed="$store.studio.view === 'content'" @click="$store.studio.setView('content')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125S3.75 14.278 3.75 12"/></svg>
-                Content
+                <span x-show="$store.studio.view === 'content'" x-cloak>Content</span>
             </button>
-            <button type="button" class="s-view" data-view="code" x-show="$store.studio.codeAvailable" x-cloak :class="$store.studio.view === 'code' && 'is-active'" :aria-pressed="$store.studio.view === 'code'" @click="$store.studio.setView('code')">
+            <button type="button" class="s-view s-tip" data-view="code" x-show="$store.studio.codeAvailable" x-cloak :class="$store.studio.view === 'code' && 'is-active'" :data-tip="$store.studio.view === 'code' ? '' : 'Code — the site\'s files'" aria-label="Code" :aria-pressed="$store.studio.view === 'code'" @click="$store.studio.setView('code')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5"/></svg>
-                Code
+                <span x-show="$store.studio.view === 'code'" x-cloak>Code</span>
             </button>
         </nav>
     </div>
@@ -184,21 +190,25 @@
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
         </button>
 
-        {{-- One responsive button: a click cycles Desktop → Tablet → Phone.
-             The icon is the current device; the tooltip names the next one. --}}
-        <button
-            type="button"
-            class="s-tb-btn s-tb-quiet s-tip"
-            :class="$store.studio.device !== 'desktop' && 'is-accent'"
-            x-show="$store.studio.canvasVisible"
-            :data-tip="({ desktop: 'Desktop — switch to Tablet  ⌥2', tablet: 'Tablet · 768px — switch to Phone  ⌥3', mobile: 'Phone · 390px — switch to Desktop  ⌥1' })[$store.studio.device]"
-            :aria-label="'Preview size: ' + $store.studio.device"
-            @click="$store.studio.cycleDevice()"
-        >
-            <svg x-show="$store.studio.device === 'desktop'" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25"/></svg>
-            <svg x-show="$store.studio.device === 'tablet'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5h3m-6.75 2.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-15a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v15a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
-            <svg x-show="$store.studio.device === 'mobile'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3"/></svg>
-        </button>
+        {{-- The canvas's width: Fit (the stage as it is) or a device. A device
+             is a real width — the page is laid out at 1440, 768 or 390 and
+             shown scaled down where the stage is narrower; the percentage
+             beside the buttons says by how much. --}}
+        <div class="s-devices" x-show="$store.studio.canvasVisible" role="group" aria-label="Canvas width">
+            <span class="s-devices-zoom" x-show="$store.studio.device !== 'fit' && $store.studio.zoom < 0.995" x-cloak x-text="Math.round($store.studio.zoom * 100) + '%'" title="The page is shown smaller than life to fit"></span>
+            <button type="button" class="s-device s-tip" :class="$store.studio.device === 'fit' && 'is-active'" data-tip="Fit — the width there is  ⌥0" aria-label="Fit the window" :aria-pressed="$store.studio.device === 'fit'" @click="$store.studio.setDevice('fit')">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.75 12h16.5M7 8.5 3.5 12 7 15.5M17 8.5l3.5 3.5-3.5 3.5"/></svg>
+            </button>
+            <button type="button" class="s-device s-tip" :class="$store.studio.device === 'desktop' && 'is-active'" data-tip="Desktop · 1440px  ⌥1" aria-label="Desktop width" :aria-pressed="$store.studio.device === 'desktop'" @click="$store.studio.setDevice('desktop')">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25"/></svg>
+            </button>
+            <button type="button" class="s-device s-tip" :class="$store.studio.device === 'tablet' && 'is-active'" data-tip="Tablet · 768px  ⌥2" aria-label="Tablet width" :aria-pressed="$store.studio.device === 'tablet'" @click="$store.studio.setDevice('tablet')">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5h3m-6.75 2.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-15a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v15a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+            </button>
+            <button type="button" class="s-device s-tip" :class="$store.studio.device === 'mobile' && 'is-active'" data-tip="Phone · 390px  ⌥3" aria-label="Phone width" :aria-pressed="$store.studio.device === 'mobile'" @click="$store.studio.setDevice('mobile')">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3"/></svg>
+            </button>
+        </div>
 
         {{-- The Assistant — the right column, in any view (developer mode) --}}
         <button

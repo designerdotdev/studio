@@ -73,6 +73,7 @@ class SiteWriter
         $this->planBlocks($docs['blocks'] ?? [], $state, $writes, $deletes, $next);
         $this->planLayouts($docs['layouts'] ?? [], $state, $writes, $deletes, $next);
         $this->planPages($docs['pages'] ?? [], $docs['site'] ?? [], $state, $writes, $deletes, $next);
+        $this->planThemeFont($docs['site'] ?? null, $writes, $deletes);
 
         // Apply: deletions first (a page moving onto a freed URL), then
         // writes, each through a temp file so a reader never sees half.
@@ -861,6 +862,57 @@ class SiteWriter
         if ($current !== $data && !($current === null && $data === [])) {
             $writes[$path] = $data === [] ? "{}\n" : JsonDocument::update($text, $data);
         }
+
+        // The theme is one marked block in the site's stylesheet; a site
+        // that never had one is left byte for byte
+        $stylesheet = \Designer\Studio\Support\SiteTheme::stylesheet();
+
+        if (is_file($stylesheet)) {
+            $css = (string) file_get_contents($stylesheet);
+            $themed = \Designer\Studio\Support\SiteTheme::write($css, $site['theme'] ?? null);
+
+            if ($themed !== $css) {
+                $writes[SitePaths::relative($stylesheet)] = $themed;
+            }
+        } elseif (!empty($site['theme'])) {
+            $this->notes[] = 'The theme was not written: this site has no css/site.css.';
+        }
+    }
+
+    /**
+     * The theme's type pairing needs its font on the page, and a font is
+     * linked from the <head> — which the layouts own. Every layout file
+     * (as this flush is about to leave it) gets, loses or keeps the one
+     * marked <link>; a site with no pairing chosen is not touched.
+     */
+    protected function planThemeFont(?array $site, array &$writes, array $deletes): void
+    {
+        if ($site === null) {
+            return;
+        }
+
+        $files = array_map(
+            fn ($file) => SitePaths::relative($file),
+            glob(SitePaths::components(SitePaths::LAYOUTS . '/*.blade.php')) ?: []
+        );
+
+        foreach (array_unique([...$files, ...array_filter(array_keys($writes), fn ($path) => str_contains($path, '/' . SitePaths::LAYOUTS . '/'))]) as $relative) {
+            if (isset($deletes[$relative]) && !isset($writes[$relative])) {
+                continue;
+            }
+
+            $current = $writes[$relative] ?? (is_file(base_path($relative)) ? (string) file_get_contents(base_path($relative)) : null);
+
+            if ($current === null) {
+                continue;
+            }
+
+            $linked = \Designer\Studio\Support\SiteTheme::link($current, $site['theme'] ?? null);
+
+            if ($linked !== $current) {
+                $writes[$relative] = $linked;
+            }
+        }
     }
 
     /* ------------------------------------------------------------ */
@@ -874,6 +926,10 @@ class SiteWriter
 
         $manifest['template'] = $site['template'] ?? $manifest['template'];
         $manifest['home'] = $site['home_slug'] ?? $manifest['home'];
+
+        if (isset($docs['site'])) {
+            $manifest['theme'] = $site['theme'] ?? null;
+        }
 
         // Settings for a hand-written page (its SEO tags, say) belong to the
         // developer: kept for as long as the page file exists — the home

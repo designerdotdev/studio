@@ -159,7 +159,7 @@
                scrolls under it. Done, Esc or a click on the canvas around
                the card brings the page back. */
             html.studio-focus {
-                --studio-bar-h: 56px;
+                --studio-bar-h: calc(56px * var(--studio-unzoom, 1));
                 --studio-focus-gap: 32px;
             }
 
@@ -265,14 +265,14 @@
             html.studio-focus .studio-section.is-editing .studio-chip,
             html.studio-focus .studio-section.is-editing .studio-hidden-badge {
                 left: 16px;
-                top: calc((var(--studio-bar-h) - 24px) / 2);
+                top: 16px; /* centred in the 56px bar; `zoom` scales it with the chip */
                 opacity: 1;
                 transform: none;
             }
 
             html.studio-focus .studio-section.is-editing .studio-toolbar {
                 right: 12px;
-                top: calc((var(--studio-bar-h) - 32px) / 2);
+                top: 12px;
                 opacity: 1;
                 transform: none;
                 pointer-events: auto;
@@ -309,6 +309,16 @@
             }
 
             /* Name chip — a small dark pill with the scope as a dot */
+            /* A device width wider than the stage shows the canvas scaled down
+               (the editor says by how much: studio:zoom). The page shrinks; the
+               controls on it are held at their own size. */
+            .studio-chip,
+            .studio-hidden-badge,
+            .studio-toolbar,
+            .studio-insert {
+                zoom: var(--studio-unzoom, 1);
+            }
+
             .studio-chip {
                 position: absolute;
                 top: 10px;

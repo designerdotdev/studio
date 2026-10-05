@@ -34,6 +34,8 @@ class SiteChrome
         $parts = array_filter([
             $this->parts()['head_html'],
             $this->themeStyle(),
+            // The Theme panel's values, over the stylesheet's
+            SiteTheme::head($this->site->theme()),
             $this->scriptTags(),
         ]);
 

@@ -1,5 +1,5 @@
 {{-- The Design view's rail: the tools that act on the page, on the frame
-     beside it. Add section opens the library; Pages and Media open as a
+     beside it. Add section opens the library; Pages, Media and Theme open as a
      flyout over the canvas (the layout holds it) and close again — nothing
      is pushed aside. The page's settings and the palette sit at the foot. --}}
 <nav
@@ -43,6 +43,18 @@
         @click="$store.studio.toggleDrawer('media')"
     >
         <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
+    </button>
+
+    <button
+        type="button"
+        class="s-tb-btn s-tip is-right"
+        :class="$store.studio.drawer === 'theme' && 'is-active'"
+        :data-tip="$store.studio.drawer === 'theme' ? '' : 'Theme'"
+        aria-label="Theme"
+        :aria-expanded="$store.studio.drawer === 'theme'"
+        @click="$store.studio.toggleDrawer('theme')"
+    >
+        <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.25a8.75 8.75 0 1 0 0 17.5c1.1 0 1.75-.8 1.75-1.7 0-.45-.2-.85-.45-1.2-.25-.35-.45-.7-.45-1.15 0-.95.75-1.7 1.7-1.7h2.05a4.15 4.15 0 0 0 4.15-4.15C20.75 6.5 16.8 3.25 12 3.25Z"/><circle cx="7.75" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7.75" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="7.75" r="1" fill="currentColor" stroke="none"/></svg>
     </button>
 
     <span class="flex-1"></span>

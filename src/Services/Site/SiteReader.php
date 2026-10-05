@@ -705,6 +705,10 @@ class SiteReader
             'updated_at' => now()->toIso8601String(),
         ];
 
+        if (!empty($manifest['theme'])) {
+            $doc['theme'] = $manifest['theme'];
+        }
+
         return ['doc' => self::keepIfSame($doc, $previous), 'path' => SitePaths::relative($file)];
     }
 

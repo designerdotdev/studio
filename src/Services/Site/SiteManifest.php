@@ -55,6 +55,10 @@ final class SiteManifest
             }
         }
 
+        if (($manifest['theme'] ?? null) === null) {
+            unset($manifest['theme']);
+        }
+
         return json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
     }
 
@@ -66,6 +70,8 @@ final class SiteManifest
             'pages' => self::map($manifest['pages'] ?? []),
             'layouts' => self::map($manifest['layouts'] ?? []),
             'blocks' => self::map($manifest['blocks'] ?? []),
+            // The Theme panel's choices (Support\SiteTheme); absent until one is made
+            'theme' => is_array($manifest['theme'] ?? null) ? $manifest['theme'] : null,
         ];
     }
 

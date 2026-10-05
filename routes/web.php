@@ -104,6 +104,10 @@ Route::group([
         Route::get('/assistant/attachment/{name}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'attachment'])->where('name', '[a-f0-9]{40}\.[a-z]{3,4}')->name('api.assistant.attachment');
         Route::delete('/assistant/stream/{turn}', [\Designer\Studio\Http\Controllers\AssistantController::class, 'stop'])->where('turn', '[a-f0-9-]{36}')->name('api.assistant.stop');
 
+        // The Theme panel
+        Route::get('/theme', [StudioController::class, 'theme'])->name('api.theme.show');
+        Route::put('/theme', [StudioController::class, 'updateTheme'])->middleware('throttle:240,1')->name('api.theme');
+
         // Undo and redo
         Route::get('/history', [\Designer\Studio\Http\Controllers\HistoryController::class, 'state'])->name('api.history');
         Route::post('/history/undo', [\Designer\Studio\Http\Controllers\HistoryController::class, 'undo'])->middleware('throttle:120,1')->name('api.history.undo');

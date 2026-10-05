@@ -79,6 +79,8 @@
             ])->values()));
             // Every entry by its address, for a link followed on the canvas
             window.__studioEntries = window.__studioPageList.flatMap((p) => p.children);
+            // The site's theme as drafted — the Theme panel's four choices
+            window.__studioTheme = @js(collect(app(\Designer\Studio\Services\Storage\SiteRepository::class)->theme() ?? [])->only(['palette', 'accent', 'radius', 'type'])->all() ?: null);
             // The entry on the canvas, when the editor is showing one
             window.__studioEntry = @js($entry ? [
                 'title' => $entry['title'],
@@ -109,19 +111,29 @@
                     // One of a collection's pages on the canvas (?entry=):
                     // looked at, not edited — its words live in Content
                     entry: window.__studioEntry,
-                    device: 'desktop',
-                    widths: { desktop: '100%', tablet: '768px', mobile: '390px' },
+                    /* --- the canvas's width ------------------------------- */
+                    /* Fit fills the stage. A device is a real width: the page
+                       lays out at 1440, 768 or 390 whatever room there is,
+                       and is shown scaled down where the stage is narrower
+                       (`zoom`, set by the frame — 1 is actual size). */
+                    device: ['desktop', 'tablet', 'mobile'].includes(localStorage.getItem('studio.device')) ? localStorage.getItem('studio.device') : 'fit',
+                    deviceWidths: { desktop: 1440, tablet: 768, mobile: 390 },
+                    zoom: 1,
+                    setDevice(name) {
+                        this.device = this.deviceWidths[name] ? name : 'fit';
+                        localStorage.setItem('studio.device', this.device);
+                    },
 
                     /* --- the view ---------------------------------------- */
                     /* What the stage holds. Design is the page, always
                        editable — the only view a marketing team needs
                        besides Content. Code exists only where the server
                        gate AND the developer switch are on. */
-                    views: ['design', 'content', 'code'],
+                    views: ['preview', 'design', 'content', 'code'],
                     view: (() => {
                         const saved = localStorage.getItem('studio.view');
                         const developer = devModeAvailable && localStorage.getItem('studio.devmode') === '1';
-                        if (saved === 'content') return 'content';
+                        if (saved === 'content' || saved === 'preview') return saved;
                         if (saved === 'code' && developer) return 'code';
                         return 'design';
                     })(),
@@ -144,9 +156,9 @@
                         window.dispatchEvent(new CustomEvent('studio:view', { detail: { view: name } }));
                     },
                     // The canvas's and the code pane's word for it
-                    get mode() { return this.view === 'code' ? 'code' : 'edit' },
+                    get mode() { return { code: 'code', preview: 'preview' }[this.view] || 'edit' },
                     get codeAvailable() { return this.developer },
-                    get stage() { return { design: 'page', content: 'content', code: 'code' }[this.view] },
+                    get stage() { return { preview: 'page', design: 'page', content: 'content', code: 'code' }[this.view] },
                     // Something needs the page on the stage
                     leaveContent() { if (this.view === 'content') this.setView('design') },
                     // The collection the stage is showing; the Content
@@ -155,7 +167,7 @@
                     collection: null,
                     // Whether the canvas is on screen at all: Content takes
                     // its place, Code hides it unless the split is open.
-                    get canvasVisible() { return this.view === 'design' || (this.view === 'code' && this.codeSplit) },
+                    get canvasVisible() { return this.view === 'design' || this.view === 'preview' || (this.view === 'code' && this.codeSplit) },
 
                     // Code is full-width by default; the split brings the
                     // live preview back beside the editor.
@@ -196,7 +208,7 @@
                        button or the panel's close. Nothing is pushed aside.
                        Media is also the image picker, from any view
                        (Studio.mediaPick). */
-                    drawers: ['pages', 'media'],
+                    drawers: ['pages', 'media', 'theme'],
                     drawer: null,
                     // The one that was open last: ⌘B brings it back, and it
                     // is what stays drawn while the flyout slides away
@@ -221,9 +233,12 @@
                     drawerWidths: {
                         pages: clamp(parseInt(localStorage.getItem('studio.panel-width'), 10), 260, 520, 300),
                         media: clamp(parseInt(localStorage.getItem('studio.panel-width-wide'), 10), 300, 640, 420),
+                        theme: 340,
                     },
                     get drawerWidth() { return this.drawerWidths[this.drawerShown] },
                     setDrawerWidth(px) {
+                        // Theme is a fixed sheet of swatches: nothing to gain from a wider one
+                        if (this.drawerShown === 'theme') return;
                         const media = this.drawerShown === 'media';
                         this.drawerWidths[this.drawerShown] = Math.round(Math.min(media ? 640 : 520, Math.max(media ? 300 : 260, px)));
                         localStorage.setItem(media ? 'studio.panel-width-wide' : 'studio.panel-width', String(this.drawerWidths[this.drawerShown]));
@@ -463,11 +478,6 @@
                         if (data.files?.length) window.dispatchEvent(new CustomEvent('studio:files-changed', { detail: { paths: data.files } }));
                         window.dispatchEvent(new CustomEvent('studio:status', { detail: { state: 'saved' } }));
                         window.Studio.toast({ title: direction === 'undo' ? 'Undone' : 'Redone', description: data.label }, 'info', 2200);
-                    },
-
-                    // The top bar's one responsive button steps Desktop → Tablet → Phone
-                    cycleDevice() {
-                        this.device = { desktop: 'tablet', tablet: 'mobile', mobile: 'desktop' }[this.device] || 'desktop';
                     },
 
                     /* --- appearance -------------------------------------- */
@@ -918,6 +928,9 @@
         <div x-data data-drawer="pages" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'pages'">
             <livewire:studio::pages-panel :page-slug="$page->slug" :entry-path="$entryPath" />
         </div>
+        <div x-data data-drawer="theme" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'theme'" x-cloak>
+            @include('studio::partials.theme-panel')
+        </div>
         <div x-data data-drawer="media" class="flex min-h-0 flex-1 flex-col" x-show="$store.studio.drawerShown === 'media'" x-cloak>
             <livewire:studio::media-panel />
         </div>
@@ -968,7 +981,8 @@
                         run: () => { studio.leaveContent(); window.location.href = e.url },
                     })),
                     { label: 'Page settings', hint: 'Page', run: () => studio.openPageSettings() },
-                    { label: 'Design', hint: 'View', when: studio.view !== 'design', run: () => studio.setView('design') },
+                    { label: 'Preview', hint: 'View', when: studio.view !== 'preview', run: () => studio.setView('preview') },
+                    { label: 'Edit', hint: 'View', when: studio.view !== 'design', run: () => studio.setView('design') },
                     { label: 'Content', hint: 'View', when: studio.view !== 'content', run: () => studio.setView('content') },
                     { label: 'Code', hint: 'View', when: studio.codeAvailable && studio.view !== 'code', run: () => studio.setView('code') },
                     { label: studio.codeSplit ? 'Hide the preview split' : 'Show the preview beside the code', hint: 'Code', when: studio.view === 'code', run: () => studio.toggleCodeSplit() },
@@ -980,13 +994,15 @@
                     { label: studio.history.redo ? 'Redo — ' + studio.history.redo : 'Redo', hint: '⇧⌘Z', when: !!studio.history.redo, run: () => studio.redo() },
                     { label: 'Assistant', hint: '⌘J', when: studio.chatAvailable, run: () => studio.focusChat() },
                     { label: 'Pages', hint: 'Panel', run: () => { studio.setView('design'); studio.openDrawer('pages') } },
+                    { label: 'Theme — palette, accent, corners, type', hint: 'Panel', run: () => { studio.setView('design'); studio.openDrawer('theme') } },
                     { label: 'Media', hint: 'Panel', run: () => studio.openDrawer('media') },
                     { label: 'Refresh the preview', hint: 'Canvas', run: () => window.dispatchEvent(new CustomEvent('studio:refresh-preview')) },
                     { label: 'Open in a new tab', hint: 'Canvas', run: () => window.open(@js($openUrl), '_blank', 'noopener') },
                     { label: 'View live site', hint: 'Site', run: () => window.open(@js($liveUrl ?? url('/')), '_blank', 'noopener') },
-                    { label: 'Desktop width', hint: '⌥1', when: studio.device !== 'desktop', run: () => studio.device = 'desktop' },
-                    { label: 'Tablet width', hint: '⌥2', when: studio.device !== 'tablet', run: () => studio.device = 'tablet' },
-                    { label: 'Mobile width', hint: '⌥3', when: studio.device !== 'mobile', run: () => studio.device = 'mobile' },
+                    { label: 'Fit the canvas to the window', hint: '⌥0', when: studio.device !== 'fit', run: () => studio.setDevice('fit') },
+                    { label: 'Desktop width — 1440', hint: '⌥1', when: studio.device !== 'desktop', run: () => studio.setDevice('desktop') },
+                    { label: 'Tablet width — 768', hint: '⌥2', when: studio.device !== 'tablet', run: () => studio.setDevice('tablet') },
+                    { label: 'Phone width — 390', hint: '⌥3', when: studio.device !== 'mobile', run: () => studio.setDevice('mobile') },
                     { label: studio.theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance', hint: 'Appearance', run: () => studio.toggleTheme() },
                     @if($devModeAvailable)
                     { label: studio.devMode ? 'Turn developer mode off' : 'Turn developer mode on', hint: 'Editor', run: () => studio.toggleDevMode() },
@@ -1245,7 +1261,7 @@
     {{-- A collection's page on the canvas (?entry=): a bar at the foot of
          the stage says what it is and where its words are edited — Content. --}}
     @if($entry)
-        <div class="s-entry-bar" x-data x-show="$store.studio.view === 'design'" x-cloak role="status">
+        <div class="s-entry-bar" x-data x-show="$store.studio.stage === 'page'" x-cloak role="status">
             <span class="s-entry-bar-dot" aria-hidden="true"></span>
             <span class="truncate">From the <strong x-text="$store.studio.entry.label"></strong> collection</span>
             <button
@@ -1322,16 +1338,39 @@
 
             <div class="min-w-0 flex-1 overflow-auto" x-show="$store.studio.canvasVisible">
                 <div class="flex h-full flex-col">
+                    {{-- The frame. Fit: the whole stage. A device: the page at
+                         that width, scaled down to the room there is — the
+                         iframe keeps its real size and is transformed, so the
+                         page's breakpoints are the device's, not the stage's. --}}
                     <div
-                        class="s-frame mx-auto w-full transition-[max-width] duration-300 ease-out"
-                        :class="$store.studio.device !== 'desktop' && 'is-narrow'"
-                        :style="`max-width: ${$store.studio.widths[$store.studio.device]}`"
+                        class="s-frame mx-auto"
+                        x-data="{
+                            room: { w: 0, h: 0 },
+                            get width() { return $store.studio.deviceWidths[$store.studio.device] || 0 },
+                            get scale() { return this.width && this.room.w ? Math.min(1, this.room.w / this.width) : 1 },
+                            get frameStyle() { return this.width ? `width: ${Math.round(this.width * this.scale)}px` : 'width: 100%' },
+                            get pageStyle() {
+                                return this.width
+                                    ? `flex: none; width: ${this.width}px; height: ${Math.ceil(this.room.h / this.scale)}px; transform: scale(${this.scale}); transform-origin: 0 0`
+                                    : '';
+                            },
+                            tell() {
+                                $store.studio.zoom = this.scale;
+                                window.dispatchEvent(new CustomEvent('studio:to-iframe', { detail: { type: 'studio:zoom', scale: this.scale } }));
+                            },
+                        }"
+                        x-init="new ResizeObserver(([entry]) => room = { w: entry.contentRect.width, h: entry.contentRect.height }).observe($el.parentElement)"
+                        x-effect="scale; tell()"
+                        @studio:canvas-loaded.window="tell()"
+                        :class="width && Math.round(width * scale) < room.w && 'is-narrow'"
+                        :style="frameStyle"
                     >
                         {{-- Live preview --}}
                         <iframe
                             id="studio-canvas-frame"
                             class="w-full flex-1 border-0 bg-white"
                             src="{{ $canvasUrl }}"
+                            :style="pageStyle"
                             title="Page preview"
                         ></iframe>
                     </div>

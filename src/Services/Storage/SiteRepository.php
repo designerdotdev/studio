@@ -62,6 +62,28 @@ class SiteRepository
         return $this->save(['data' => $data]);
     }
 
+    /** The Theme panel's choices and what they come to (Support\SiteTheme), or null. */
+    public function theme(): ?array
+    {
+        $theme = $this->get()['theme'] ?? null;
+
+        return is_array($theme) && !empty($theme['vars']) ? $theme : null;
+    }
+
+    /** Set the theme; null takes the key away, so an unthemed site reads as it always did. */
+    public function setTheme(?array $theme): void
+    {
+        $doc = $this->get();
+
+        if ($theme === null) {
+            unset($doc['theme']);
+        } else {
+            $doc['theme'] = $theme;
+        }
+
+        $this->storage->write(self::PATH, ['updated_at' => now()->toIso8601String()] + $doc);
+    }
+
     /** Slug of the template this site was installed from, if any. */
     public function template(): ?string
     {

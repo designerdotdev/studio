@@ -167,7 +167,7 @@
                                 x-transition:leave-start="translate-x-0 opacity-100"
                                 x-transition:leave-end="-translate-x-2 opacity-0"
                                 :style="{ width: $store.studio.drawerWidth + 'px' }"
-                                :aria-label="$store.studio.drawerShown === 'media' ? 'Media' : 'Pages'"
+                                :aria-label="({ media: 'Media', theme: 'Theme' })[$store.studio.drawerShown] || 'Pages'"
                             >
                                 {{ $flyout }}
 
